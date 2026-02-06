@@ -162,7 +162,6 @@ CF_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
 # Admin emailovi (spusti na lower-case!)
 ADMIN_EMAILS = {
     "bozicorama@gmail.com",
-    "meneghetti.garden@gmail.com"
 }
 
 
