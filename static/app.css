@@ -1609,3 +1609,222 @@ body{
   border-radius: 16px;
   padding-right: 42px; /* room for icon overlay */
 }
+
+/* =========================================================
+   STEP 6 — Sidebar + Active state + Badge styling
+   Paste at END of app.css
+   ========================================================= */
+
+/* --- Theme-ish tokens (safe defaults) --- */
+:root{
+  --tm-bg: #0f1411;
+  --tm-panel: #121a16;
+  --tm-panel-2: #16211c;
+
+  --tm-text: #e7efe9;
+  --tm-muted: rgba(231,239,233,.70);
+
+  /* maslinasto naglasak (ne preagresivno) */
+  --tm-accent: #8aa65a;        /* olive */
+  --tm-accent-2: #a6c36e;      /* lighter olive */
+  --tm-border: rgba(231,239,233,.10);
+  --tm-border-2: rgba(231,239,233,.14);
+
+  --tm-shadow: 0 10px 30px rgba(0,0,0,.35);
+  --tm-radius: 14px;
+}
+
+/* --- Sidebar container (works with .sidebar OR aside.sidebar) --- */
+.sidebar,
+aside.sidebar{
+  background: linear-gradient(180deg, var(--tm-panel), var(--tm-panel-2));
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius);
+  box-shadow: var(--tm-shadow);
+  overflow: hidden;
+}
+
+/* spacing inside sidebar */
+.sidebar .sidebar-inner,
+.sidebar .nav,
+.sidebar nav{
+  padding: 12px;
+}
+
+/* --- Nav links in sidebar (works with .nav-link OR a links) --- */
+.sidebar a,
+.sidebar .nav-link{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 12px;
+  border-radius: 12px;
+
+  color: var(--tm-muted);
+  text-decoration: none;
+
+  border: 1px solid transparent;
+  transition: background .15s ease, border-color .15s ease, transform .05s ease, color .15s ease;
+}
+
+/* icon size (for real icons, not emoji) */
+.sidebar a i,
+.sidebar .nav-link i,
+.sidebar a svg,
+.sidebar .nav-link svg{
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  opacity: .92;
+}
+
+/* hover */
+.sidebar a:hover,
+.sidebar .nav-link:hover{
+  background: rgba(255,255,255,.04);
+  border-color: var(--tm-border);
+  color: var(--tm-text);
+}
+
+/* active state:
+   - supports: .active on link, aria-current="page", or .is-active */
+.sidebar a.active,
+.sidebar a.is-active,
+.sidebar a[aria-current="page"],
+.sidebar .nav-link.active,
+.sidebar .nav-link.is-active,
+.sidebar .nav-link[aria-current="page"]{
+  background: rgba(138,166,90,.10);
+  border-color: rgba(138,166,90,.30);
+  color: var(--tm-text);
+  position: relative;
+}
+
+/* left indicator bar for active */
+.sidebar a.active::before,
+.sidebar a.is-active::before,
+.sidebar a[aria-current="page"]::before,
+.sidebar .nav-link.active::before,
+.sidebar .nav-link.is-active::before,
+.sidebar .nav-link[aria-current="page"]::before{
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--tm-accent-2), var(--tm-accent));
+}
+
+/* push content a bit so indicator doesn't overlap */
+.sidebar a.active,
+.sidebar a.is-active,
+.sidebar a[aria-current="page"],
+.sidebar .nav-link.active,
+.sidebar .nav-link.is-active,
+.sidebar .nav-link[aria-current="page"]{
+  padding-left: 18px;
+}
+
+/* subtle "pressed" */
+.sidebar a:active,
+.sidebar .nav-link:active{
+  transform: translateY(1px);
+}
+
+/* section title inside sidebar (optional helper) */
+.sidebar .sidebar-title,
+.sidebar .nav-title{
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(231,239,233,.55);
+  margin: 10px 12px 6px;
+}
+
+/* --- Badge styling (works with .badge OR .pill OR .tm-badge) --- */
+.badge,
+.pill,
+.tm-badge{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+
+  border: 1px solid var(--tm-border-2);
+  background: rgba(255,255,255,.04);
+  color: var(--tm-text);
+}
+
+/* badge sizes (optional) */
+.badge.sm, .tm-badge.sm{ padding: 3px 8px; font-size: 11px; }
+.badge.lg, .tm-badge.lg{ padding: 6px 12px; font-size: 13px; }
+
+/* status colors:
+   supports: .status-open/.status-done/.status-overdue OR .open/.done/.overdue */
+.badge.status-open, .badge.open,
+.tm-badge.status-open, .tm-badge.open{
+  background: rgba(138,166,90,.12);
+  border-color: rgba(138,166,90,.35);
+  color: var(--tm-text);
+}
+
+.badge.status-done, .badge.done,
+.tm-badge.status-done, .tm-badge.done{
+  background: rgba(65, 185, 120, .12);
+  border-color: rgba(65, 185, 120, .35);
+  color: var(--tm-text);
+}
+
+.badge.status-overdue, .badge.overdue,
+.tm-badge.status-overdue, .tm-badge.overdue{
+  background: rgba(235, 87, 87, .12);
+  border-color: rgba(235, 87, 87, .35);
+  color: var(--tm-text);
+}
+
+/* badge inside sidebar link aligned to the right */
+.sidebar a .badge,
+.sidebar .nav-link .badge,
+.sidebar a .tm-badge,
+.sidebar .nav-link .tm-badge{
+  margin-left: auto;
+}
+
+/* if you have count badges (numbers) */
+.badge.count,
+.tm-badge.count{
+  min-width: 26px;
+  padding: 4px 8px;
+  justify-content: center;
+}
+
+/* --- Mobile: make sidebar less “heavy” and improve tap targets --- */
+@media (max-width: 820px){
+  .sidebar,
+  aside.sidebar{
+    border-radius: 12px;
+  }
+
+  .sidebar a,
+  .sidebar .nav-link{
+    padding: 12px 12px;
+  }
+
+  .sidebar a.active,
+  .sidebar a.is-active,
+  .sidebar a[aria-current="page"],
+  .sidebar .nav-link.active,
+  .sidebar .nav-link.is-active,
+  .sidebar .nav-link[aria-current="page"]{
+    padding-left: 20px;
+  }
+}
