@@ -162,8 +162,9 @@ CF_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
 # Admin emailovi (spusti na lower-case!)
 ADMIN_EMAILS = {
     "bozicorama@gmail.com",
+    "meneghetti.garden@gmail.com"
 }
-from types import SimpleNamespace
+
 
 def redirect_back(default="admin_tasks"):
     next_url = request.args.get("next") or request.form.get("next")
@@ -207,10 +208,29 @@ def get_current_user(db) -> User | None:
     email = get_cf_email()
     if not email:
         return None
+
     user = db.query(User).filter(User.username == email).first()
-    if not user or not user.is_active:
+
+    # AUTO-CREATE user if missing (Cloudflare Access already authenticated)
+    if not user:
+        role = "admin" if email in {e.lower() for e in ADMIN_EMAILS} else "worker"
+        user = User(
+            username=email,
+            password_hash=_random_password_hash(),  # dummy
+            role=role,
+            lang="en",
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    if not user.is_active:
         return None
+
+    # If email is admin but user role isn't, allowlist still grants admin access elsewhere
     return user
+
 
 def get_current_user_or_dev(db) -> User | None:
     """
