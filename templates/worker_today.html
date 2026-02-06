@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="appbar">
+  <div class="brand">
+    <span class="brand-mark">🍃</span>
+    <span>TaskManager</span>
+  </div>
+  <div class="appbar-actions">
+    <span class="muted">{{ today }}</span>
+    <a class="btn btn-ghost" href="{{ url_for('logout') }}">Logout</a>
+  </div>
+</div>
+
+<header class="dash-head">
+  <div>
+    <h1>Today</h1>
+    <div class="muted">{{ today }} → {{ until }}</div>
+  </div>
+</header>
+
+<section class="stats">
+  <div class="stat">
+    <div class="stat-label">Today's Tasks</div>
+    <div class="stat-num">{{ today_tasks|length }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Overdue</div>
+    <div class="stat-num danger">{{ overdue_tasks|length }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Upcoming</div>
+    <div class="stat-num">{{ upcoming_tasks|length }}</div>
+  </div>
+</section>
+
+<section class="list-head">
+  <div class="list-title">TASKS</div>
+  <div class="chips">
+    <a class="chip chip-active" href="{{ url_for('worker_today') }}?module={{ active_module }}">All</a>
+    <a class="chip" href="#overdue">Overdue <span class="chip-badge">{{ overdue_tasks|length }}</span></a>
+    <a class="chip" href="#today">Today</a>
+    <a class="chip" href="#upcoming">Upcoming</a>
+  </div>
+</section>
+
+<section class="task-list">
+
+  <div id="overdue" class="group-head">OVERDUE</div>
+  {% if overdue_tasks %}
+    {% for t in overdue_tasks %}
+      {% set group = "overdue" %}
+      {% include "partials/_task_card_worker.html" %}
+    {% endfor %}
+  {% else %}
+    <div class="empty muted">No overdue tasks.</div>
+  {% endif %}
+
+  <div id="today" class="group-head">TODAY</div>
+  {% if today_tasks %}
+    {% for t in today_tasks %}
+      {% set group = "today" %}
+      {% include "partials/_task_card_worker.html" %}
+    {% endfor %}
+  {% else %}
+    <div class="empty muted">No tasks for today.</div>
+  {% endif %}
+
+  <div id="upcoming" class="group-head">UPCOMING</div>
+  {% if upcoming_tasks %}
+    {% for t in upcoming_tasks %}
+      {% set group = "upcoming" %}
+      {% include "partials/_task_card_worker.html" %}
+    {% endfor %}
+  {% else %}
+    <div class="empty muted">No upcoming tasks.</div>
+  {% endif %}
+
+</section>
+
+{% endblock %}

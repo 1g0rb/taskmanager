@@ -1,0 +1,11 @@
+services:
+  taskmanager_web:
+    build: .
+    ports:
+      - "5001:8000"
+    environment:
+      - SECRET_KEY=change-me
+      - DATABASE_URL=sqlite:////app/data/app.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

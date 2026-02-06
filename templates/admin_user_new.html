@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-6">
+    <div class="card">
+      <h2 style="margin-top:0;">Create user</h2>
+
+      <form method="post">
+        <label>Username</label>
+        <input class="input" name="username" required>
+
+        <label>Password</label>
+        <input class="input" name="password" type="password" required>
+
+        <label>Role</label>
+        <select class="input" name="role" required>
+          <option value="worker">worker</option>
+          <option value="admin">admin</option>
+        </select>
+
+        <label>Language</label>
+        <select class="input" name="lang" required>
+          <option value="en" selected>en</option>
+          <option value="hr">hr</option>
+        </select>
+
+        <!-- ✅ TEAM -->
+        <label>Team (optional)</label>
+        <select class="input" name="team_id">
+          <option value="">—</option>
+          {% for t in teams %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label style="margin-top:12px;">
+          <input type="checkbox" name="is_active" checked> Active
+        </label>
+
+        <div style="margin-top:14px; display:flex; gap:10px;">
+          <button class="btn ok" type="submit">Create</button>
+          <a class="btn" href="{{ url_for('admin_users') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

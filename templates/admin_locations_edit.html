@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>Edit Location</h2>
+
+<div class="card">
+  <form method="post" action="{{ url_for('admin_locations_edit_post', loc_id=loc.id) }}">
+
+    <label>Naziv</label>
+    <input type="text" name="name" value="{{ loc.name }}" required>
+
+    <label>Module</label>
+    <select name="module" required>
+      <option value="horticulture" {% if loc.module == "horticulture" %}selected{% endif %}>horticulture</option>
+      <option value="garden" {% if loc.module == "garden" %}selected{% endif %}>garden</option>
+    </select>
+
+    <label>Kind</label>
+    <select name="kind" required>
+      <option value="area" {% if loc.kind == "area" %}selected{% endif %}>area</option>
+      <option value="unit" {% if loc.kind == "unit" %}selected{% endif %}>unit (residence)</option>
+    </select>
+
+    <label>Parent (samo za unit)</label>
+    <select name="parent_id">
+      <option value="">(none)</option>
+      {% for a in areas %}
+        <option value="{{ a.id }}" {% if loc.parent_id == a.id %}selected{% endif %}>
+          {{ a.module }} · {{ a.name }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <div style="margin-top:12px; display:flex; gap:10px;">
+      <button type="submit">Save</button>
+      <a class="btn" href="{{ url_for('admin_locations') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

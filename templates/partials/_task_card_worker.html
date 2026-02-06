@@ -1,0 +1,116 @@
+{# partials/_task_card_worker.html #}
+{% set s = (t.status or "open") %}
+{% set ids = task_to_user_ids.get(t.id, []) %}
+{% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
+
+<article class="task-card" data-group="{{ group }}" data-status="{{ s }}">
+
+  <div class="accent
+    {% if group == 'overdue' %}accent-overdue
+    {% elif group == 'upcoming' %}accent-upcoming
+    {% elif s == 'in_progress' %}accent-progress
+    {% elif s == 'blocked' %}accent-blocked
+    {% else %}accent-today{% endif %}"></div>
+
+  <div class="task-body">
+    <div class="task-top">
+      <div class="task-title">{{ t.title }}</div>
+      <div class="avatar">👤</div>
+    </div>
+
+    <div class="task-meta">
+      {% if t.task_date %}<span class="meta">📅 {{ t.task_date }}</span>{% endif %}
+      <span class="pill {% if t.module == "garden" %}garden{% elif t.module == "horticulture" %}horticulture{% endif %}">{{ t.module }}</span>
+      <span class="meta">📍 {{ loc_name }}</span>
+    </div>
+
+    {% if ids %}
+      <div class="task-assign muted">
+        {% for uid in ids %}
+          {{ users[uid].username if uid in users else "?" }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="task-actions">
+
+      <!-- PRIMARY: Complete -->
+      <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
+        <button class="btn-primary" type="submit">✅ Complete</button>
+      </form>
+
+      <!-- SECONDARY: More dropdown -->
+      <details class="more">
+        <summary class="btn-ghost">More ▾</summary>
+
+        <div class="more-menu">
+
+          {% if t.status in ["open", "in_progress"] %}
+            <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
+              <button class="menu-item" type="submit">▶ Start</button>
+            </form>
+          {% endif %}
+
+          {% if t.status == "blocked" %}
+            <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
+              <button class="menu-item" type="submit">🔓 Unblock</button>
+            </form>
+          {% endif %}
+
+          <button class="menu-item" type="button"
+            onclick="this.closest('.task-card').querySelector('.task-details').open = true; this.closest('details.more').open = false;">
+            ℹ️ Details
+          </button>
+
+          {% if t.status in ["open", "in_progress"] %}
+            <div class="menu-divider"></div>
+            <div class="menu-label">⛔ Block task</div>
+
+            <form method="post" action="{{ url_for('worker_task_blocked', task_id=t.id) }}?module={{ active_module }}">
+              <select class="input" name="reason" required>
+                <option value="">-- Reason --</option>
+                <option value="guest">Guest</option>
+                <option value="rain">Rain</option>
+                <option value="access">No access</option>
+                <option value="equipment">Equipment</option>
+                <option value="other">Other</option>
+              </select>
+
+              <select class="input" name="blocked_location_id">
+                <option value="">-- Residence (optional) --</option>
+                {% for loc in residences_by_parent.get(t.location_id, []) %}
+                  <option value="{{ loc.id }}">{{ loc.name }}</option>
+                {% endfor %}
+              </select>
+
+              <input class="input" type="date" name="blocked_until">
+              <button class="menu-danger" type="submit">⛔ Confirm block</button>
+            </form>
+          {% endif %}
+
+        </div>
+      </details>
+
+    </div>
+
+    <!-- DETAILS (otvara se iz "More") -->
+    <details class="task-details">
+      <summary>Details</summary>
+
+      {% if t.started_at %}
+        <div class="detail-line">Start task: {{ t.started_at }}</div>
+      {% else %}
+        <div class="detail-line">Start task: —</div>
+      {% endif %}
+
+      {% if t.next_action_date %}
+        <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
+      {% endif %}
+
+      {% if t.status == "blocked" and t.blocked_reason %}
+        <div class="detail-line">Blocked: {{ t.blocked_reason }}</div>
+      {% endif %}
+    </details>
+
+  </div>
+</article>

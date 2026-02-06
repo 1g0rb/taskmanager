@@ -1,0 +1,138 @@
+{# --- Admin Task Card v2 (uses existing batch endpoints) --- #}
+{% set s = (t.status or "open") %}
+{% set ids = task_to_user_ids.get(t.id, []) %}
+{% set d = (t.task_date|string) if t.task_date else "" %}
+{% set is_overdue = (t.status != "done" and d and d < today) %}
+{% set is_today = (t.status != "done" and d and d == today) %}
+{% set is_upcoming = (t.status != "done" and d and d > today) %}
+
+<div class="taskv2" id="task-{{ t.id }}">
+
+  <div class="taskv2-accent
+    {% if t.status == 'done' %}done{% elif t.status == 'blocked' %}blocked
+    {% elif is_overdue %}overdue{% elif is_today %}today{% elif is_upcoming %}upcoming
+    {% else %}open{% endif %}">
+  </div>
+
+  <div class="taskv2-body">
+
+    <div class="taskv2-top">
+      <div class="taskv2-title">{{ t.title }}</div>
+
+      <div class="taskv2-right">
+        {% if is_overdue %}
+          <span class="pill danger">Overdue</span>
+        {% elif is_today %}
+          <span class="pill ok">Today</span>
+        {% elif is_upcoming %}
+          <span class="pill purple">Upcoming</span>
+        {% endif %}
+
+        <span class="pill ghost">{{ s|replace('_',' ') }}</span>
+      </div>
+    </div>
+
+    <div class="taskv2-meta">
+
+      <div class="meta-line">
+        <span class="meta-ico">📅</span>
+        <span class="meta-txt">{{ t.task_date if t.task_date else "—" }}</span>
+      </div>
+
+      <div class="meta-line">
+        <span class="meta-ico">📍</span>
+        <span class="meta-txt">{{ locations[t.location_id].name if t.location_id in locations else "?" }}</span>
+      </div>
+
+      <div class="meta-line">
+        <span class="meta-ico">🏷</span>
+        <span class="meta-txt">
+          {% if (t.module or '')|lower == 'garden' %}
+            <span class="pill module garden">Garden</span>
+          {% else %}
+            <span class="pill module horti">Horticulture</span>
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="meta-line">
+        <span class="meta-ico">👥</span>
+        <span class="meta-txt">
+          {% if ids %}
+            {% for uid in ids %}
+              <span class="pill user">{{ users[uid].username if uid in users else "?" }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="pill warn">Unassigned</span>
+          {% endif %}
+        </span>
+      </div>
+
+      {% if t.notes %}
+      <div class="meta-line wide">
+        <span class="meta-ico">📝</span>
+        <span class="meta-txt">{{ t.notes }}</span>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <div class="taskv2-actions">
+
+      <div class="taskv2-left">
+        <label class="select-box">
+          <input class="task-select" type="checkbox" value="{{ t.id }}">
+        </label>
+
+        {# Single-assign via existing batch_assign #}
+        <form method="post" action="{{ url_for('admin_tasks_batch_assign') }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="task_ids" value="{{ t.id }}">
+
+          <select name="user_id" class="assign-select">
+            <option value="">Assign…</option>
+            {% for u in users.values() %}
+              <option value="{{ u.id }}">{{ u.username }}</option>
+            {% endfor %}
+          </select>
+
+          <button class="btn mini" type="submit">Assign</button>
+        </form>
+      </div>
+
+      <div class="taskv2-right-actions">
+
+        {# Done (single) via batch_done #}
+        <form method="post" action="{{ url_for('admin_tasks_batch_done') }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="task_ids" value="{{ t.id }}">
+          <button class="btn mini ok" type="submit">Done</button>
+        </form>
+
+        {# Block (single) via batch_block #}
+        <form method="post" action="{{ url_for('admin_tasks_batch_block') }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="task_ids" value="{{ t.id }}">
+          <button class="btn mini warn" type="submit">Block</button>
+        </form>
+
+        {# Unblock (single) via batch_unblock #}
+        <form method="post" action="{{ url_for('admin_tasks_batch_unblock') }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="task_ids" value="{{ t.id }}">
+          <button class="btn mini" type="submit">Unblock</button>
+        </form>
+
+        {# Next day (single) via batch_next_day #}
+        <form method="post" action="{{ url_for('admin_tasks_batch_next_day') }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <input type="hidden" name="task_ids" value="{{ t.id }}">
+          <button class="btn mini" type="submit">Next day</button>
+        </form>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>

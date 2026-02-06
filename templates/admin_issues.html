@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0;">Issues</h2>
+  <div class="small" style="margin:8px 0 12px 0;">Last 200 reports.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Title</th>
+        <th>Cat</th>
+        <th>Sev</th>
+        <th>Status</th>
+        <th>Module</th>
+        <th>Location</th>
+        <th>By</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in issues %}
+      <tr>
+        <td>{{ i.created_at }}</td>
+        <td>{{ i.title }}</td>
+        <td>{{ i.category }}</td>
+        <td>{{ i.severity }}</td>
+        <td>
+  <form method="post" action="{{ url_for('admin_issue_set_status', issue_id=i.id) }}">
+    <select class="input" name="status" onchange="this.form.submit()" style="width:140px;">
+      <option value="open" {% if i.status=="open" %}selected{% endif %}>open</option>
+      <option value="ack" {% if i.status=="ack" %}selected{% endif %}>ack</option>
+      <option value="in_progress" {% if i.status=="in_progress" %}selected{% endif %}>in progress</option>
+      <option value="resolved" {% if i.status=="resolved" %}selected{% endif %}>resolved</option>
+    </select>
+  </form>
+</td>
+
+        <td>{{ i.module }}</td>
+        <td>
+          {% if i.location_id and i.location_id in locations %}
+            {{ locations[i.location_id].name }}
+          {% else %} — {% endif %}
+        </td>
+        <td>
+          {% if i.created_by in users %}
+            {{ users[i.created_by].username }}
+          {% else %} — {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

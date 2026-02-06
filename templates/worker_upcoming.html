@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <h2 style="margin:0;">Upcoming</h2>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn {% if days==1 %}ok{% endif %}" href="{{ url_for('worker_upcoming', days=1, module=active_module) }}">Tomorrow</a>
+      <a class="btn {% if days==7 %}ok{% endif %}" href="{{ url_for('worker_upcoming', days=7, module=active_module) }}">Next 7 days</a>
+      <a class="btn {% if days==14 %}ok{% endif %}" href="{{ url_for('worker_upcoming', days=14, module=active_module) }}">Next 14 days</a>
+    </div>
+
+    <a class="btn warn" href="{{ url_for('worker_issue_new') }}">⚠ Report issue</a>
+  </div>
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+    <a class="btn {% if active_module=='all' %}ok{% endif %}" href="{{ url_for('worker_upcoming', days=days, module='all') }}">All</a>
+    <a class="btn {% if active_module=='horticulture' %}ok{% endif %}" href="{{ url_for('worker_upcoming', days=days, module='horticulture') }}">Horticulture</a>
+    <a class="btn {% if active_module=='garden' %}ok{% endif %}" href="{{ url_for('worker_upcoming', days=days, module='garden') }}">Garden</a>
+  </div>
+
+  {% if not tasks %}
+    <p class="small" style="margin:10px 0 0;">No upcoming tasks.</p>
+  {% endif %}
+</div>
+
+<div style="height:14px;"></div>
+
+{% for t in tasks %}
+  <div class="card" style="margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+      <div>
+        <div style="font-weight:800; font-size:16px;">{{ t.title }}</div>
+        <div class="small">
+          📅 {{ t.task_date }} · {{ t.module }} · {{ locations[t.location_id].name if t.location_id in locations else "?" }}
+        </div>
+
+        {% set ids = task_to_user_ids.get(t.id, []) %}
+        {% if ids %}
+          <div class="small" style="margin-top:6px;">
+            👥 Assigned:
+            {% for uid in ids %}
+              {{ users[uid].username if uid in users else "?" }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="small" style="margin-top:6px;">👥 Assigned: —</div>
+        {% endif %}
+
+        {% if t.notes %}
+          <div class="small" style="margin-top:6px;">📝 {{ t.notes }}</div>
+        {% endif %}
+      </div>
+
+      <div class="badge">Status: {{ t.status }}</div>
+    </div>
+  </div>
+{% endfor %}
+
+{% endblock %}

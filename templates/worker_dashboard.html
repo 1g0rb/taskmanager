@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="appbar">
+  <div class="brand">TaskManager</div>
+  <div class="appbar-actions">
+    <button class="icon-btn" type="button">🔍</button>
+  </div>
+</div>
+
+<header class="dash-head">
+  <div>
+    <h1>Dashboard</h1>
+    <div class="muted">{{ today_pretty }}</div>
+  </div>
+  <a class="link-btn" href="{{ url_for('logout') }}">Logout</a>
+</header>
+
+<section class="stats">
+  <div class="stat">
+    <div class="muted">Today's Tasks</div>
+    <div class="stat-num">{{ today_tasks|length }}</div>
+  </div>
+  <div class="stat">
+    <div class="muted">Overdue</div>
+    <div class="stat-num danger">{{ overdue_tasks|length }}</div>
+  </div>
+  <div class="stat">
+    <div class="muted">Upcoming</div>
+    <div class="stat-num">{{ upcoming_tasks|length }}</div>
+  </div>
+</section>
+
+<section class="list-head">
+  <div class="list-title">TODAY'S TASKS</div>
+  <div class="chips">
+    <button class="chip chip-active">All</button>
+    <button class="chip">Overdue <span class="chip-badge">{{ overdue_tasks|length }}</span></button>
+    <button class="chip">Upcoming</button>
+  </div>
+</section>
+
+<section class="task-list">
+
+  {% for t in overdue_tasks %}
+    {% set group = "overdue" %}
+    {% include "partials/_task_card_worker.html" %}
+  {% endfor %}
+
+  {% for t in today_tasks %}
+    {% set group = "today" %}
+    {% include "partials/_task_card_worker.html" %}
+  {% endfor %}
+
+  {% for t in upcoming_tasks %}
+    {% set group = "upcoming" %}
+    {% include "partials/_task_card_worker.html" %}
+  {% endfor %}
+
+</section>
+
+{% endblock %}

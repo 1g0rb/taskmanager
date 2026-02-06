@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title or "TaskManager" }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+
+  <script defer>
+    // MVP auto-refresh (30s)
+    setTimeout(() => window.location.reload(), 30000);
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    {# Sidebar only for admin users #}
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      {% include "partials/_sidebar.html" %}
+    {% endif %}
+
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,126 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-6">
+    <div class="card">
+      <h2 style="margin-top:0;">Create task</h2>
+
+      <form method="post">
+        <label>Title</label>
+        <input class="input" name="title" placeholder="e.g. Hedge trimming" required>
+
+        <label>Date</label>
+        <input class="input" name="task_date" type="date">
+
+        <label>Module</label>
+        <select class="input" name="module" id="module">
+          <option value="horticulture">HORTICULTURE</option>
+          <option value="garden">GARDEN</option>
+        </select>
+
+        <label>Location (Phase / Area)</label>
+        <select class="input" name="area_id" id="area_id" required>
+          {% for a in areas %}
+            <option value="{{ a.id }}" data-module="{{ a.module }}">{{ a.module }} — {{ a.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label>Residence (optional)</label>
+        <select class="input" name="residence_id" id="residence_id">
+          <option value="">— none —</option>
+          {% for u in units %}
+            <option value="{{ u.id }}" data-parent="{{ u.parent_id }}" data-module="{{ u.module }}">
+              {{ u.name }}
+            </option>
+          {% endfor %}
+        </select>
+
+        <div class="small" style="margin-top:6px;">
+          If you pick a Residence, task will be created for that Residence. Otherwise it stays on the Phase/Area.
+        </div>
+
+        <script>
+          (function(){
+            const moduleSel = document.getElementById("module");
+            const areaSel   = document.getElementById("area_id");
+            const unitSel   = document.getElementById("residence_id");
+
+            if(!moduleSel || !areaSel || !unitSel) return;
+
+            function firstVisibleOption(selectEl){
+              for (const opt of selectEl.options){
+                if (!opt.hidden && opt.value) return opt.value;
+              }
+              return "";
+            }
+
+            function filterAreasByModule(){
+              const mod = moduleSel.value;
+
+              for (const opt of areaSel.options){
+                const m = opt.getAttribute("data-module");
+                opt.hidden = (m !== mod);
+              }
+
+              // if current selected is hidden, pick first visible
+              if (areaSel.selectedOptions.length && areaSel.selectedOptions[0].hidden){
+                areaSel.value = firstVisibleOption(areaSel);
+              }
+            }
+
+            function filterUnitsByAreaAndModule(){
+              const mod = moduleSel.value;
+              const pid = areaSel.value;
+
+              // reset selection when changing area/module
+              unitSel.value = "";
+
+              for (const opt of unitSel.options){
+                const p = opt.getAttribute("data-parent");
+                const m = opt.getAttribute("data-module");
+
+                if (!p) { // "none" option
+                  opt.hidden = false;
+                  continue;
+                }
+
+                opt.hidden = (p !== pid) || (m !== mod);
+              }
+            }
+
+            function refreshAll(){
+              filterAreasByModule();
+              filterUnitsByAreaAndModule();
+            }
+
+            moduleSel.addEventListener("change", refreshAll);
+            areaSel.addEventListener("change", filterUnitsByAreaAndModule);
+
+            // initial
+            refreshAll();
+          })();
+        </script>
+
+        <!-- ✅ ASSIGN PEOPLE (MULTI) -->
+        <label>Assign people (optional, multi)</label>
+        <select class="input" name="assigned_user_ids" multiple size="7">
+          {% for w in workers %}
+            <option value="{{ w.id }}">{{ w.username }} ({{ w.role }})</option>
+          {% endfor %}
+        </select>
+        <div class="small" style="margin-top:6px;">
+          Tip: hold Ctrl (Windows) / Cmd (Mac) to select multiple people.
+        </div>
+
+        <label>Notes (optional)</label>
+        <input class="input" name="notes" placeholder="extra details...">
+
+        <div style="margin-top:14px; display:flex; gap:10px;">
+          <button class="btn ok" type="submit">Create</button>
+          <a class="btn" href="{{ url_for('admin_tasks') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

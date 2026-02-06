@@ -1,0 +1,188 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+
+  
+  <div class="dash-hero">
+
+  <div class="dash-hero-top">
+    <div class="dash-hero-title">
+      <div class="dash-kicker">Live • auto refresh 30s</div>
+      <div class="dash-h1">Overview</div>
+    </div>
+
+    <div class="dash-hero-actions">
+      <a class="btn primary" href="{{ url_for('admin_task_new') }}">+ New task</a>
+    </div>
+  </div>
+
+  <div class="dash-stats">
+    <a class="dash-stat {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today') }}">
+      <div class="dash-stat-label">Today</div>
+      <div class="dash-stat-value">{{ counts['today'] }}</div>
+      <div class="dash-stat-ico">📅</div>
+    </a>
+
+    <a class="dash-stat {{ 'active' if flt=='overdue' else '' }}" href="{{ url_for('admin_tasks', filter='overdue') }}">
+      <div class="dash-stat-label">Overdue</div>
+      <div class="dash-stat-value danger">{{ counts['overdue'] }}</div>
+      <div class="dash-stat-ico">⏳</div>
+    </a>
+
+    <a class="dash-stat {{ 'active' if flt=='open' else '' }}" href="{{ url_for('admin_tasks', filter='open') }}">
+      <div class="dash-stat-label">Open</div>
+      <div class="dash-stat-value">{{ counts['open'] }}</div>
+      <div class="dash-stat-ico">🧩</div>
+    </a>
+
+    <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done') }}">
+      <div class="dash-stat-label">Done</div>
+      <div class="dash-stat-value">{{ counts['done'] }}</div>
+      <div class="dash-stat-ico">✅</div>
+    </a>
+
+    <a class="dash-stat ghost {{ 'active' if flt=='all' else '' }}" href="{{ url_for('admin_tasks') }}">
+      <div class="dash-stat-label">All</div>
+      <div class="dash-stat-value">↩</div>
+      <div class="dash-stat-ico">🗂</div>
+    </a>
+  </div>
+
+  {% if urgent_tasks %}
+  <div class="dash-urgent">
+    <div class="dash-urgent-head">
+      <div class="dash-urgent-title">🔥 Urgent</div>
+      <div class="dash-urgent-sub">Overdue and due today (not done)</div>
+    </div>
+
+    <div class="dash-urgent-strip">
+      {% for t in urgent_tasks %}
+        {% set is_overdue = (t.task_date and (t.task_date|string) < today) %}
+        <a class="dash-urgent-card" href="#task-{{ t.id }}">
+          <div class="dash-urgent-top">
+            <span class="dash-pill {{ 'danger' if is_overdue else 'ok' }}">
+              {{ "OVERDUE" if is_overdue else "TODAY" }}
+            </span>
+            <span class="dash-urgent-date">{{ t.task_date }}</span>
+          </div>
+
+          <div class="dash-urgent-name">{{ t.title }}</div>
+
+          <div class="dash-urgent-meta">
+            <span class="dash-badge">{{ t.module }}</span>
+            <span class="dash-meta">📍 {{ locations[t.location_id].name if t.location_id in locations else "?" }}</span>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="dash-filters">
+    <div class="dash-chips">
+      <a class="chip {{ 'active' if flt=='all' else '' }}" href="{{ url_for('admin_tasks') }}">All</a>
+      <a class="chip {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today') }}">Today</a>
+      <a class="chip {{ 'active' if flt=='overdue' else '' }}" href="{{ url_for('admin_tasks', filter='overdue') }}">Overdue</a>
+      <a class="chip {{ 'active' if flt=='upcoming' else '' }}" href="{{ url_for('admin_tasks', filter='upcoming') }}">Upcoming</a>
+    </div>
+
+    <div class="dash-selects">
+      <select class="select">
+        <option>All modules</option>
+        <option>Horticulture</option>
+        <option>Garden</option>
+      </select>
+
+      <select class="select">
+        <option>All locations</option>
+      </select>
+
+      <select class="select">
+        <option>All assignees</option>
+      </select>
+    </div>
+  </div>
+
+</div>
+
+
+  {% for key, title in [
+    ("overdue", "🔥 Overdue"),
+    ("today", "📅 Today"),
+    ("upcoming", "🟢 Upcoming"),
+    ("done", "✅ Done")
+  ] %}
+
+    {% set items = groups.get(key, []) %}
+
+    {% if items %}
+    <div class="group">
+
+      <div class="group-header" onclick="toggleGroup('{{ key }}')">
+        <span>{{ title }} ({{ items|length }})</span>
+        <span class="group-toggle">▼</span>
+      </div>
+
+      <div class="group-body" id="group-{{ key }}">
+        {% for t in items %}
+          {% include "partials/_task_card_admin.html" %}
+        {% endfor %}
+      </div>
+
+    </div>
+    {% endif %}
+
+  {% endfor %}
+
+  <div id="bulk-bar" class="bulk-bar hidden">
+    <div class="bulk-left">
+      <span id="bulk-count">0</span> selected
+    </div>
+
+    <div class="bulk-actions">
+
+      <form method="post" action="{{ url_for('admin_tasks_batch_done') }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <div id="bulk-done-ids"></div>
+        <button class="btn mini ok" type="submit">Done selected</button>
+      </form>
+
+      <form method="post" action="{{ url_for('admin_tasks_batch_assign') }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <div id="bulk-assign-ids"></div>
+
+        <select name="user_id" class="assign-select" id="bulk-assign-user">
+          <option value="">Assign to...</option>
+          {% for u in users.values() %}
+            <option value="{{ u.id }}">{{ u.username }}</option>
+          {% endfor %}
+        </select>
+
+        <button class="btn mini" type="submit">Assign</button>
+      </form>
+
+      <form method="post" action="{{ url_for('admin_tasks_batch_next_day') }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <div class="bulk-next-ids"></div>
+        <button class="btn mini" type="submit">Next day</button>
+      </form>
+
+      <form method="post" action="{{ url_for('admin_tasks_batch_block') }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <div class="bulk-block-ids"></div>
+        <button class="btn mini warn" type="submit">Block</button>
+      </form>
+
+      <form method="post" action="{{ url_for('admin_tasks_batch_unblock') }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <div class="bulk-unblock-ids"></div>
+      </form>
+
+      <button class="btn mini" id="bulk-clear" type="button">Clear</button>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

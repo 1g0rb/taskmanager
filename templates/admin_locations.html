@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>Admin → Locations</h2>
+
+<div class="card">
+  <h3>Dodaj novu lokaciju</h3>
+
+  <form method="post" action="{{ url_for('admin_locations_add') }}" class="row">
+
+    <input type="text" name="name" placeholder="Naziv (npr. Phase 2 ili R26)" required>
+
+    <select name="module" required>
+      <option value="horticulture">horticulture</option>
+      <option value="garden">garden</option>
+    </select>
+
+    <select name="kind" required>
+      <option value="area">area</option>
+      <option value="unit">unit (residence)</option>
+    </select>
+
+    <select name="parent_id">
+      <option value="">(parent: none)</option>
+      {% for a in areas %}
+        <option value="{{ a.id }}">{{ a.module }} · {{ a.name }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Dodaj</button>
+  </form>
+
+  <div class="small" style="margin-top:8px; opacity:.8;">
+    Tip: za rezidencije (R26...) stavi <b>kind=unit</b> i odaberi parent (npr. Phase 2).
+  </div>
+</div>
+
+<div class="card">
+  <h3>Popis</h3>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Naziv</th>
+        <th>Module</th>
+        <th>Kind</th>
+        <th>Parent</th>
+        <th style="width:220px;">Akcije</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for loc in locations %}
+      <tr>
+        <td>{{ loc.name }}</td>
+        <td>{{ loc.module }}</td>
+        <td>{{ loc.kind }}</td>
+        <td>{{ parent_name.get(loc.parent_id, "-") }}</td>
+        <td>
+          <a class="btn" href="{{ url_for('admin_locations_edit', loc_id=loc.id) }}">Edit</a>
+
+          <form method="post"
+                action="{{ url_for('admin_locations_delete', loc_id=loc.id) }}"
+                style="display:inline"
+                onsubmit="return confirm('Obrisati lokaciju: {{ loc.name }} ?');">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
