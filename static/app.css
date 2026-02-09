@@ -1106,3 +1106,251 @@ a.stat:hover{
   transform: translateY(-1px);
   box-shadow: 0 18px 40px rgba(15,23,42,.10);
 }
+
+/* ===== Users toolbar (clean) ===== */
+.users-toolbar{
+  display:grid;
+  grid-template-columns: 1fr 320px;  /* search | filters */
+  gap: 14px 18px;
+  align-items:start;
+  margin: 14px 0 18px;
+}
+
+.users-toolbar-left{ width:100%; }
+.users-toolbar-left .input{
+  width:100%;
+  max-width: 520px;
+}
+
+.users-toolbar-right{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:stretch;
+}
+
+.users-toolbar-right .input,
+.users-toolbar-right .btn{
+  width:100%;
+}
+
+/* mobile */
+@media (max-width: 900px){
+  .users-toolbar{
+    grid-template-columns: 1fr;
+  }
+  .users-toolbar-left .input{
+    max-width: 100%;
+  }
+}
+
+/* ===== Users table polish ===== */
+.table td{
+  vertical-align: middle;
+}
+
+.users-cell-stack{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-width: 140px;
+}
+
+.users-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:flex-start;
+}
+
+
+/* ================= USERS PAGE (isolated styles) ================= */
+
+.users-toolbar{
+  display:grid;
+  grid-template-columns: 1fr 320px;  /* search | filters */
+  gap: 14px 18px;
+  align-items:start;
+  margin: 14px 0 18px;
+}
+
+.users-toolbar-left{ width:100%; }
+.users-toolbar-left .input{
+  width:100%;
+  max-width: 520px;
+}
+
+.users-toolbar-right{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:stretch;
+}
+
+.users-toolbar-right .input,
+.users-toolbar-right .btn{
+  width:100%;
+}
+
+@media (max-width: 900px){
+  .users-toolbar{ grid-template-columns: 1fr; }
+  .users-toolbar-left .input{ max-width: 100%; }
+}
+
+/* table spacing (only users table) */
+.users-table{ width:100%; border-collapse: separate; border-spacing: 0 10px; }
+.users-table thead th{ text-align:left; font-weight:900; padding: 8px 10px; }
+.users-table tbody td{
+  padding: 10px;
+  vertical-align: middle;
+  background: rgba(255,255,255,.92);
+  border-top: 1px solid rgba(15,23,42,.06);
+  border-bottom: 1px solid rgba(15,23,42,.06);
+}
+.users-table tbody td:first-child{
+  border-left: 1px solid rgba(15,23,42,.06);
+  border-top-left-radius: 14px;
+  border-bottom-left-radius: 14px;
+}
+.users-table tbody td:last-child{
+  border-right: 1px solid rgba(15,23,42,.06);
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+}
+
+.users-cell-stack{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-width: 160px;
+}
+
+.users-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:flex-start;
+}
+
+/* role badge just for users page */
+.users-badge{
+  display:inline-flex;
+  align-items:center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 1px solid rgba(15,23,42,.10);
+  background: rgba(15,23,42,.04);
+  width: fit-content;
+}
+
+.users-badge.admin{
+  background: rgba(214,69,69,.12);
+  border-color: rgba(214,69,69,.22);
+  color: #b42323;
+}
+
+.users-badge.worker{
+  background: rgba(95,122,106,.10);
+  border-color: rgba(95,122,106,.18);
+  color: var(--primary);
+}
+
+/* --- Users table: stable columns (no floating) --- */
+.users-table{
+  width:100%;
+  table-layout: fixed; /* ključ */
+}
+
+.users-table th,
+.users-table td{
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* samo email može prelomiti ako bude predugačak */
+.users-table td:nth-child(1){
+  white-space: normal;
+}
+
+/* malo zategni vertikalno poravnanje u role/team */
+.users-table td:nth-child(3),
+.users-table td:nth-child(4){
+  vertical-align: top;
+}
+
+/* --- Users: align Role badge + dropdown (no floating) --- */
+.users-role-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.users-role-row form{
+  margin:0;
+}
+
+.users-select-compact{
+  width: 140px;     /* stabilno */
+  padding-top: 8px;
+  padding-bottom: 8px;
+  height: 40px;
+}
+
+/* da badge bude iste visine "vizualno" */
+.users-badge{
+  height: 32px;
+  display:inline-flex;
+  align-items:center;
+}
+/* Users: align cells on same vertical center */
+.users-center{
+  display:flex;
+  align-items:center;
+  min-height: 44px;   /* stabilizira visinu reda */
+}
+
+.users-center form{
+  margin:0;
+}
+
+/* već imamo users-select-compact, ali ga učvrsti */
+.users-select-compact{
+  height: 40px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* da pill bude iste “visine” kao select */
+.users-pill{
+  height: 32px;
+  display:inline-flex;
+  align-items:center;
+}
+
+/* Force perfect vertical alignment in users table */
+.users-table tbody tr{
+  height: 64px;
+}
+.users-table tbody td{
+  vertical-align: middle !important;
+}
+.users-role-row,
+.users-center,
+.users-actions{
+  height: 64px;
+  display:flex;
+  align-items:center;
+}
+.users-actions{
+  justify-content:flex-start;
+}
+.users-actions .small{ margin-left: 0; }
+
+.users-actions form {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}

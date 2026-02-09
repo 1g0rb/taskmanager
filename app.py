@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, date, timedelta
 from functools import wraps
 import secrets
+from sqlalchemy.exc import IntegrityError
 from types import SimpleNamespace
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from werkzeug.security import generate_password_hash
@@ -24,13 +25,16 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    username = Column(String, unique=True, nullable=False)  # koristimo kao email
+    username = Column(String, unique=True, nullable=False)  # email
     password_hash = Column(String, nullable=False)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
 
-    role = Column(String, default="worker")  # admin/worker
+    display_name = Column(String, nullable=True)  # <-- novo (opcionalno)
+
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    role = Column(String, default="worker")
     lang = Column(String, default="en")
     is_active = Column(Boolean, default=True)
+
 
 
 class Team(Base):
@@ -148,9 +152,19 @@ def ensure_task_column_carryover():
             conn.execute(text("ALTER TABLE tasks ADD COLUMN carryover_from_task_id INTEGER"))
             print("✅ Added column: tasks.carryover_from_task_id")
 
+def ensure_user_column_display_name():
+    with engine.begin() as conn:
+        cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+        names = {c[1] for c in cols}
+        if "display_name" not in names:
+            conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR"))
+            print("✅ Added column: users.display_name")
 
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
+Base.metadata.create_all(engine)
+ensure_task_column_carryover()
+ensure_user_column_display_name()
 
 # ---------------- App ----------------
 app = Flask(__name__)
@@ -158,6 +172,7 @@ app.secret_key = "dev-change-me"  # kasnije prebaci u ENV
 
 # ---------------- Cloudflare Access auth ----------------
 CF_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
+CF_NAME_HEADER  = "Cf-Access-Authenticated-User-Name"
 
 # Admin emailovi (spusti na lower-case!)
 ADMIN_EMAILS = {
@@ -202,33 +217,59 @@ def get_cf_email() -> str | None:
     email = email.strip().lower()
     return email or None
 
+def get_cf_name() -> str | None:
+    name = request.headers.get(CF_NAME_HEADER)
+    if not name:
+        return None
+    name = name.strip()
+    return name or None
 
-def get_current_user(db) -> User | None:
+def get_current_user(db: Session) -> User | None:
     email = get_cf_email()
     if not email:
         return None
 
     user = db.query(User).filter(User.username == email).first()
 
-    # AUTO-CREATE user if missing (Cloudflare Access already authenticated)
     if not user:
         role = "admin" if email in {e.lower() for e in ADMIN_EMAILS} else "worker"
+        name = get_cf_name()
+
         user = User(
             username=email,
-            password_hash=_random_password_hash(),  # dummy
+            password_hash=_random_password_hash(),
             role=role,
             lang="en",
             is_active=True,
+            display_name=name,
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
 
-    if not user.is_active:
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            # ako su 2 requesta došla odjednom prvi put
+            db.rollback()
+            user = db.query(User).filter(User.username == email).first()
+
+    # update display_name ako prije nije bilo
+    if user and not user.display_name:
+        name = get_cf_name()
+        if name:
+            user.display_name = name
+            db.commit()
+
+    if not user or not user.is_active:
         return None
 
-    # If email is admin but user role isn't, allowlist still grants admin access elsewhere
+    # opcionalno: auto-promote ako je na allowlisti
+    if user.username.lower() in ADMIN_EMAILS and user.role != "admin":
+        user.role = "admin"
+        db.commit()
+
     return user
+
 
 
 def get_current_user_or_dev(db) -> User | None:
@@ -286,16 +327,13 @@ def admin_required(fn):
 
 # ---------------- Seeds ----------------
 def ensure_admin_seed():
-    """
-    IMPORTANT:
-    Cloudflare auth koristi email. Ovaj seed je samo fallback.
-    Preporuka: napravi user record u bazi s pravim emailom.
-    """
+    if not app.debug:
+        return  # u produkciji ne seedamo ništa
+
     db = SessionLocal()
     try:
         exists = db.query(User).first()
         if not exists:
-            # napravi admin user koji ćeš kasnije zamijeniti emailom
             u = User(
                 username="admin@example.com",
                 password_hash=_random_password_hash(),
@@ -305,9 +343,10 @@ def ensure_admin_seed():
             )
             db.add(u)
             db.commit()
-            print("Seeded default admin: admin@example.com (CHANGE THIS TO YOUR EMAIL!)")
+            print("Seeded default admin for DEV only: admin@example.com")
     finally:
         db.close()
+
 
 
 def ensure_team_seed():
@@ -446,15 +485,14 @@ def health():
     return "ok", 200
 
 
-# ---------------- Routes ----------------
 @app.get("/")
-@cf_required
 def index():
-    user = request.cf_user  # type: ignore[attr-defined]
-    is_admin = (user.role == "admin") or (user.username.lower() in ADMIN_EMAILS)
-    if is_admin:
-        return redirect_back()
-    return redirect_back("worker_dashboard")
+    # Root nikad ne smije vraćati 401 (Cloudflare Access flow).
+    # Samo preusmjeri na željeni default screen.
+    return redirect("/admin/tasks")
+    # ili ako želiš admin landing:
+    # return redirect("/admin/tasks")
+
 
 
 @app.get("/logout")
@@ -602,7 +640,7 @@ def admin_tasks():
             if t.status == "done":
                 return (3, d)  # done last
             if d < today:
-                return (0, d)  # overdue first
+                return (0, d)  # unfinished first
             if d == today:
                 return (1, d)  # today
             return (2, d)      # future
@@ -629,9 +667,9 @@ def admin_tasks():
 
         # COUNTS (from unfiltered list)
         counts = {
-            "today": sum(1 for t in tasks if (t.task_date and str(t.task_date) == today)),
-            "overdue": sum(1 for t in tasks if (t.task_date and str(t.task_date) < today and t.status != "done")),
-            "open": sum(1 for t in tasks if t.status == "open"),
+            "today": sum(1 for t in tasks if (t.task_date and str(t.task_date) == today and t.status != "done")),
+            "unfinished": sum(1 for t in tasks if (t.task_date and str(t.task_date) < today and t.status != "done")),
+            "upcoming": sum(1 for t in tasks if (t.task_date and str(t.task_date) > today and t.status != "done")),
             "done": sum(1 for t in tasks if t.status == "done"),
         }
 
@@ -639,7 +677,7 @@ def admin_tasks():
         filtered_tasks = tasks
         if flt == "today":
             filtered_tasks = [t for t in tasks if (t.task_date and str(t.task_date) == today)]
-        elif flt == "overdue":
+        elif flt == "unfinished":
             filtered_tasks = [t for t in tasks if (t.task_date and str(t.task_date) < today and t.status != "done")]
         elif flt == "open":
             filtered_tasks = [t for t in tasks if t.status == "open"]
@@ -649,7 +687,7 @@ def admin_tasks():
             filtered_tasks = [t for t in tasks if (t.task_date and str(t.task_date) > today and t.status != "done")]
 
         # GROUPING (based on filtered list)
-        groups = {"overdue": [], "today": [], "upcoming": [], "done": []}
+        groups = {"unfinished": [], "today": [], "upcoming": [], "done": []}
 
         for t in filtered_tasks:
             if t.status == "done":
@@ -662,7 +700,7 @@ def admin_tasks():
 
             d = str(t.task_date)
             if d < today:
-                groups["overdue"].append(t)
+                groups["unfinished"].append(t)
             elif d == today:
                 groups["today"].append(t)
             else:
@@ -686,13 +724,125 @@ def admin_tasks():
 
 
 
-
 @app.get("/admin/users")
 @admin_required
 def admin_users():
-    # privremeno: dok ne implementiramo Users page
-    return redirect_back()
+    q = (request.args.get("q") or "").strip().lower()
+    status = (request.args.get("status") or "active").strip().lower()  # active/all/disabled
+    team_raw = (request.args.get("team") or "").strip()
+    team_id = int(team_raw) if team_raw.isdigit() else None
 
+    db = SessionLocal()
+    try:
+        teams = db.query(Team).order_by(Team.name.asc()).all()
+
+        query = db.query(User)
+
+        if status == "active":
+            query = query.filter(User.is_active == True)
+        elif status == "disabled":
+            query = query.filter(User.is_active == False)
+
+        if team_id is not None:
+            query = query.filter(User.team_id == team_id)
+
+        if q:
+            # traži po emailu i imenu
+            query = query.filter(
+                or_(
+                    User.username.ilike(f"%{q}%"),
+                    User.display_name.ilike(f"%{q}%"),
+                )
+            )
+
+        # sort: active prvo, admini gore, email asc
+        users = query.order_by(
+            User.is_active.desc(),
+            case((User.role == "admin", 1), else_=0).desc(),
+            User.username.asc()
+        ).all()
+
+        return render_template(
+            "admin_users.html",
+            title="Users",
+            users=users,
+            teams=teams,
+            q=q,
+            status=status,
+            team_id=team_id,
+        )
+    finally:
+        db.close()
+
+
+@app.post("/admin/users/<int:user_id>/toggle_active")
+@admin_required
+def admin_user_toggle_active(user_id: int):
+    db = SessionLocal()
+    try:
+        u = db.get(User, user_id)
+        if not u:
+            flash("User not found.")
+            return redirect(url_for("admin_users"))
+        current = request.cf_user  # type: ignore[attr-defined]
+        if u.id == current.id:
+            flash("You cannot disable yourself.")
+            return redirect(url_for("admin_users"))
+        u.is_active = not bool(u.is_active)
+        db.commit()
+        flash("User updated.")
+        return redirect(url_for("admin_users"))
+    finally:
+        db.close()
+
+
+@app.post("/admin/users/<int:user_id>/set_role")
+@admin_required
+def admin_user_set_role(user_id: int):
+    role = (request.form.get("role") or "worker").strip().lower()
+    if role not in ("admin", "worker"):
+        flash("Invalid role.")
+        return redirect(url_for("admin_users"))
+
+    db = SessionLocal()
+    try:
+        u = db.get(User, user_id)
+        if not u:
+            flash("User not found.")
+            return redirect(url_for("admin_users"))
+        u.role = role
+        db.commit()
+        flash("Role updated.")
+        return redirect(url_for("admin_users"))
+    finally:
+        db.close()
+
+
+@app.post("/admin/users/<int:user_id>/set_team")
+@admin_required
+def admin_user_set_team(user_id: int):
+    team_id_raw = (request.form.get("team_id") or "").strip()
+    team_id = int(team_id_raw) if team_id_raw.isdigit() else None
+
+    db = SessionLocal()
+    try:
+        u = db.get(User, user_id)
+        if not u:
+            flash("User not found.")
+            return redirect(url_for("admin_users"))
+
+        if team_id is not None:
+            t = db.get(Team, team_id)
+            if not t or not t.is_active:
+                flash("Team not valid.")
+                return redirect(url_for("admin_users"))
+
+        u.team_id = team_id
+        db.commit()
+        flash("Team updated.")
+        return redirect(url_for("admin_users"))
+    finally:
+        db.close()
 
 
 @app.route("/admin/tasks/new", methods=["GET", "POST"])
@@ -832,6 +982,26 @@ def admin_team_new():
             db.close()
 
     return render_template("admin_team_new.html", title="Create team")
+
+def get_or_create_user_from_email(db: Session, email: str) -> User:
+    email = (email or "").strip().lower()
+    if not email:
+        raise ValueError("Missing email from Cloudflare.")
+
+    u = db.query(User).filter(User.username == email).first()
+    if u:
+        return u
+
+    # Ako ti je password_hash nullable=True, ovu liniju možeš maknuti
+    u = User(
+        username=email,
+        role="worker",
+        password_hash=generate_password_hash(secrets.token_hex(16)),
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
 
 
 # -------- Worker dashboard --------
@@ -1553,8 +1723,11 @@ def admin_tasks_batch_next_day():
         rows = db.query(Task).filter(Task.id.in_(task_ids)).all()
 
         for t in rows:
+            if t.status == "done":
+                continue
             if t.task_date:
                 t.task_date = t.task_date + timedelta(days=1)
+
 
         db.commit()
         return redirect_back()
@@ -1571,10 +1744,11 @@ def admin_tasks_batch_block():
             return redirect_back()
 
         task_ids = [int(x) for x in ids]
-        db.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.status: "blocked"},
-            synchronize_session=False
-        )
+        db.query(Task).filter(
+            Task.id.in_(task_ids),
+            Task.status != "done"
+            ).update({Task.status: "blocked"}, synchronize_session=False)
+
         db.commit()
         return redirect_back()
     finally:
@@ -1591,10 +1765,11 @@ def admin_tasks_batch_unblock():
 
 
         task_ids = [int(x) for x in ids]
-        db.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.status: "open"},
-            synchronize_session=False
-        )
+        db.query(Task).filter(
+            Task.id.in_(task_ids),
+            Task.status != "done"
+            ).update({Task.status: "open"}, synchronize_session=False)
+
         db.commit()
         return redirect_back()
     finally:

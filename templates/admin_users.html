@@ -1,34 +1,126 @@
 {% extends "layout.html" %}
 {% block content %}
 <div class="card">
-  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-    <h2 style="margin:0;">Users</h2>
-    <a class="btn ok" href="{{ url_for('admin_user_new') }}">+ New user</a>
+
+  <div class="page-head">
+    <div class="page-title">
+      <h2>Users</h2>
+      <div class="small">Staff &amp; team management (Cloudflare Access handles login).</div>
+    </div>
   </div>
 
-  <div class="small" style="margin:8px 0 12px 0;">Create, manage and onboard workers.</div>
+  <form method="get" class="users-toolbar">
+    <div class="users-toolbar-left">
+      <input class="input" type="text" name="q" placeholder="Search email or name…" value="{{ q or '' }}">
+    </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Username</th>
-        <th>Role</th>
-        <th>Language</th>
-        <th>Active</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for u in users %}
-      <tr>
-        <td>{{ u.id }}</td>
-        <td>{{ u.username }}</td>
-        <td>{{ u.role }}</td>
-        <td>{{ u.lang }}</td>
-        <td>{{ "yes" if u.is_active else "no" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <div class="users-toolbar-right">
+      <select class="input" name="status" onchange="this.form.submit()">
+        <option value="active" {{ 'selected' if status=='active' else '' }}>Active</option>
+        <option value="all" {{ 'selected' if status=='all' else '' }}>All</option>
+        <option value="disabled" {{ 'selected' if status=='disabled' else '' }}>Disabled</option>
+      </select>
+
+      <select class="input" name="team" onchange="this.form.submit()">
+        <option value="" {{ 'selected' if not team_id else '' }}>All teams</option>
+        {% for t in teams %}
+          <option value="{{ t.id }}" {{ 'selected' if team_id==t.id else '' }}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+
+      <button class="btn" type="submit">Filter</button>
+    </div>
+  </form>
+
+  <div style="overflow:auto;">
+    <table class="users-table">
+      <colgroup>
+        <col style="width:26%">
+        <col style="width:18%">
+        <col style="width:24%">
+        <col style="width:14%">
+        <col style="width:10%">
+        <col style="width:8%">
+      </colgroup>
+
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Team</th>
+          <th>Active</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for u in users %}
+        {% set is_me = (current_user.is_authenticated and current_user.id == u.id) %}
+        <tr class="{{ 'muted' if not u.is_active else '' }}">
+
+          <td>{{ u.username }}</td>
+          <td>{{ u.display_name or '' }}</td>
+
+          <td>
+            <div class="users-role-row">
+              <span class="users-badge {{ 'admin' if u.role=='admin' else 'worker' }}">
+                {{ u.role|upper }}
+              </span>
+
+              <form method="post" action="{{ url_for('admin_user_set_role', user_id=u.id) }}">
+                <select name="role" class="input users-select-compact" onchange="this.form.submit()">
+                  <option value="worker" {{ 'selected' if u.role=='worker' else '' }}>worker</option>
+                  <option value="admin" {{ 'selected' if u.role=='admin' else '' }}>admin</option>
+                </select>
+              </form>
+            </div>
+          </td>
+
+          <td>
+            <div class="users-center">
+              <form method="post" action="{{ url_for('admin_user_set_team', user_id=u.id) }}">
+                <select name="team_id" class="input users-select-compact" onchange="this.form.submit()">
+                  <option value="" {{ 'selected' if not u.team_id else '' }}>—</option>
+                  {% for t in teams %}
+                    <option value="{{ t.id }}" {{ 'selected' if u.team_id==t.id else '' }}>
+                      {{ t.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </form>
+            </div>
+          </td>
+
+          <td>
+            <div class="users-center">
+              {% if u.is_active %}
+                <span class="pill ok users-pill">ACTIVE</span>
+              {% else %}
+                <span class="pill ghost users-pill">DISABLED</span>
+              {% endif %}
+            </div>
+          </td>
+
+          <td>
+            <div class="users-actions">
+              <form method="post" action="{{ url_for('admin_user_toggle_active', user_id=u.id) }}">
+                <button class="btn {{ 'warn' if u.is_active else 'primary' }}"
+                        type="submit"
+                        {{ 'disabled' if is_me else '' }}>
+                  {{ 'Disable' if u.is_active else 'Enable' }}
+                </button>
+              </form>
+
+            
+            </div>
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
 </div>
 {% endblock %}

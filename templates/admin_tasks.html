@@ -3,106 +3,86 @@
 
 <div class="card">
 
+  <div class="dash-stats">
 
-  <div class="dash-hero">
+  <a class="dash-stat {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today') }}">
+    <div class="dash-stat-label">Today</div>
+    <div class="dash-stat-value">{{ counts['today'] }}</div>
+    <div class="dash-stat-ico">📅</div>
+  </a>
 
-    <div class="dash-hero-top">
-      <div class="dash-hero-title">
-        <div class="dash-kicker">Live • auto refresh 30s</div>
-        <div class="dash-h1">Overview</div>
-      </div>
+  <a class="dash-stat {{ 'active' if flt=='unfinished' else '' }}" href="{{ url_for('admin_tasks', filter='unfinished') }}">
+    <div class="dash-stat-label">Unfinished</div>
+    <div class="dash-stat-value danger">{{ counts['unfinished'] }}</div>
+    <div class="dash-stat-ico">⏳</div>
+  </a>
 
-      <div class="dash-hero-actions">
-        <a class="btn primary" href="{{ url_for('admin_task_new') }}">+ New task</a>
-      </div>
-    </div>
+  <a class="dash-stat {{ 'active' if flt=='upcoming' else '' }}" href="{{ url_for('admin_tasks', filter='upcoming') }}">
+    <div class="dash-stat-label">Upcoming</div>
+    <div class="dash-stat-value">{{ counts['upcoming'] }}</div>
+    <div class="dash-stat-ico">🟣</div>
+  </a>
 
-    <div class="dash-stats">
-      <a class="dash-stat {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today') }}">
-        <div class="dash-stat-label">Today</div>
-        <div class="dash-stat-value">{{ counts['today'] }}</div>
-        <div class="dash-stat-ico">📅</div>
-      </a>
+  <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done') }}">
+    <div class="dash-stat-label">Done</div>
+    <div class="dash-stat-value">{{ counts['done'] }}</div>
+    <div class="dash-stat-ico">✅</div>
+  </a>
 
-      <a class="dash-stat {{ 'active' if flt=='overdue' else '' }}"
-        href="{{ url_for('admin_tasks', filter='overdue') }}">
-        <div class="dash-stat-label">Overdue</div>
-        <div class="dash-stat-value danger">{{ counts['overdue'] }}</div>
-        <div class="dash-stat-ico">⏳</div>
-      </a>
 
-      <a class="dash-stat {{ 'active' if flt=='open' else '' }}" href="{{ url_for('admin_tasks', filter='open') }}">
-        <div class="dash-stat-label">Open</div>
-        <div class="dash-stat-value">{{ counts['open'] }}</div>
-        <div class="dash-stat-ico">🧩</div>
-      </a>
-
-      <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done') }}">
-        <div class="dash-stat-label">Done</div>
-        <div class="dash-stat-value">{{ counts['done'] }}</div>
-        <div class="dash-stat-ico">✅</div>
-      </a>
-
-      <a class="dash-stat ghost {{ 'active' if flt=='all' else '' }}" href="{{ url_for('admin_tasks') }}">
-        <div class="dash-stat-label">All</div>
-        <div class="dash-stat-value">↩</div>
-        <div class="dash-stat-ico">🗂</div>
-      </a>
-    </div>
-<div class="dash-filters">
-  <div class="dash-selects">
-    <select class="select">
-      <option>All modules</option>
-      <option>Horticulture</option>
-      <option>Garden</option>
-    </select>
-
-    <select class="select">
-      <option>All locations</option>
-    </select>
-
-    <select class="select">
-      <option>All assignees</option>
-    </select>
-  </div>
 </div>
 
 
-  </div>
+    <div class="dash-filters">
+      <div class="dash-selects">
+        <select class="select">
+          <option>All modules</option>
+          <option>Horticulture</option>
+          <option>Garden</option>
+        </select>
 
+        <select class="select">
+          <option>All locations</option>
+        </select>
+
+        <select class="select">
+          <option>All assignees</option>
+        </select>
+      </div>
+    </div>
+
+  </div>
 
   {% for key, title in [
-  ("overdue", "🔥 Overdue"),
-  ("today", "📅 Today"),
-  ("upcoming", "🟢 Upcoming"),
-  ("done", "✅ Done")
+    ("unfinished", "🔥 Unfinished"),
+    ("today", "📅 Today"),
+    ("upcoming", "🟢 Upcoming"),
+    ("done", "✅ Done")
   ] %}
 
-  {% set items = groups.get(key, []) %}
+    {% set items = groups.get(key, []) %}
 
-  {% if items %}
-  <div class="group">
+    {% if items %}
+      <div class="group">
 
-    <div class="group-header" id="group-head-{{ key }}" onclick="toggleGroup('{{ key }}')">
+        <div class="group-header" id="group-head-{{ key }}" onclick="toggleGroup('{{ key }}')">
+          <span>{{ title }} ({{ items|length }})</span>
+          <span class="group-toggle">▼</span>
+        </div>
 
-      <span>{{ title }} ({{ items|length }})</span>
-      <span class="group-toggle">▼</span>
-    </div>
+        <div class="group-body" id="group-{{ key }}">
+          {% for t in items %}
+            {% include "partials/_task_card_admin.html" %}
+          {% endfor %}
+        </div>
 
-    <div class="group-body" id="group-{{ key }}">
-      {% for t in items %}
-      {% include "partials/_task_card_admin.html" %}
-      {% endfor %}
-    </div>
-
-
-  </div>
-  {% endif %}
+      </div>
+    {% endif %}
 
   {% endfor %}
 
-
 </div>
+
 <script>
 function toggleGroup(key){
   const body = document.getElementById("group-" + key);
