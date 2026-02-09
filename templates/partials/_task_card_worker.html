@@ -2,6 +2,7 @@
 {% set s = (t.status or "open") %}
 {% set ids = task_to_user_ids.get(t.id, []) %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
+{% set is_today = (t.task_date and (t.task_date|string) == (today|string)) %}
 
 <article class="task-card" data-group="{{ group }}" data-status="{{ s }}">
 
@@ -13,103 +14,155 @@
     {% else %}accent-today{% endif %}"></div>
 
   <div class="task-body">
+
     <div class="task-top">
-      <div class="task-title">{{ t.title }}</div>
-      <div class="avatar">👤</div>
+      <div class="task-main">
+        <div class="task-title">{{ t.title }}</div>
+      </div>
+
+      <div class="task-right">
+        <span class="badge
+          {% if s == 'done' %}badge-done
+          {% elif s == 'blocked' %}badge-blocked
+          {% elif s == 'in_progress' %}badge-progress
+          {% else %}badge-open{% endif %}">
+          {% if s == 'done' %}Done
+          {% elif s == 'blocked' %}Blocked
+          {% elif s == 'in_progress' %}Started
+          {% else %}Open{% endif %}
+        </span>
+      </div>
     </div>
 
-    <div class="task-meta">
-      {% if t.task_date %}<span class="meta">📅 {{ t.task_date }}</span>{% endif %}
-      <span class="pill {% if t.module == "garden" %}garden{% elif t.module == "horticulture" %}horticulture{% endif %}">{{ t.module }}</span>
+    {% if t.task_date %}
+    <div class="task-subline">
+      <span class="meta">📅 {{ "Today" if is_today else t.task_date }}</span>
+    </div>
+    {% endif %}
+
+    <div class="task-subline">
+      <span class="pill module {% if t.module == 'garden' %}garden{% elif t.module == 'horticulture' %}horti{% endif %}">
+        {{ t.module }}
+      </span>
       <span class="meta">📍 {{ loc_name }}</span>
     </div>
 
     {% if ids %}
-      <div class="task-assign muted">
+    <div class="task-subline assignees">
+      <span class="meta">👤
         {% for uid in ids %}
           {{ users[uid].username if uid in users else "?" }}{% if not loop.last %}, {% endif %}
         {% endfor %}
-      </div>
+      </span>
+    </div>
     {% endif %}
 
     <div class="task-actions">
 
-      <!-- PRIMARY: Complete -->
-      <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
-        <button class="btn-primary" type="submit">✅ Complete</button>
+      {# START #}
+      {% if s == "open" %}
+      <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="wbtn start" type="submit">▶ Start</button>
       </form>
+      {% elif s == "in_progress" %}
+      <form>
+        <button class="wbtn start active" type="button" disabled>▶ Started</button>
+      </form>
+      {% else %}
+      <form>
+        <button class="wbtn start" type="button" disabled>▶ Start</button>
+      </form>
+      {% endif %}
 
-      <!-- SECONDARY: More dropdown -->
-      <details class="more">
-        <summary class="btn-ghost">More ▾</summary>
+      {# DONE #}
+      {% if s != "done" %}
+      <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="wbtn done" type="submit">✅ Done</button>
+      </form>
+      {% else %}
+      <form>
+        <button class="wbtn done" type="button" disabled>✅ Done</button>
+      </form>
+      {% endif %}
 
-        <div class="more-menu">
-
-          {% if t.status in ["open", "in_progress"] %}
-            <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
-              <button class="menu-item" type="submit">▶ Start</button>
-            </form>
-          {% endif %}
-
-          {% if t.status == "blocked" %}
-            <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
-              <button class="menu-item" type="submit">🔓 Unblock</button>
-            </form>
-          {% endif %}
-
-          <button class="menu-item" type="button"
-            onclick="this.closest('.task-card').querySelector('.task-details').open = true; this.closest('details.more').open = false;">
-            ℹ️ Details
-          </button>
-
-          {% if t.status in ["open", "in_progress"] %}
-            <div class="menu-divider"></div>
-            <div class="menu-label">⛔ Block task</div>
-
-            <form method="post" action="{{ url_for('worker_task_blocked', task_id=t.id) }}?module={{ active_module }}">
-              <select class="input" name="reason" required>
-                <option value="">-- Reason --</option>
-                <option value="guest">Guest</option>
-                <option value="rain">Rain</option>
-                <option value="access">No access</option>
-                <option value="equipment">Equipment</option>
-                <option value="other">Other</option>
-              </select>
-
-              <select class="input" name="blocked_location_id">
-                <option value="">-- Residence (optional) --</option>
-                {% for loc in residences_by_parent.get(t.location_id, []) %}
-                  <option value="{{ loc.id }}">{{ loc.name }}</option>
-                {% endfor %}
-              </select>
-
-              <input class="input" type="date" name="blocked_until">
-              <button class="menu-danger" type="submit">⛔ Confirm block</button>
-            </form>
-          {% endif %}
-
-        </div>
-      </details>
+      {# BLOCK / UNBLOCK #}
+      {% if s == "blocked" %}
+      <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="wbtn block" type="submit">🔓 Unblock</button>
+      </form>
+      {% elif s in ["open","in_progress"] %}
+      <form>
+        <button class="wbtn block" type="button" onclick="
+          const card=this.closest('.task-card');
+          const d=card.querySelector('.task-details');
+          d.open=true;
+          const bf=card.querySelector('.block-form');
+          if (bf) bf.hidden=false;
+        ">
+          ⛔ Block
+        </button>
+      </form>
+      {% else %}
+      <form>
+        <button class="wbtn block" type="button" disabled>⛔ Block</button>
+      </form>
+      {% endif %}
 
     </div>
 
-    <!-- DETAILS (otvara se iz "More") -->
-    <details class="task-details">
-      <summary>Details</summary>
+    <div class="task-details-link">
+      <a href="#" onclick="
+        const card=this.closest('.task-card');
+        card.querySelector('.task-details').open=true;
+        return false;
+      ">▸ Details</a>
+    </div>
 
-      {% if t.started_at %}
-        <div class="detail-line">Start task: {{ t.started_at }}</div>
-      {% else %}
-        <div class="detail-line">Start task: —</div>
-      {% endif %}
+    <details class="task-details">
+      <summary class="sr-only">Details</summary>
+
+      <div class="detail-line">Start task: {{ t.started_at if t.started_at else "—" }}</div>
 
       {% if t.next_action_date %}
-        <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
+      <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
       {% endif %}
 
-      {% if t.status == "blocked" and t.blocked_reason %}
-        <div class="detail-line">Blocked: {{ t.blocked_reason }}</div>
+      {% if s == "blocked" and t.blocked_reason %}
+      <div class="detail-line">Blocked: {{ t.blocked_reason }}</div>
       {% endif %}
+
+      <div class="block-form" hidden>
+        <form method="post" action="{{ url_for('worker_task_blocked', task_id=t.id) }}?module={{ active_module }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+
+          <div class="detail-line" style="margin-top:10px; font-weight:800;">Reason</div>
+          <select class="input" name="reason" required>
+            <option value="">-- Reason --</option>
+            <option value="guest">Guest</option>
+            <option value="rain">Rain</option>
+            <option value="access">No access</option>
+            <option value="equipment">Equipment</option>
+            <option value="other">Other</option>
+          </select>
+
+          <div class="detail-line" style="margin-top:10px; font-weight:800;">Residence (optional)</div>
+          <select class="input" name="blocked_location_id">
+            <option value="">-- Residence (optional) --</option>
+            {% for loc in residences_by_parent.get(t.location_id, []) %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="detail-line" style="margin-top:10px; font-weight:800;">Blocked until (optional)</div>
+          <input class="input" type="date" name="blocked_until">
+
+          <button class="wbtn block" type="submit" style="margin-top:10px;">⛔ Confirm block</button>
+        </form>
+      </div>
+
     </details>
 
   </div>

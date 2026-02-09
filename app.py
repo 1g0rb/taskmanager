@@ -943,6 +943,7 @@ def worker_today():
         return render_template(
             "worker_today.html",
             title="My tasks",
+            autorefresh=True,
             overdue_tasks=overdue_tasks,
             today_tasks=today_tasks,
             upcoming_tasks=upcoming_tasks,
@@ -953,7 +954,10 @@ def worker_today():
             task_to_user_ids=task_to_user_ids,
             active_module=active_module,
             today=today,
-            until=until
+            until=until,
+            active_tab="tasks",
+
+            
             
 
         )
@@ -1039,11 +1043,32 @@ def worker_dashboard():
             residences_by_parent=residences_by_parent,
             active_module=active_module,
             today=today,
-            until=until
+            until=until,
+            active_tab="tasks",
+
         )
     finally:
         db.close()
 
+
+from urllib.parse import urlparse
+
+def safe_next_url(default: str):
+    # next dolazi iz POST forme (hidden input)
+    nxt = (request.form.get("next") or "").strip()
+    if not nxt:
+        return default
+
+    # dozvoli samo relative URL (npr. /worker/today?...), zabrani http://...
+    p = urlparse(nxt)
+    if p.scheme or p.netloc:
+        return default
+
+    # minimalna zaštita: mora početi s /
+    if not nxt.startswith("/"):
+        return default
+
+    return nxt
 
 # -------- Worker actions --------
 @app.post("/worker/task/<int:task_id>/start")
@@ -1052,20 +1077,23 @@ def worker_task_start(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
 
+    default_url = url_for("worker_dashboard", module=module)
+    next_url = safe_next_url(default_url)
+
     db = SessionLocal()
     try:
         t = db.get(Task, task_id)
         if not t:
             flash("Task not found.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if not is_task_allowed_for_worker(db, t, user):
             flash("Not allowed.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if t.status == "done":
             flash("Task already done.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if t.status == "blocked":
             t.blocked_reason = None
@@ -1078,7 +1106,7 @@ def worker_task_start(task_id: int):
             t.started_at = datetime.utcnow()
 
         db.commit()
-        return redirect(url_for("worker_dashboard", module=module))
+        return redirect(next_url)
     finally:
         db.close()
 
@@ -1090,16 +1118,19 @@ def worker_task_done(task_id: int):
     module = (request.args.get("module") or "all").lower()
     today = date.today()
 
+    default_url = url_for("worker_dashboard", module=module)
+    next_url = safe_next_url(default_url)
+
     db = SessionLocal()
     try:
         t = db.get(Task, task_id)
         if not t:
             flash("Task not found.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if not is_task_allowed_for_worker(db, t, user):
             flash("Not allowed.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if getattr(t, "carryover_from_task_id", None):
             orig_id = t.carryover_from_task_id
@@ -1116,7 +1147,7 @@ def worker_task_done(task_id: int):
             t.finished_at = datetime.utcnow()
 
             db.commit()
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         blocks = db.query(ResidenceBlock).filter(ResidenceBlock.task_id == t.id).all()
 
@@ -1140,7 +1171,6 @@ def worker_task_done(task_id: int):
 
             db.add(new_task)
             db.flush()
-
             copy_assignees(db, t.id, new_task.id)
 
         if blocks:
@@ -1157,7 +1187,7 @@ def worker_task_done(task_id: int):
         t.blocked_location_id = None
 
         db.commit()
-        return redirect(url_for("worker_dashboard", module=module))
+        return redirect(next_url)
     finally:
         db.close()
 
@@ -1167,6 +1197,10 @@ def worker_task_done(task_id: int):
 def worker_task_blocked(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
+
+    default_url = url_for("worker_dashboard", module=module)
+    next_url = safe_next_url(default_url)
+
     reason = (request.form.get("reason") or "").strip().lower()
 
     blocked_loc_raw = (request.form.get("blocked_location_id") or "").strip()
@@ -1183,15 +1217,15 @@ def worker_task_blocked(task_id: int):
         t = db.get(Task, task_id)
         if not t:
             flash("Task not found.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if not is_task_allowed_for_worker(db, t, user):
             flash("Not allowed.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if not reason:
             flash("Blocked reason is required.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         if blocked_location_id:
             db.add(ResidenceBlock(
@@ -1202,7 +1236,7 @@ def worker_task_blocked(task_id: int):
                 created_by=user.id
             ))
             db.commit()
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         t.status = "blocked"
         t.blocked_reason = reason
@@ -1215,31 +1249,36 @@ def worker_task_blocked(task_id: int):
         t.finished_at = None
 
         db.commit()
-        return redirect(url_for("worker_dashboard", module=module))
+        return redirect(next_url)
     finally:
         db.close()
 
 
 @app.post("/worker/task/<int:task_id>/unblock")
 @cf_required
-def worker_task_unblock(task_id):
+def worker_task_unblock(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
-    module = (request.args.get("module") or "all")
+    module = (request.args.get("module") or "all").lower()
+
+    default_url = url_for("worker_dashboard", module=module)
+    next_url = safe_next_url(default_url)
 
     db = SessionLocal()
     try:
         t = db.get(Task, task_id)
         if not t:
             flash("Task not found.")
-            return redirect(url_for("worker_dashboard", module=module))
+            return redirect(next_url)
 
         # permission
         is_admin = (user.role == "admin") or (user.username.lower() in ADMIN_EMAILS)
         if not is_admin:
-            assigned_user_ids = [r.user_id for r in db.query(TaskAssignee).filter(TaskAssignee.task_id == t.id).all()]
+            assigned_user_ids = [
+                r.user_id for r in db.query(TaskAssignee).filter(TaskAssignee.task_id == t.id).all()
+            ]
             if assigned_user_ids and (user.id not in assigned_user_ids):
                 flash("Not allowed.")
-                return redirect(url_for("worker_dashboard", module=module))
+                return redirect(next_url)
 
         t.status = "open"
         t.blocked_reason = None
@@ -1249,7 +1288,7 @@ def worker_task_unblock(task_id):
         db.commit()
 
         flash("Task unblocked.")
-        return redirect(url_for("worker_dashboard", module=module))
+        return redirect(next_url)
     finally:
         db.close()
 
@@ -1261,9 +1300,12 @@ def worker_issue_new():
     user = request.cf_user  # type: ignore[attr-defined]
     db = SessionLocal()
     try:
-        locations = db.query(Location).filter(Location.is_active == True).order_by(
-            Location.module.asc(), Location.name.asc()
-        ).all()
+        locations = (
+            db.query(Location)
+            .filter(Location.is_active == True)
+            .order_by(Location.module.asc(), Location.name.asc())
+            .all()
+        )
 
         if request.method == "POST":
             title = (request.form.get("title") or "").strip()
@@ -1271,12 +1313,18 @@ def worker_issue_new():
             severity = request.form.get("severity") or "low"
             module = request.form.get("module") or "horticulture"
             notes = (request.form.get("notes") or "").strip()
-            loc_raw = request.form.get("location_id") or ""
-            location_id = int(loc_raw) if loc_raw else None
+            loc_raw = (request.form.get("location_id") or "").strip()
+            location_id = int(loc_raw) if loc_raw.isdigit() else None
 
             if not title:
                 flash("Title is required.")
-                return render_template("worker_issue_new.html", title="Report issue", locations=locations)
+                return render_template(
+                    "worker_issue_new.html",
+                    title="Report issue",
+                    locations=locations,
+                    active_tab="issues",
+                    active_module=module,   # da footer zadrži module
+                )
 
             iss = Issue(
                 title=title,
@@ -1291,12 +1339,29 @@ def worker_issue_new():
             db.add(iss)
             db.commit()
             flash("Issue reported.")
-            return redirect_back("worker_today")
+            return redirect(url_for("worker_today", module=module))
 
-        return render_template("worker_issue_new.html", title="Report issue", locations=locations)
+        return render_template(
+            "worker_issue_new.html",
+            title="Report issue",
+            locations=locations,
+            active_tab="issues",
+            active_module=(request.args.get("module") or "all").lower(),
+        )
+
     finally:
         db.close()
 
+@app.get("/worker/settings")
+@cf_required
+def worker_settings():
+    # samo placeholder da url_for radi
+    return render_template(
+        "worker_settings.html",
+        title="Settings",
+        active_tab="settings",
+        active_module=(request.args.get("module") or "all").lower(),
+    )
 
 # -------- Admin: Issues --------
 @app.get("/admin/issues")

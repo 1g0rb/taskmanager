@@ -1,0 +1,611 @@
+/* =========================================================
+   TaskManager — worker.css (STABLE • WORKER ONLY)
+   Worker dashboard + task cards (mobile-first)
+   ========================================================= */
+
+:root{
+  --w-bg: #e7e9ee;
+}
+
+/* ---------- Shell ---------- */
+.worker-shell{
+  background: var(--w-bg);
+  min-height: 100vh;
+}
+
+.worker-page{
+  padding: 14px 16px 92px;
+}
+
+/* ---------- Topbar ---------- */
+.worker-topbar{
+  background: var(--w-header);
+  border-bottom: 1px solid var(--w-border);
+  padding: 26px 16px;
+}
+
+.worker-topbar-inner{ display:flex; align-items:center; }
+
+.worker-brand{ display:flex; align-items:center; gap:10px; }
+
+.worker-brand .brand-mark{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(95,122,106,.12);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.brand-text{ display:flex; flex-direction:column; line-height:1.05; }
+.brand-title{ font-size:18px; font-weight:900; letter-spacing:-0.3px; }
+.brand-sub{ font-size:12px; color:var(--muted); font-weight:600; }
+
+/* ---------- Page head ---------- */
+.worker-title{
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+  margin: 10px 0 4px;
+}
+.worker-date{
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+/* ---------- Stats pills ---------- */
+.worker-stats-row{
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  padding: 2px 2px 8px;
+  margin: 10px 0 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.worker-stat-pill{
+  flex: 0 0 auto;
+  min-width: 110px;
+  background:#fff;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.06);
+}
+.worker-stat-pill .label{ color: var(--muted); font-size: 12px; font-weight: 800; }
+.worker-stat-pill .value{ font-size: 26px; font-weight: 900; margin-top: 6px; letter-spacing: -0.4px; }
+.worker-stat-pill .value.danger{ color: var(--danger); }
+
+/* ---------- Section heads ---------- */
+.worker-shell .task-list{ display:block; }
+
+.worker-shell .group-head{
+  margin-top: 18px;
+  margin-bottom: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.06);
+  letter-spacing: .12em;
+  color: rgba(15,23,42,.55);
+  font-weight: 900;
+  font-size: 12px;
+}
+.worker-shell .group-head:first-of-type{
+  border-top: none;
+  padding-top: 0;
+  margin-top: 12px;
+}
+
+/* =========================================================
+   TASK CARD — FULL WORKER LAYOUT (OVERRIDES app.css)
+   ========================================================= */
+
+.worker-shell .task-card{
+  display:grid !important;
+  grid-template-columns: 6px 1fr !important;
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,.06) !important;
+  border-radius: 18px !important;
+  overflow:hidden !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,.04) !important;
+  margin-bottom: 14px;
+}
+
+.worker-shell .task-card .accent{
+  width: 6px;
+}
+
+.worker-shell .task-body{
+  padding: 14px 14px 12px;
+}
+
+.worker-shell .task-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom: 6px;
+}
+
+.worker-shell .task-title{
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  margin:0;
+  line-height: 1.15;
+}
+
+/* desno: samo status (Open/Started/Done/Blocked) */
+.worker-shell .task-right{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+.worker-shell .avatar{ display:none !important; } /* makni 👤 */
+
+/* meta rows */
+.worker-shell .task-subline{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top: 6px;
+}
+.worker-shell .task-subline .meta{
+  font-size: 13px;
+  color: rgba(15,23,42,.70);
+}
+.worker-shell .task-subline.assignees .meta{
+  color: rgba(15,23,42,.60);
+}
+
+/* module pill */
+.worker-shell .pill.module{
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.worker-shell .pill.module.garden{
+  background: rgba(95,122,106,.12);
+  border: 1px solid rgba(95,122,106,.25);
+  color: var(--primary);
+}
+.worker-shell .pill.module.horti{
+  background: rgba(124, 92, 214, .10);
+  border: 1px solid rgba(124, 92, 214, .18);
+  color: #5b3bd4;
+}
+
+/* ---------- Actions: 2 u redu + Block full width ---------- */
+.worker-shell .task-actions{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+  margin-top: 10px;
+}
+
+.worker-shell .task-actions form{ display:block; }
+.worker-shell .task-actions > *{ width:100%; }
+
+/* treći element (Block) ide cijelom širinom */
+.worker-shell .task-actions > :nth-child(3){
+  grid-column: 1 / -1;
+}
+
+.worker-shell .wbtn{
+  width: 100%;
+  justify-content:center;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: #fff;
+  font-weight: 900;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+}
+
+.worker-shell .wbtn:disabled{ opacity:.65; cursor:not-allowed; }
+
+.worker-shell .wbtn.start{ color: rgba(15,23,42,.80); }
+.worker-shell .wbtn.start.active{
+  opacity: 1;
+  background: rgba(95,122,106,.12);
+  border-color: rgba(95,122,106,.25);
+  color: var(--primary);
+}
+
+.worker-shell .wbtn.done{
+  background: rgba(95,122,106,.12);
+  border-color: rgba(95,122,106,.25);
+  color: var(--primary);
+}
+
+.worker-shell .wbtn.block{
+  background: rgba(214,69,69,.10);
+  border-color: rgba(214,69,69,.20);
+  color: #b42323;
+}
+
+/* ---------- Details ---------- */
+.worker-shell .task-details-link{
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(15,23,42,.70);
+}
+.worker-shell .task-details-link a{ text-decoration:none; color: inherit; }
+
+.worker-shell .task-details > summary.sr-only{ display:none; }
+
+.worker-shell .task-details{ margin-top: 8px; }
+.worker-shell .task-details[open]{
+  background: rgba(15,23,42,.03);
+  border: 1px solid rgba(15,23,42,.06);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.worker-shell .task-details .detail-line{
+  font-size: 13px;
+  color: rgba(15,23,42,.75);
+  margin: 4px 0;
+}
+.worker-shell .task-details .block-form{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.08);
+}
+
+/* ---------- Footer nav ---------- */
+.worker-footer{
+  position: fixed;
+  left:0; right:0; bottom:0;
+  background: rgba(255,255,255,.94);
+  border-top: 1px solid rgba(0,0,0,.06);
+  backdrop-filter: blur(10px);
+  padding: 10px 12px;
+  display:flex;
+  justify-content: space-around;
+  z-index: 200;
+}
+.worker-navitem{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  font-size: 12px;
+  color: rgba(15,23,42,.70);
+  font-weight: 800;
+}
+.worker-navitem.active{ color: var(--primary); }
+
+/* === FINAL POLISH (add at end) === */
+
+/* Accent stripe: full height inside card */
+.worker-shell .task-card{
+  position: relative;
+}
+
+.worker-shell .task-card .accent{
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+}
+
+/* Make sure content doesn't sit under accent */
+.worker-shell .task-body{
+  padding-left: 16px; /* malo više da se ne dodiruje accent */
+}
+
+/* Tighten vertical rhythm like mockup */
+.worker-shell .task-top{ margin-bottom: 2px; }
+.worker-shell .task-subline{ margin-top: 4px; }
+.worker-shell .task-actions{ margin-top: 8px; }
+.worker-shell .task-details-link{ margin-top: 8px; }
+
+/* Badge a bit cleaner */
+.worker-shell .task-right .badge{
+  line-height: 1;
+  padding: 5px 10px;
+}
+/* =========================================================
+   WORKER TASK CARD — SAFE RESET (paste at VERY END)
+   This forces correct layout no matter what app.css does.
+   ========================================================= */
+
+.worker-shell .task-card{
+  display: grid !important;
+  grid-template-columns: 6px 1fr !important;
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,.06) !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,.04) !important;
+}
+
+.worker-shell .task-card .accent{
+  position: static !important;
+  width: 6px !important;
+  height: auto !important;
+  border-radius: 0 !important;
+}
+
+.worker-shell .task-body{
+  padding: 14px 14px 12px !important;
+  min-width: 0 !important;
+}
+
+/* TOP row: title left, badge right */
+.worker-shell .task-top{
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  margin-bottom: 6px !important;
+}
+
+.worker-shell .task-main{ min-width:0 !important; }
+
+.worker-shell .task-title{
+  margin: 0 !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.2px !important;
+  line-height: 1.15 !important;
+  word-break: break-word !important;
+}
+
+.worker-shell .task-right{
+  display:flex !important;
+  align-items:flex-end !important;
+  gap:10px !important;
+}
+
+.worker-shell .task-right .badge{
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  line-height: 1 !important;
+}
+
+/* Meta lines */
+.worker-shell .task-subline{
+  display:flex !important;
+  align-items:center !important;
+  gap:10px !important;
+  flex-wrap: wrap !important;
+  margin: 6px 0 0 !important;
+}
+
+.worker-shell .task-subline .meta{
+  font-size: 13px !important;
+  color: rgba(15,23,42,.70) !important;
+}
+
+/* Actions: Start + Done in one row, Block full width under */
+.worker-shell .task-actions{
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+  margin-top: 10px !important;
+}
+
+.worker-shell .task-actions > *{
+  width: 100% !important;
+}
+
+.worker-shell .task-actions form{
+  width: 100% !important;
+}
+
+.worker-shell .task-actions .wbtn{
+  width: 100% !important;
+  height: 40px !important;
+  border-radius: 999px !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+}
+
+/* last action = Block/Unblock spans full row */
+.worker-shell .task-actions > *:last-child{
+  grid-column: 1 / -1 !important;
+}
+
+/* Details link */
+.worker-shell .task-details-link{
+  margin-top: 10px !important;
+  font-size: 13px !important;
+  color: rgba(15,23,42,.70) !important;
+  font-weight: 800 !important;
+}
+
+.worker-shell .task-details-link a{
+  text-decoration: none !important;
+  color: inherit !important;
+}
+/* ===============================
+   WORKER — CARD STRIPE (SAFE)
+   =============================== */
+
+/* task-card back to 2-col grid: stripe + body */
+.worker-shell .task-card{
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0,0,0,.04);
+  margin-bottom: 14px;
+  position: static;         /* IMPORTANT: no absolute stripe system */
+}
+
+/* stripe column */
+.worker-shell .task-card .accent{
+  width: 6px;
+  position: static;
+  border-radius: 0;
+}
+
+/* body padding */
+.worker-shell .task-card .task-body{
+  padding: 14px 14px 12px;
+}
+
+/* stripe colors (match groups) */
+.worker-shell .accent-today{    background: rgba(95,122,106,.75); }
+.worker-shell .accent-overdue{  background: rgba(214,69,69,.75); }
+.worker-shell .accent-upcoming{ background: rgba(124,58,237,.65); }
+.worker-shell .accent-progress{ background: rgba(95,122,106,.75); } /* ili plava ako želiš */
+.worker-shell .accent-blocked{  background: rgba(245,158,11,.70); }
+
+/* ===============================
+   WORKER — SECTION SEPARATION
+   =============================== */
+
+.worker-shell .task-list{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* section header */
+.worker-shell .group-head{
+  margin-top: 18px;
+  margin-bottom: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.06);
+  letter-spacing: .12em;
+  color: rgba(15,23,42,.55);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+/* first header (TODAY) without top border */
+.worker-shell .group-head:first-of-type{
+  border-top: none;
+  padding-top: 0;
+  margin-top: 12px;
+}
+
+/* =========================================================
+   WORKER — SAFE OVERRIDES (put at END of worker.css)
+   Stripe + section separation + action row stability
+   ========================================================= */
+
+/* Make sure worker page uses full width like mobile */
+body.worker .main-content{
+  padding: 0;                /* worker layout handles padding */
+}
+
+/* Section separation (TODAY / UPCOMING / OVERDUE) */
+body.worker .task-list{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+
+body.worker .group-head{
+  margin-top: 18px;
+  margin-bottom: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.06);
+  letter-spacing: .12em;
+  color: rgba(15,23,42,.55);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+body.worker .group-head:first-of-type{
+  border-top: none;
+  padding-top: 0;
+  margin-top: 12px;
+}
+
+/* CARD: restore 2-col grid stripe + body (no absolute) */
+body.worker .task-card{
+  display:grid;
+  grid-template-columns: 6px 1fr;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 18px;
+  overflow:hidden;
+  box-shadow: 0 10px 25px rgba(0,0,0,.04);
+  margin-bottom: 14px;
+  position: static;
+}
+
+/* Stripe column */
+body.worker .task-card .accent{
+  width: 6px;
+  position: static;
+}
+
+/* Body padding */
+body.worker .task-card .task-body{
+  padding: 14px 14px 12px;
+}
+
+/* Stripe colors */
+body.worker .accent-today{    background: rgba(95,122,106,.75); }
+body.worker .accent-overdue{  background: rgba(214,69,69,.75); }
+body.worker .accent-upcoming{ background: rgba(124,58,237,.65); }
+body.worker .accent-progress{ background: rgba(95,122,106,.75); }
+body.worker .accent-blocked{  background: rgba(245,158,11,.70); }
+
+/* Actions: keep 2+1 layout (Start/Done row, Block full width) */
+body.worker .task-actions{
+  display:flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+body.worker .task-actions form{
+  flex: 1 1 0;
+  min-width: 140px;
+}
+
+body.worker .task-actions form:nth-child(3){
+  flex: 1 1 100%;
+}
+
+/* Buttons fill their slots */
+body.worker .task-actions .wbtn{
+  width:100%;
+  justify-content:center;
+}
+/* ===========================
+   FOOTER — FORCE CLICKABILITY
+   =========================== */
+
+.worker-footer{
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 2147483647 !important; /* max */
+  pointer-events: auto !important;
+}
+
+.worker-footer a{
+  pointer-events: auto !important;
+  text-decoration: none !important;
+}
+
+/* ništa iz contenta ne smije "ležati" preko footera */
+.main-content{
+  padding-bottom: 96px !important;
+}
+
+/* ekstremni safety: ako neki element ima overlay, neka ne hvata klik u dnu */
+.main-content *{
+  -webkit-tap-highlight-color: transparent;
+}

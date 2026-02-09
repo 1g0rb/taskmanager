@@ -1,27 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>{{ title or "TaskManager" }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <!-- Base CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v=999">
 
-  <script defer>
-    // MVP auto-refresh (30s)
-    setTimeout(() => window.location.reload(), 30000);
-  </script>
+  <!-- Worker CSS (only on /worker routes) -->
+  {% if request.path.startswith('/worker') %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='worker.css') }}?v=2002">
+  {% endif %}
+
+  {% block head_extra %}{% endblock %}
 </head>
-<body>
+
+<body class="{{ body_class or '' }}" data-autorefresh="{{ '1' if autorefresh else '0' }}">
+
   <div class="app-shell">
-    {# Sidebar only for admin users #}
-    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+
+    <!-- Admin sidebar (NOT on worker pages) -->
+    {% if current_user.is_authenticated
+          and current_user.role == 'admin'
+          and not request.path.startswith('/worker') %}
       {% include "partials/_sidebar.html" %}
     {% endif %}
 
     <main class="main-content">
       {% block content %}{% endblock %}
     </main>
-  </div>
+
+  </div> <!-- end .app-shell -->
+
+
+  <!-- Worker footer (ONLY on worker pages) -->
+  {% if current_user.is_authenticated and request.path.startswith('/worker') %}
+  <footer class="worker-footer">
+
+    <a class="worker-navitem {{ 'active' if active_tab=='tasks' else '' }}"
+       href="{{ url_for('worker_today', module=active_module|default('all')) }}">
+      <span class="nav-ico">✅</span>
+      <span>Tasks</span>
+    </a>
+
+    <a class="worker-navitem {{ 'active' if active_tab=='issues' else '' }}"
+       href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
+      <span class="nav-ico">🛠</span>
+      <span>Issues</span>
+    </a>
+
+    <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
+       href="{{ url_for('worker_today', module=active_module|default('all')) }}">
+      <span class="nav-ico">⚙️</span>
+      <span>Settings</span>
+    </a>
+
+  </footer>
+  {% endif %}
+
+
+  <script defer>
+    (function () {
+      const enabled = document.body?.dataset?.autorefresh === "1";
+      if (!enabled) return;
+
+      // Do not auto-refresh worker pages
+      if (document.querySelector(".worker-footer")) return;
+
+      const intervalMs = 30000;
+
+      setInterval(() => {
+        const el = document.activeElement;
+        if (el && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return;
+        if (document.querySelector("details[open]")) return;
+        window.location.reload();
+      }, intervalMs);
+    })();
+  </script>
+
 </body>
 </html>
