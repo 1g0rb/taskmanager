@@ -382,6 +382,9 @@ select.input{ cursor:pointer; }
 .stats.stats-4{
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.stats.stats-5{
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
 
 /* works even if .stat is <a> */
 .stat,
@@ -771,4 +774,335 @@ a.stat:hover{
 /* spanovi ne smiju krasti click */
 .worker-footer a span{
   pointer-events:none !important;
+}
+
+/* ============ Admin: dash filters layout ============ */
+.dash-filters{ margin: 10px 0 14px; }
+
+.dash-filters-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.dash-chips{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+.dash-selects{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+/* da dropdownovi budu malo “kompaktniji” kao worker */
+.dash-selects .select{
+  height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* ============ Admin: actions inside task card ============ */
+.taskv2 .task-actions,
+.task-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top: 10px;
+}
+
+/* smanji mini gumbe da ne pojedu karticu */
+.btn.mini{
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+/* ============ Admin Task Card v2: actions layout ============ */
+.taskv2-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15,23,42,.08);
+}
+
+.taskv2-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.taskv2-right-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+/* checkbox da izgleda uredno */
+.select-box{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: rgba(255,255,255,.9);
+}
+.task-select{
+  width: 16px;
+  height: 16px;
+}
+
+/* form-e u toolbaru držimo inline */
+.taskv2-actions form{
+  margin:0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+@media (max-width: 700px){
+  .taskv2-actions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .taskv2-right-actions{
+    justify-content:flex-start;
+  }
+}
+/* ===== Admin: sticky filter row under stats ===== */
+.dash-filters{
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  background: rgba(246,247,251,.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(15,23,42,.08);
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.04);
+  margin: 10px 0 14px;
+}
+
+.dash-selects{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+.dash-selects .select{
+  height: 40px;
+  min-width: 160px;
+}
+/* ===== Admin: group accordion polish ===== */
+.group{
+  margin-top: 14px;
+}
+
+.group-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+
+  padding: 12px 14px;
+  border-radius: 16px;
+
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(15,23,42,.08);
+  box-shadow: 0 10px 25px rgba(0,0,0,.04);
+
+  cursor:pointer;
+  user-select:none;
+
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+.group-header:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 16px 35px rgba(0,0,0,.08);
+  border-color: rgba(15,23,42,.12);
+}
+
+/* title inside header */
+.group-header span:first-child{
+  font-weight: 900;
+  letter-spacing: .01em;
+}
+
+/* toggle arrow */
+.group-toggle{
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border: 1px solid rgba(15,23,42,.10);
+  background: rgba(15,23,42,.03);
+}
+
+/* body spacing */
+.group-body{
+  margin-top: 10px;
+}
+.group-header.collapsed .group-toggle{
+  transform: rotate(-90deg);
+}
+.group-toggle{ transition: transform .12s ease; }
+
+/* ===================== PILL SYSTEM (Admin + Worker) ===================== */
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .01em;
+  line-height: 1;
+  border: 1px solid rgba(15,23,42,.10);
+  background: rgba(15,23,42,.04);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* states */
+.pill.ghost{
+  background: rgba(15,23,42,.03);
+  border-color: rgba(15,23,42,.10);
+  color: rgba(15,23,42,.70);
+}
+
+.pill.ok{
+  background: var(--olive-soft);
+  border-color: rgba(95,122,106,.22);
+  color: var(--primary);
+}
+
+.pill.danger{
+  background: rgba(214,69,69,.12);
+  border-color: rgba(214,69,69,.22);
+  color: #b42323;
+}
+
+.pill.warn{
+  background: rgba(245,158,11,.14);
+  border-color: rgba(245,158,11,.22);
+  color: #a16207;
+}
+
+.pill.purple{
+  background: rgba(124,58,237,.12);
+  border-color: rgba(124,58,237,.20);
+  color: var(--purple);
+}
+
+/* module pills */
+.pill.module{
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .08em;
+  padding: 6px 10px;
+}
+
+.pill.module.garden{
+  background: rgba(16,185,129,.10);
+  border-color: rgba(16,185,129,.18);
+  color: rgba(16,185,129,.95);
+}
+
+.pill.module.horti{
+  background: rgba(59,130,246,.10);
+  border-color: rgba(59,130,246,.18);
+  color: rgba(59,130,246,.95);
+}
+
+/* user pills */
+.pill.user{
+  background: rgba(15,23,42,.03);
+  border-color: rgba(15,23,42,.10);
+  color: rgba(15,23,42,.78);
+}
+.taskv2-right .pill{ padding: 6px 9px; font-size: 11px; }
+
+/* ================= Admin task card polish ================= */
+
+/* malo “finiji” card */
+.taskv2{
+  border-radius: 22px;
+  box-shadow: 0 12px 28px rgba(15,23,42,.06);
+}
+
+/* title + top spacing */
+.taskv2-title{
+  font-size: 19px;
+  font-weight: 950;
+  letter-spacing: -0.3px;
+}
+
+/* desno: pills neka budu kompaktne i poravnate */
+.taskv2-right{
+  gap:8px;
+}
+.taskv2-right .pill{
+  font-size: 11px;
+  padding: 6px 9px;
+}
+
+/* meta grid: tiše i urednije */
+.taskv2-meta{
+  margin-top: 10px;
+  gap: 8px 14px;
+  opacity: .92;
+}
+
+.meta-line{
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: rgba(15,23,42,.02);
+  border: 1px solid rgba(15,23,42,.06);
+}
+
+/* ikone i tekst */
+.meta-ico{ opacity: .85; }
+.meta-txt{ color: rgba(15,23,42,.72); font-weight: 700; }
+
+/* notes wide: neka izgleda kao “info row” */
+.meta-line.wide{
+  background: rgba(124,58,237,.05);
+  border-color: rgba(124,58,237,.10);
+}
+
+/* actions bar: jasna separacija */
+.taskv2-actions{
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15,23,42,.08);
+}
+
+/* desno: gumbi nek budu jednaki */
+.taskv2-right-actions .btn.mini{
+  min-width: 74px;
+  justify-content:center;
+}
+
+/* hover premium */
+.taskv2:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(15,23,42,.10);
 }
