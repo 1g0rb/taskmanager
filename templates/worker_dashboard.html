@@ -22,7 +22,7 @@
     <div class="stat-num">{{ today_tasks|length }}</div>
   </div>
   <div class="stat">
-    <div class="muted">Overdue</div>
+    <div class="muted">Unfinished</div>
     <div class="stat-num danger">{{ overdue_tasks|length }}</div>
   </div>
   <div class="stat">
@@ -35,7 +35,7 @@
   <div class="list-title">TODAY'S TASKS</div>
   <div class="chips">
     <button class="chip chip-active">All</button>
-    <button class="chip">Overdue <span class="chip-badge">{{ overdue_tasks|length }}</span></button>
+    <button class="chip">Unfinished <span class="chip-badge">{{ overdue_tasks|length }}</span></button>
     <button class="chip">Upcoming</button>
   </div>
 </section>

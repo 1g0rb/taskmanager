@@ -32,7 +32,7 @@
       </a>
 
       <a class="worker-stat-pill" href="#overdue">
-        <div class="label">Overdue</div>
+        <div class="label">Unfinished</div>
         <div class="value danger">{{ overdue_tasks|length }}</div>
       </a>
 
@@ -45,7 +45,7 @@
     <section class="task-list">
 
       {% if overdue_tasks %}
-        <div id="overdue" class="group-head">OVERDUE</div>
+        <div id="overdue" class="group-head">UNFINISHED</div>
         {% for t in overdue_tasks %}
           {% set group = "overdue" %}
           {% include "partials/_task_card_worker.html" %}

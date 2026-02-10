@@ -162,8 +162,6 @@ def ensure_user_column_display_name():
 
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
-Base.metadata.create_all(engine)
-ensure_task_column_carryover()
 ensure_user_column_display_name()
 
 # ---------------- App ----------------
@@ -296,8 +294,8 @@ def cf_required(fn):
         try:
             user = get_current_user_or_dev(db)
             if not user:
-                # Ako Access nije prošao ili user ne postoji u bazi:
-                abort(401)
+                return redirect("/cdn-cgi/access/login")
+
             request.cf_user = user  # type: ignore[attr-defined]
             return fn(*args, **kwargs)
         finally:
@@ -487,12 +485,20 @@ def health():
 
 @app.get("/")
 def index():
-    # Root nikad ne smije vraćati 401 (Cloudflare Access flow).
-    # Samo preusmjeri na željeni default screen.
-    return redirect("/admin/tasks")
-    # ili ako želiš admin landing:
-    # return redirect("/admin/tasks")
+    db = SessionLocal()
+    try:
+        user = get_current_user_or_dev(db)
+        if not user:
+            # ovo pusti Cloudflareu da odradi login
+            return redirect("/cdn-cgi/access/login")
 
+        is_admin = (user.role == "admin") or (user.username.lower() in ADMIN_EMAILS)
+        if is_admin:
+            return redirect(url_for("admin_tasks"))
+
+        return redirect(url_for("worker_today"))
+    finally:
+        db.close()
 
 
 @app.get("/logout")
