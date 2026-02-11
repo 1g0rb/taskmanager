@@ -1436,3 +1436,28 @@ a.stat:hover{
     display: none !important;
   }
 }
+
+
+
+/* Mobile nav — FIX: overlay ne smije blokirati sidebar klikove */
+@media (max-width: 900px){
+
+  /* overlay ispod sidebara */
+  .mobile-overlay{
+    z-index: 9998 !important;
+    pointer-events: auto !important;
+  }
+
+  /* sidebar mora biti iznad overlaya */
+  .sidebar{
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 10000 !important;
+    pointer-events: auto !important;
+  }
+
+  /* topbar iznad svega */
+  .mobile-topbar{
+    z-index: 10001 !important;
+  }
+}
