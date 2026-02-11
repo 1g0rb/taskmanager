@@ -1428,3 +1428,11 @@ a.stat:hover{
     background: rgba(0,0,0,.35);
   }
 }
+
+/* HARD DESKTOP HIDE (override everything) */
+@media (min-width: 901px){
+  .mobile-topbar,
+  .mobile-overlay{
+    display: none !important;
+  }
+}
