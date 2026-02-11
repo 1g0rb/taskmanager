@@ -15,11 +15,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy import select
 
+
 # ---------------- DB ----------------
-engine = create_engine("sqlite:///taskmanager.db", echo=False, future=True)
+DB_URL = os.environ.get("DATABASE_URL", "sqlite:////app/data/taskmanager.db")
+engine = create_engine(DB_URL, echo=False, future=True)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
-
 
 class User(Base):
     __tablename__ = "users"
