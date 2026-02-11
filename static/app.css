@@ -1354,3 +1354,80 @@ a.stat:hover{
   display: flex;
   align-items: center;
 }
+
+
+/* =========================================
+   MOBILE NAV DRAWER (Admin sidebar)
+   ========================================= */
+
+.mobile-topbar,
+.mobile-overlay { display:none; }
+
+@media (max-width: 900px){
+
+  /* top bar */
+  .mobile-topbar{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(246,247,251,.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(15,23,42,.10);
+    padding: 10px 12px;
+  }
+
+  .mobile-burger{
+    border: 1px solid rgba(15,23,42,.14);
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .mobile-title{
+    font-weight: 900;
+    letter-spacing: .2px;
+  }
+
+  /* overlay */
+  .mobile-overlay{
+    display:none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 55;
+  }
+
+  /* sidebar becomes drawer (NOT hidden) */
+  .sidebar{
+    display:block !important;            /* override your display:none */
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 82vw;
+    max-width: 320px;
+    z-index: 60;
+
+    transform: translateX(-105%);
+    transition: transform .18s ease;
+  }
+
+  /* when open */
+  body.nav-open .sidebar{
+    transform: translateX(0);
+  }
+
+  body.nav-open .mobile-overlay{
+    display:block;
+  }
+
+  /* content padding a bit smaller */
+  .main-content{
+    padding: 12px;
+  }
+}

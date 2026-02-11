@@ -18,6 +18,15 @@
 </head>
 
 <body class="{{ body_class or '' }}" data-autorefresh="{{ '1' if autorefresh else '0' }}">
+  <!-- Mobile topbar -->
+<div class="mobile-topbar">
+  <button class="mobile-burger" id="navToggle" type="button">☰</button>
+  <div class="mobile-title">TaskManager</div>
+</div>
+
+<!-- Mobile overlay -->
+<div class="mobile-overlay" id="navOverlay"></div>
+
 
   <div class="app-shell">
 
@@ -78,7 +87,20 @@
         window.location.reload();
       }, intervalMs);
     })();
+    
   </script>
+<script>
+  (function () {
+    const btn = document.getElementById("navToggle");
+    const overlay = document.getElementById("navOverlay");
+
+    function closeNav() { document.body.classList.remove("nav-open"); }
+    function toggleNav() { document.body.classList.toggle("nav-open"); }
+
+    if (btn) btn.addEventListener("click", toggleNav);
+    if (overlay) overlay.addEventListener("click", closeNav);
+  })();
+</script>
 
 </body>
 </html>
