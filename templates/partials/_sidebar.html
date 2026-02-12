@@ -11,6 +11,8 @@
     <a class="{{ 'active' if request.endpoint=='admin_task_new' else '' }}" href="{{ url_for('admin_task_new') }}">➕ Create task</a>
     <a class="{{ 'active' if request.endpoint=='admin_locations' else '' }}" href="{{ url_for('admin_locations') }}">📍 Locations</a>
     <a class="{{ 'active' if request.endpoint=='admin_users' else '' }}" href="{{ url_for('admin_users') }}">👤 Users</a>
+    <a class="{{ 'active' if request.endpoint=='admin_issues' else '' }}"
+     href="{{ url_for('admin_issues') }}">🛠 Issues</a>
 
     <hr style="margin:16px 0; opacity:.7;">
 
