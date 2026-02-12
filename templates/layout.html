@@ -26,7 +26,8 @@
 </div>
 
 <!-- Mobile overlay -->
-<div class="mobile-overlay" id="navOverlay"></div>
+<div class="mobile-overlay" id="navOverlay" hidden></div>
+
 
 
   <div class="app-shell">
@@ -95,13 +96,44 @@
     const btn = document.getElementById("navToggle");
     const overlay = document.getElementById("navOverlay");
 
-    function closeNav() { document.body.classList.remove("nav-open"); }
-    function toggleNav() { document.body.classList.toggle("nav-open"); }
+    function openNav() {
+      document.body.classList.add("nav-open");
+      if (overlay) overlay.hidden = false;
+      if (btn) btn.setAttribute("aria-expanded", "true");
+    }
 
-    if (btn) btn.addEventListener("click", toggleNav);
+    function closeNav() {
+      document.body.classList.remove("nav-open");
+      if (overlay) overlay.hidden = true;
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    }
+
+    function toggleNav() {
+      if (document.body.classList.contains("nav-open")) closeNav();
+      else openNav();
+    }
+
+    if (btn) {
+      btn.setAttribute("aria-controls", "sidebar"); // ako sidebar ima id, vidi ispod
+      btn.setAttribute("aria-expanded", "false");
+      btn.addEventListener("click", toggleNav);
+    }
+
     if (overlay) overlay.addEventListener("click", closeNav);
+
+    // ESC zatvara
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.body.classList.contains("nav-open")) closeNav();
+    });
+
+    // Kad pređeš na desktop širinu, obavezno zatvori drawer
+    const mq = window.matchMedia("(min-width: 901px)");
+    mq.addEventListener?.("change", () => {
+      if (mq.matches) closeNav();
+    });
   })();
 </script>
+
 
 </body>
 </html>

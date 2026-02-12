@@ -1355,109 +1355,97 @@ a.stat:hover{
   align-items: center;
 }
 
-
 /* =========================================
-   NAV RESPONSIVE LOCK (FINAL)
+   MOBILE NAV (single source of truth)
+   Works for ADMIN sidebar drawer on mobile
    ========================================= */
 
-/* DESKTOP default: sidebar ON, mobile topbar OFF */
+/* Desktop: sidebar visible, mobile topbar/overlay hidden */
 .sidebar{ display:block; }
-.mobile-topbar,
+.mobile-topbar{ display:none; }
 .mobile-overlay{ display:none; }
 
-/* MOBILE: sidebar becomes drawer, topbar ON */
+/* Mobile */
 @media (max-width: 900px){
-  .mobile-topbar{ display:flex !important; }
-  .mobile-overlay{ display:none; } /* prikazuje se tek kad je nav-open */
 
+  /* show mobile topbar */
+  .mobile-topbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    position: sticky;
+    top: 0;
+    z-index: 10020;
+    height: 52px;
+    padding: 10px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-burger{
+    border: 1px solid rgba(15,23,42,.12);
+    background: rgba(255,255,255,.92);
+    border-radius: 12px;
+    height: 40px;
+    min-width: 40px;
+    cursor: pointer;
+    font-weight: 900;
+  }
+
+  .mobile-title{
+    font-weight: 900;
+    letter-spacing: -0.2px;
+  }
+
+  /* Sidebar becomes drawer (still only included on admin pages by your layout logic) */
   .sidebar{
-    display:block !important;        /* ne hide, nego drawer */
+    display:block !important;
     position: fixed;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
     height: 100vh;
     width: 82vw;
     max-width: 320px;
-    z-index: 60;
+    z-index: 10030;              /* above overlay */
     transform: translateX(-105%);
     transition: transform .18s ease;
   }
 
-  body.nav-open .sidebar{ transform: translateX(0); }
-
-  body.nav-open .mobile-overlay{
-    display:block !important;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.35);
-    z-index: 55;
+  body.nav-open .sidebar{
+    transform: translateX(0);
   }
 
-  /* topbar uvijek klikabilan */
-  .mobile-topbar{ z-index: 9999 !important; }
-  .mobile-burger{ z-index: 10000 !important; pointer-events:auto !important; }
+  /* Overlay */
+  .mobile-overlay{
+    display:none;                 /* default hidden */
+  }
 
-  .main-content{ padding-top: 64px !important; }
-}
-
-/* DESKTOP safety: ako netko ručno ostavi nav-open, ne smije utjecati */
-@media (min-width: 901px){
-  body.nav-open .mobile-overlay{ display:none !important; }
-  body.nav-open .sidebar{ transform:none !important; position: static !important; height:auto !important; }
-}
-
-/* Desktop default: mobile topbar hidden */
-.mobile-topbar,
-.mobile-overlay{
-  display:none;
-}
-
-/* Mobile only */
-@media (max-width: 900px){
-  .mobile-topbar{ display:flex; }
-}
-@media (max-width: 900px){
-  .mobile-topbar{ position: sticky; top:0; z-index: 9999; }
-  .mobile-burger{ pointer-events:auto; }
-}
-@media (max-width: 900px){
   body.nav-open .mobile-overlay{
     display:block;
     position: fixed;
     inset: 0;
-    z-index: 9998;
-    background: rgba(0,0,0,.35);
+    z-index: 10025;              /* below sidebar, above page */
+    background: rgba(2,6,23,.42);
+  }
+
+  /* push content below sticky topbar */
+  .main-content{
+    padding-top: 64px !important;
+  }
+
+  /* optional: lock background scroll when nav open */
+  body.nav-open{
+    overflow: hidden;
   }
 }
 
-/* HARD DESKTOP HIDE (override everything) */
+/* Desktop safety: nav-open should not affect layout */
 @media (min-width: 901px){
-  .mobile-topbar,
-  .mobile-overlay{
-    display: none !important;
-  }
-}
-
-
-
-/* Mobile nav — FIX: overlay ne smije blokirati sidebar klikove */
-@media (max-width: 900px){
-
-  /* overlay ispod sidebara */
-  .mobile-overlay{
-    z-index: 9998 !important;
-    pointer-events: auto !important;
-  }
-
-  /* sidebar mora biti iznad overlaya */
-  .sidebar{
-    position: fixed !important;
-    top: 0; left: 0; bottom: 0;
-    z-index: 10000 !important;
-    pointer-events: auto !important;
-  }
-
-  /* topbar iznad svega */
-  .mobile-topbar{
-    z-index: 10001 !important;
+  body.nav-open{ overflow: auto; }
+  body.nav-open .mobile-overlay{ display:none !important; }
+  body.nav-open .sidebar{
+    transform:none !important;
+    position: static !important;
+    height: auto !important;
   }
 }

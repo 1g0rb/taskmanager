@@ -5,7 +5,7 @@ services:
       - "5001:8000"
     environment:
       - SECRET_KEY=change-me
-      - DATABASE_URL=sqlite:////app/data/app.db
+      - DATABASE_URL=sqlite:////app/data/taskmanager.db
     volumes:
       - ./data:/app/data
     restart: unless-stopped

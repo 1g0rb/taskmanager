@@ -1,6 +1,7 @@
 # app.py
 from __future__ import annotations
 import os
+from ipaddress import ip_address, ip_network
 
 from datetime import datetime, date, timedelta
 from functools import wraps
@@ -18,11 +19,20 @@ from sqlalchemy import select
 
 
 # ---------------- DB ----------------
-DB_URL = os.environ.get("DATABASE_URL", "sqlite:////app/data/taskmanager.db")
-engine = create_engine(DB_URL, echo=False, future=True)
+DB_URL = os.environ.get("DATABASE_URL")
+if not DB_URL:
+    # local dev (Windows/Linux) -> db u projektu /data
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    DATA_DIR = os.path.join(BASE_DIR, "data")
+    os.makedirs(DATA_DIR, exist_ok=True)
+    DB_PATH = os.path.join(DATA_DIR, "taskmanager.db")
+    DB_URL = f"sqlite:///{DB_PATH.replace(os.sep,'/')}"
 
+
+engine = create_engine(DB_URL, echo=False, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
+
 
 class User(Base):
     __tablename__ = "users"
@@ -179,6 +189,7 @@ CF_NAME_HEADER  = "Cf-Access-Authenticated-User-Name"
 ADMIN_EMAILS = {
     "bozicorama@gmail.com",
 }
+DEV_BYPASS = os.environ.get("DEV_BYPASS", "").lower() in ("1", "true", "yes")
 
 
 def redirect_back(default="admin_tasks"):
@@ -271,23 +282,39 @@ def get_current_user(db: Session) -> User | None:
 
     return user
 
+def get_local_dev_user(db: Session) -> User:
+    # probaj uzeti prvog aktivnog admina
+    u = db.query(User).filter(User.role == "admin", User.is_active == True).first()
+    if u:
+        return u
+
+    # ako nema admina, napravi lokalnog
+    u = User(
+        username="local@dev",
+        password_hash=_random_password_hash(),
+        role="admin",
+        lang="en",
+        is_active=True,
+        display_name="Local Dev",
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
 
 
-def get_current_user_or_dev(db) -> User | None:
-    """
-    In production: require Cloudflare Access email header.
-    In local debug: allow auto-login as first active admin (for UI work).
-    """
+def get_current_user_or_dev(db: Session) -> User | None:
+    # normalno: Cloudflare Access user
     user = get_current_user(db)
     if user:
         return user
 
-    # DEV BYPASS (only when Flask debug is ON)
-    if app.debug:
-        dev_user = db.query(User).filter(User.role == "admin", User.is_active == True).first()
-        return dev_user
+    # DEV/LAN bypass: ako je lokalni request ili ako je DEV_BYPASS upaljen
+    if DEV_BYPASS or is_local_request():
+        return get_local_dev_user(db)
 
     return None
+
 
 
 def cf_required(fn):
@@ -304,6 +331,7 @@ def cf_required(fn):
         finally:
             db.close()
     return wrapper
+
 
 
 def admin_required(fn):
@@ -478,6 +506,32 @@ def copy_assignees(db, src_task_id: int, dst_task_id: int) -> None:
     rows = db.query(TaskAssignee).filter(TaskAssignee.task_id == src_task_id).all()
     for r in rows:
         db.add(TaskAssignee(task_id=dst_task_id, user_id=r.user_id))
+
+def is_local_request() -> bool:
+    """
+    True if request is coming from localhost/LAN (dev/local testing).
+    Works both with and without reverse proxy.
+    """
+    # 1) direct remote addr
+    ra = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if not ra:
+        ra = request.remote_addr or ""
+
+    try:
+        ip = ip_address(ra)
+    except ValueError:
+        return False
+
+    # localhost + private ranges
+    if ip.is_loopback:
+        return True
+
+    private_nets = [
+        ip_network("10.0.0.0/8"),
+        ip_network("172.16.0.0/12"),
+        ip_network("192.168.0.0/16"),
+    ]
+    return any(ip in n for n in private_nets)
 
 
 # ---------------- Health ----------------
