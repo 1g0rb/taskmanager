@@ -18,17 +18,20 @@
   {% block head_extra %}{% endblock %}
 </head>
 
-<body class="{{ body_class or '' }}" data-autorefresh="{{ '1' if autorefresh else '0' }}">
-  <!-- Mobile topbar -->
-<div class="mobile-topbar">
-  <button class="mobile-burger" id="navToggle" type="button">☰</button>
-  <div class="mobile-title">TaskManager</div>
-</div>
+{% if current_user.is_authenticated
+      and current_user.role == 'admin'
+      and not request.path.startswith('/worker') %}
 
-<!-- Mobile overlay -->
-<div class="mobile-overlay" id="navOverlay" hidden></div>
+  <!-- Mobile topbar (ADMIN only) -->
+  <div class="mobile-topbar">
+    <button class="mobile-burger" id="navToggle" type="button">☰</button>
+    <div class="mobile-title">TaskManager</div>
+  </div>
 
+  <!-- Mobile overlay -->
+  <div class="mobile-overlay" id="navOverlay" hidden></div>
 
+{% endif %}
 
   <div class="app-shell">
 

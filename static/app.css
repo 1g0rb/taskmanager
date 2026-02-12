@@ -1449,3 +1449,8 @@ a.stat:hover{
     height: auto !important;
   }
 }
+
+body.is-worker .mobile-topbar,
+body.is-worker .mobile-overlay{
+  display:none !important;
+}
