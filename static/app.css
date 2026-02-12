@@ -1454,3 +1454,9 @@ body.is-worker .mobile-topbar,
 body.is-worker .mobile-overlay{
   display:none !important;
 }
+
+@media (max-width: 900px){
+  body.is-worker .main-content{
+    padding-top: 14px !important;
+  }
+}

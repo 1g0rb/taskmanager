@@ -1,15 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <title>{{ title or "TaskManager" }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- Base CSS -->
-<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v=1002">
-
-
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v=1003">
 
   <!-- Worker CSS (only on /worker routes) -->
   {% if request.path.startswith('/worker') %}
@@ -19,20 +16,23 @@
   {% block head_extra %}{% endblock %}
 </head>
 
-{% if current_user.is_authenticated
-      and current_user.role == 'admin'
-      and not request.path.startswith('/worker') %}
+<body class="{{ body_class or '' }} {{ 'is-worker' if request.path.startswith('/worker') else 'is-admin' }}"
+      data-autorefresh="{{ '1' if autorefresh else '0' }}">
 
-  <!-- Mobile topbar (ADMIN only) -->
-  <div class="mobile-topbar">
-    <button class="mobile-burger" id="navToggle" type="button">☰</button>
-    <div class="mobile-title">TaskManager</div>
-  </div>
+  {% if current_user.is_authenticated
+        and current_user.role == 'admin'
+        and not request.path.startswith('/worker') %}
 
-  <!-- Mobile overlay -->
-  <div class="mobile-overlay" id="navOverlay" hidden></div>
+    <!-- Mobile topbar (ADMIN only) -->
+    <div class="mobile-topbar">
+      <button class="mobile-burger" id="navToggle" type="button">☰</button>
+      <div class="mobile-title">TaskManager</div>
+    </div>
 
-{% endif %}
+    <!-- Mobile overlay -->
+    <div class="mobile-overlay" id="navOverlay" hidden></div>
+
+  {% endif %}
 
   <div class="app-shell">
 
@@ -48,7 +48,6 @@
     </main>
 
   </div> <!-- end .app-shell -->
-
 
   <!-- Worker footer (ONLY on worker pages) -->
   {% if current_user.is_authenticated and request.path.startswith('/worker') %}
@@ -67,14 +66,13 @@
     </a>
 
     <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
-       href="{{ url_for('worker_today', module=active_module|default('all')) }}">
+       href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
       <span class="nav-ico">⚙️</span>
       <span>Settings</span>
     </a>
 
   </footer>
   {% endif %}
-
 
   <script defer>
     (function () {
@@ -93,51 +91,48 @@
         window.location.reload();
       }, intervalMs);
     })();
-    
   </script>
-<script>
-  (function () {
-    const btn = document.getElementById("navToggle");
-    const overlay = document.getElementById("navOverlay");
 
-    function openNav() {
-      document.body.classList.add("nav-open");
-      if (overlay) overlay.hidden = false;
-      if (btn) btn.setAttribute("aria-expanded", "true");
-    }
+  <script>
+    (function () {
+      const btn = document.getElementById("navToggle");
+      const overlay = document.getElementById("navOverlay");
 
-    function closeNav() {
-      document.body.classList.remove("nav-open");
-      if (overlay) overlay.hidden = true;
-      if (btn) btn.setAttribute("aria-expanded", "false");
-    }
+      function openNav() {
+        document.body.classList.add("nav-open");
+        if (overlay) overlay.hidden = false;
+        if (btn) btn.setAttribute("aria-expanded", "true");
+      }
 
-    function toggleNav() {
-      if (document.body.classList.contains("nav-open")) closeNav();
-      else openNav();
-    }
+      function closeNav() {
+        document.body.classList.remove("nav-open");
+        if (overlay) overlay.hidden = true;
+        if (btn) btn.setAttribute("aria-expanded", "false");
+      }
 
-    if (btn) {
-      btn.setAttribute("aria-controls", "sidebar"); // ako sidebar ima id, vidi ispod
-      btn.setAttribute("aria-expanded", "false");
-      btn.addEventListener("click", toggleNav);
-    }
+      function toggleNav() {
+        if (document.body.classList.contains("nav-open")) closeNav();
+        else openNav();
+      }
 
-    if (overlay) overlay.addEventListener("click", closeNav);
+      if (btn) {
+        btn.setAttribute("aria-controls", "sidebar");
+        btn.setAttribute("aria-expanded", "false");
+        btn.addEventListener("click", toggleNav);
+      }
 
-    // ESC zatvara
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && document.body.classList.contains("nav-open")) closeNav();
-    });
+      if (overlay) overlay.addEventListener("click", closeNav);
 
-    // Kad pređeš na desktop širinu, obavezno zatvori drawer
-    const mq = window.matchMedia("(min-width: 901px)");
-    mq.addEventListener?.("change", () => {
-      if (mq.matches) closeNav();
-    });
-  })();
-</script>
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && document.body.classList.contains("nav-open")) closeNav();
+      });
 
+      const mq = window.matchMedia("(min-width: 901px)");
+      mq.addEventListener?.("change", () => {
+        if (mq.matches) closeNav();
+      });
+    })();
+  </script>
 
 </body>
 </html>
