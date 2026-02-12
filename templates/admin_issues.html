@@ -1,10 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="card">
-  <h2 style="margin-top:0;">Issues</h2>
-  <div class="small" style="margin:8px 0 12px 0;">Last 200 reports.</div>
 
-  <table>
+<div class="card">
+
+  <h2 style="margin-top:0;">Issues</h2>
+  <div class="small">Last 200 reports.</div>
+
+  <table class="table" style="margin-top:16px; width:100%;">
     <thead>
       <tr>
         <th>When</th>
@@ -17,38 +19,42 @@
         <th>By</th>
       </tr>
     </thead>
-    <tbody>
-      {% for i in issues %}
-      <tr>
-        <td>{{ i.created_at }}</td>
-        <td>{{ i.title }}</td>
-        <td>{{ i.category }}</td>
-        <td>{{ i.severity }}</td>
-        <td>
-  <form method="post" action="{{ url_for('admin_issue_set_status', issue_id=i.id) }}">
-    <select class="input" name="status" onchange="this.form.submit()" style="width:140px;">
-      <option value="open" {% if i.status=="open" %}selected{% endif %}>open</option>
-      <option value="ack" {% if i.status=="ack" %}selected{% endif %}>ack</option>
-      <option value="in_progress" {% if i.status=="in_progress" %}selected{% endif %}>in progress</option>
-      <option value="resolved" {% if i.status=="resolved" %}selected{% endif %}>resolved</option>
-    </select>
-  </form>
-</td>
 
-        <td>{{ i.module }}</td>
-        <td>
-          {% if i.location_id and i.location_id in locations %}
-            {{ locations[i.location_id].name }}
-          {% else %} — {% endif %}
-        </td>
-        <td>
-          {% if i.created_by in users %}
-            {{ users[i.created_by].username }}
-          {% else %} — {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
+```
+<tbody>
+  {% for i in issues %}
+  <tr>
+    <td>{{ i.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    <td>{{ i.title }}</td>
+    <td>{{ i.category }}</td>
+    <td>{{ i.severity }}</td>
+    <td>{{ i.status }}</td>
+    <td>{{ i.module }}</td>
+    <td>
+      {% if i.location_id and locations.get(i.location_id) %}
+        {{ locations[i.location_id].name }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+    <td>
+      {% if users.get(i.created_by) %}
+        {{ users[i.created_by].username }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr>
+    <td colspan="8" class="small">No issues yet.</td>
+  </tr>
+  {% endfor %}
+</tbody>
+```
+
   </table>
+
 </div>
+
 {% endblock %}
