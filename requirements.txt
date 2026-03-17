@@ -3,3 +3,4 @@ flask-login
 sqlalchemy
 werkzeug
 gunicorn
+Pillow
