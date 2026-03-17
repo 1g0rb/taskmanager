@@ -1,67 +1,136 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="card">
+<div class="issues-page">
 
-  <h2 style="margin-top:0;">Issues</h2>
-  <div class="small">Last 200 reports.</div>
+  <div class="issues-head card">
+    <div>
+      <h1 class="issues-title">Issues</h1>
+      <div class="small">Last 200 reports</div>
+    </div>
+  </div>
 
-  <table class="table" style="margin-top:16px; width:100%;">
-    <thead>
-      <tr>
-        <th>When</th>
-        <th>Title</th>
-        <th>Cat</th>
-        <th>Sev</th>
-        <th>Status</th>
-        <th>Module</th>
-        <th>Location</th>
-        <th>By</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-
-    <tbody>
+  {% if issues %}
+    <div class="issues-grid">
       {% for i in issues %}
-      <tr>
-        <td>{{ i.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-        <td>{{ i.title }}</td>
-        <td>{{ i.category }}</td>
-        <td>{{ i.severity }}</td>
-        <td>{{ i.status }}</td>
-        <td>{{ i.module }}</td>
-        <td>
-          {% if i.location_id and locations.get(i.location_id) %}
-            {{ locations[i.location_id].name }}
+      <article class="issue-card">
+
+        <div class="issue-card-top">
+          <div class="issue-main">
+            <div class="issue-title-row">
+              <h3 class="issue-title">{{ i.title }}</h3>
+
+              <div class="issue-badges">
+                <span class="issue-badge issue-badge-cat">{{ i.category }}</span>
+
+                <span class="issue-badge
+                  {% if i.severity == 'high' %}issue-badge-sev-high
+                  {% elif i.severity == 'medium' %}issue-badge-sev-medium
+                  {% else %}issue-badge-sev-low{% endif %}">
+                  {{ i.severity }}
+                </span>
+
+                <span class="issue-badge
+                  {% if i.status == 'resolved' %}issue-badge-status-done
+                  {% else %}issue-badge-status-open{% endif %}">
+                  {{ i.status }}
+                </span>
+              </div>
+            </div>
+
+            <div class="issue-meta">
+              <div><strong>When:</strong> {{ i.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+              <div><strong>Module:</strong> {{ i.module }}</div>
+
+              <div>
+                <strong>Location:</strong>
+                {% if i.location_id and locations.get(i.location_id) %}
+                  {{ locations[i.location_id].name }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+
+              <div>
+                <strong>By:</strong>
+                {% if users.get(i.created_by) %}
+                  {{ users[i.created_by].username }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+            </div>
+
+            {% if i.notes %}
+            <div class="issue-notes">
+              {{ i.notes }}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="issue-photo-wrap">
+            {% if latest_photo_by_issue.get(i.id) %}
+              <img
+                src="{{ url_for('static', filename=latest_photo_by_issue[i.id]) }}"
+                alt="Issue photo"
+                class="issue-photo js-lightbox-image"
+                data-fullsrc="{{ url_for('static', filename=latest_photo_by_issue[i.id]) }}"
+              >
+            {% else %}
+              <div class="issue-photo-empty">No photo</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="issue-actions">
+
+          {% if i.linked_task_id %}
+            <div class="issue-linked small">
+              Linked task:
+              <a href="{{ url_for('admin_tasks') }}">#{{ i.linked_task_id }}</a>
+            </div>
+
+          {% elif not i.location_id %}
+            <form method="POST"
+                  action="{{ url_for('admin_issue_set_location', issue_id=i.id) }}"
+                  class="issue-inline-form">
+              <select name="location_id" class="input" required>
+                <option value="">Select location</option>
+                {% for loc in locations.values() %}
+                  <option value="{{ loc.id }}">{{ loc.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn">Save location</button>
+            </form>
+
           {% else %}
-            —
+            <form method="POST"
+                  action="{{ url_for('admin_issue_convert_to_task', issue_id=i.id) }}"
+                  style="margin:0;">
+              <button type="submit" class="btn">Convert to Task</button>
+            </form>
           {% endif %}
-        </td>
-        <td>
-          {% if users.get(i.created_by) %}
-            {{ users[i.created_by].username }}
-          {% else %}
-            —
-          {% endif %}
-        </td>
-        <td>
-          {% if i.status != "done" %}
-            <form method="post" action="{{ url_for('admin_issue_done', issue_id=i.id) }}" style="display:inline;">
-              <button type="submit" class="btn">Done</button>
+
+          {% if i.status != "resolved" %}
+            <form method="POST"
+                  action="{{ url_for('admin_issue_done', issue_id=i.id) }}"
+                  style="margin:0;">
+              <button type="submit" class="btn btn-secondary">Done</button>
             </form>
           {% else %}
-            <span class="small">Closed</span>
+            <span class="issue-closed-label">Closed</span>
           {% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="9" class="small">No issues yet.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
 
-  </table>
+        </div>
+
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card">
+      <div class="small">No issues yet.</div>
+    </div>
+  {% endif %}
 
 </div>
 

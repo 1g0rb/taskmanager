@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="worker-shell">
+  <div class="worker-topbar">
+    <div class="worker-topbar-inner">
+      <div class="worker-brand">
+        <div class="brand-mark">🌿</div>
+        <div class="brand-text">
+          <div class="brand-title">TaskManager</div>
+          <div class="brand-sub">Worker panel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="worker-page worker-home-page">
+
+    <header class="worker-head">
+      <div class="worker-head-row">
+        <div>
+          <h1 class="worker-title">Welcome</h1>
+          <div class="worker-date">{{ today_pretty }}</div>
+        </div>
+        <a class="worker-logout" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </header>
+
+    <section class="worker-home-hero card">
+      <div class="worker-home-hero-icon">👋</div>
+      <div class="worker-home-hero-text">
+        <h2 style="margin:0 0 8px 0;">Ready for today?</h2>
+        <p class="small" style="margin:0;">
+          Open your tasks, report an issue, or check your settings.
+        </p>
+      </div>
+    </section>
+
+    <section class="worker-stats-row">
+      <div class="worker-stat-pill active">
+        <div class="label">Today</div>
+        <div class="value">{{ today_tasks|length }}</div>
+      </div>
+      <div class="worker-stat-pill">
+        <div class="label">Overdue</div>
+        <div class="value danger">{{ overdue_tasks|length }}</div>
+      </div>
+      <div class="worker-stat-pill">
+        <div class="label">Upcoming</div>
+        <div class="value">{{ upcoming_tasks|length }}</div>
+      </div>
+    </section>
+
+    <section class="worker-home-actions">
+      <a class="worker-home-action-card" href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
+  <div class="worker-home-action-icon">✅</div>
+  <div class="worker-home-action-body">
+    <div class="worker-home-action-title">Open My Tasks</div>
+    <div class="worker-home-action-text">See today, overdue and upcoming tasks.</div>
+  </div>
+</a>
+
+      <a class="worker-home-action-card" href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
+        <div class="worker-home-action-icon">🛠</div>
+        <div class="worker-home-action-body">
+          <div class="worker-home-action-title">Report Issue</div>
+          <div class="worker-home-action-text">Send a new issue with details and photo.</div>
+        </div>
+      </a>
+
+      <a class="worker-home-action-card" href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
+        <div class="worker-home-action-icon">⚙️</div>
+        <div class="worker-home-action-body">
+          <div class="worker-home-action-title">Settings</div>
+          <div class="worker-home-action-text">Change module and worker preferences.</div>
+        </div>
+      </a>
+    </section>
+
+  </div>
+</div>
+
+{% endblock %}
