@@ -1,62 +1,87 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="appbar">
-  <div class="brand">TaskManager</div>
-  <div class="appbar-actions">
-    <button class="icon-btn" type="button">🔍</button>
+<div class="worker-shell">
+  <div class="worker-topbar">
+    <div class="worker-topbar-inner">
+      <div class="worker-brand">
+        <div class="brand-mark">🌿</div>
+        <div class="brand-text">
+          <div class="brand-title">TaskManager</div>
+          <div class="brand-sub">Worker panel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="worker-page">
+
+    <header class="worker-head">
+      <div class="worker-head-row">
+        <div>
+          <h1 class="worker-title">My Tasks</h1>
+          <div class="worker-date">{{ today_pretty }}</div>
+        </div>
+        <a class="worker-logout" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </header>
+
+    <section class="worker-stats-row">
+  <a class="worker-stat-pill {{ 'active' if view == 'today' else '' }}"
+     href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
+    <div class="label">Today</div>
+    <div class="value">{{ today_tasks|length }}</div>
+  </a>
+
+  <a class="worker-stat-pill {{ 'active' if view == 'unfinished' else '' }}"
+     href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='unfinished') }}">
+    <div class="label">Unfinished</div>
+    <div class="value danger">{{ overdue_tasks|length }}</div>
+  </a>
+
+  <a class="worker-stat-pill {{ 'active' if view == 'upcoming' else '' }}"
+     href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='upcoming') }}">
+    <div class="label">Upcoming</div>
+    <div class="value">{{ upcoming_tasks|length }}</div>
+  </a>
+</section>
+
+    <section class="task-list">
+
+      {% if overdue_tasks %}
+        <div class="group-head">UNFINISHED</div>
+        {% for t in overdue_tasks %}
+          {% set group = "overdue" %}
+          {% include "partials/_task_card_worker.html" %}
+        {% endfor %}
+      {% endif %}
+
+      {% if today_tasks %}
+        <div class="group-head">TODAY</div>
+        {% for t in today_tasks %}
+          {% set group = "today" %}
+          {% include "partials/_task_card_worker.html" %}
+        {% endfor %}
+      {% endif %}
+
+      {% if upcoming_tasks %}
+        <div class="group-head">UPCOMING</div>
+        {% for t in upcoming_tasks %}
+          {% set group = "upcoming" %}
+          {% include "partials/_task_card_worker.html" %}
+        {% endfor %}
+      {% endif %}
+
+      {% if not overdue_tasks and not today_tasks and not upcoming_tasks %}
+        <div class="worker-empty">
+          <div class="worker-empty-icon">✅</div>
+          <div class="worker-empty-title">No tasks right now</div>
+          <div class="worker-empty-text">You currently have no assigned tasks in this period.</div>
+        </div>
+      {% endif %}
+
+    </section>
   </div>
 </div>
-
-<header class="dash-head">
-  <div>
-    <h1>Dashboard</h1>
-    <div class="muted">{{ today_pretty }}</div>
-  </div>
-  <a class="link-btn" href="{{ url_for('logout') }}">Logout</a>
-</header>
-
-<section class="stats">
-  <div class="stat">
-    <div class="muted">Today's Tasks</div>
-    <div class="stat-num">{{ today_tasks|length }}</div>
-  </div>
-  <div class="stat">
-    <div class="muted">Unfinished</div>
-    <div class="stat-num danger">{{ overdue_tasks|length }}</div>
-  </div>
-  <div class="stat">
-    <div class="muted">Upcoming</div>
-    <div class="stat-num">{{ upcoming_tasks|length }}</div>
-  </div>
-</section>
-
-<section class="list-head">
-  <div class="list-title">TODAY'S TASKS</div>
-  <div class="chips">
-    <button class="chip chip-active">All</button>
-    <button class="chip">Unfinished <span class="chip-badge">{{ overdue_tasks|length }}</span></button>
-    <button class="chip">Upcoming</button>
-  </div>
-</section>
-
-<section class="task-list">
-
-  {% for t in overdue_tasks %}
-    {% set group = "overdue" %}
-    {% include "partials/_task_card_worker.html" %}
-  {% endfor %}
-
-  {% for t in today_tasks %}
-    {% set group = "today" %}
-    {% include "partials/_task_card_worker.html" %}
-  {% endfor %}
-
-  {% for t in upcoming_tasks %}
-    {% set group = "upcoming" %}
-    {% include "partials/_task_card_worker.html" %}
-  {% endfor %}
-
-</section>
 
 {% endblock %}

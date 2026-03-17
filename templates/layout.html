@@ -53,25 +53,31 @@
   {% if current_user.is_authenticated and request.path.startswith('/worker') %}
   <footer class="worker-footer">
 
-    <a class="worker-navitem {{ 'active' if active_tab=='tasks' else '' }}"
-       href="{{ url_for('worker_today', module=active_module|default('all')) }}">
-      <span class="nav-ico">✅</span>
-      <span>Tasks</span>
-    </a>
+  <a class="worker-navitem {{ 'active' if active_tab=='home' else '' }}"
+     href="{{ url_for('worker_home', module=active_module|default('all')) }}">
+    <span class="nav-ico">🏠</span>
+    <span>Home</span>
+  </a>
 
-    <a class="worker-navitem {{ 'active' if active_tab=='issues' else '' }}"
-       href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
-      <span class="nav-ico">🛠</span>
-      <span>Issues</span>
-    </a>
+  <a class="worker-navitem {{ 'active' if active_tab=='tasks' else '' }}"
+     href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
+    <span class="nav-ico">✅</span>
+    <span>Tasks</span>
+  </a>
 
-    <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
-       href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
-      <span class="nav-ico">⚙️</span>
-      <span>Settings</span>
-    </a>
+  <a class="worker-navitem {{ 'active' if active_tab=='issues' else '' }}"
+     href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
+    <span class="nav-ico">🛠</span>
+    <span>Issues</span>
+  </a>
 
-  </footer>
+  <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
+     href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
+    <span class="nav-ico">⚙️</span>
+    <span>Settings</span>
+  </a>
+
+</footer>
   {% endif %}
 
   <script defer>
@@ -133,6 +139,70 @@
       });
     })();
   </script>
+<script>
+
+const photoInput = document.getElementById("issue-photo")
+const preview = document.getElementById("photo-preview")
+
+if(photoInput){
+
+  photoInput.addEventListener("change", function(e){
+
+    const file = e.target.files[0]
+    if(!file) return
+
+    preview.src = URL.createObjectURL(file)
+    preview.style.display = "block"
+
+  })
+
+}
+
+</script>
+
+<script>
+document.addEventListener("click", function(e){
+
+  const thumb = e.target.closest(".js-lightbox-image, .js-task-photo")
+  const lightbox = document.getElementById("image-lightbox")
+  const lightboxImg = document.getElementById("image-lightbox-img")
+  const closeBtn = document.getElementById("image-lightbox-close")
+
+  if(thumb && lightbox && lightboxImg){
+    lightboxImg.src = thumb.dataset.fullsrc || thumb.src
+    lightbox.hidden = false
+    document.body.style.overflow = "hidden"
+    return
+  }
+
+  if(!lightbox || lightbox.hidden){
+    return
+  }
+
+  if(e.target === lightbox || e.target === closeBtn){
+    lightbox.hidden = true
+    lightboxImg.src = ""
+    document.body.style.overflow = ""
+  }
+
+})
+
+document.addEventListener("keydown", function(e){
+  const lightbox = document.getElementById("image-lightbox")
+  const lightboxImg = document.getElementById("image-lightbox-img")
+
+  if(e.key === "Escape" && lightbox && !lightbox.hidden){
+    lightbox.hidden = true
+    lightboxImg.src = ""
+    document.body.style.overflow = ""
+  }
+})
+</script>
+
+<div id="image-lightbox" class="image-lightbox" hidden>
+  <button id="image-lightbox-close" class="image-lightbox-close" type="button">✕</button>
+  <img id="image-lightbox-img" class="image-lightbox-img" src="" alt="Full image">
+</div>
 
 </body>
 </html>

@@ -5,7 +5,7 @@
     <div class="card">
       <h2 style="margin-top:0;">Report issue</h2>
 
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <label>Title</label>
         <input class="input" name="title" placeholder="e.g. Trimmer line empty / mower won't start" required>
 
@@ -34,16 +34,28 @@
         <select class="input" name="location_id">
           <option value="">—</option>
           {% for l in locations %}
-            <option value="{{ l.id }}">{{ l.module }} — {{ l.name }}</option>
+          <option value="{{ l.id }}">{{ l.module }} — {{ l.name }}</option>
           {% endfor %}
         </select>
 
         <label>Notes (optional)</label>
         <input class="input" name="notes" placeholder="extra details...">
 
-        <div style="margin-top:14px; display:flex; gap:10px;">
+        <label>Photo (optional)</label>
+
+        <div class="photo-center">
+          <input id="issue-photo" type="file" name="photo" accept="image/*" capture="environment" hidden>
+
+          <label for="issue-photo" class="btn photo-btn">
+            📷 Take photo
+          </label>
+        </div>
+
+        <img id="photo-preview" class="photo-preview" style="display:none;">
+
+        <div class="form-actions">
           <button class="btn warn" type="submit">Submit</button>
-          <a class="btn" href="{{ url_for('worker_today') }}">Cancel</a>
+          <a class="btn" href="{{ url_for('worker_home', module=active_module|default('all')) }}">Cancel</a>
         </div>
       </form>
     </div>
