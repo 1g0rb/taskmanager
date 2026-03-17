@@ -17,41 +17,49 @@
         <th>Module</th>
         <th>Location</th>
         <th>By</th>
+        <th>Actions</th>
       </tr>
     </thead>
 
-```
-<tbody>
-  {% for i in issues %}
-  <tr>
-    <td>{{ i.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-    <td>{{ i.title }}</td>
-    <td>{{ i.category }}</td>
-    <td>{{ i.severity }}</td>
-    <td>{{ i.status }}</td>
-    <td>{{ i.module }}</td>
-    <td>
-      {% if i.location_id and locations.get(i.location_id) %}
-        {{ locations[i.location_id].name }}
+    <tbody>
+      {% for i in issues %}
+      <tr>
+        <td>{{ i.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ i.title }}</td>
+        <td>{{ i.category }}</td>
+        <td>{{ i.severity }}</td>
+        <td>{{ i.status }}</td>
+        <td>{{ i.module }}</td>
+        <td>
+          {% if i.location_id and locations.get(i.location_id) %}
+            {{ locations[i.location_id].name }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          {% if users.get(i.created_by) %}
+            {{ users[i.created_by].username }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          {% if i.status != "done" %}
+            <form method="post" action="{{ url_for('admin_issue_done', issue_id=i.id) }}" style="display:inline;">
+              <button type="submit" class="btn">Done</button>
+            </form>
+          {% else %}
+            <span class="small">Closed</span>
+          {% endif %}
+        </td>
+      </tr>
       {% else %}
-        —
-      {% endif %}
-    </td>
-    <td>
-      {% if users.get(i.created_by) %}
-        {{ users[i.created_by].username }}
-      {% else %}
-        —
-      {% endif %}
-    </td>
-  </tr>
-  {% else %}
-  <tr>
-    <td colspan="8" class="small">No issues yet.</td>
-  </tr>
-  {% endfor %}
-</tbody>
-```
+      <tr>
+        <td colspan="9" class="small">No issues yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
 
   </table>
 

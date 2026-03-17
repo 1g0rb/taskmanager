@@ -2,7 +2,8 @@
 from __future__ import annotations
 import os
 from ipaddress import ip_address, ip_network
-
+from uuid import uuid4
+from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
 from functools import wraps
 import secrets
@@ -155,6 +156,21 @@ class ResidenceBlock(Base):
 
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class TaskPhoto(Base):
+    __tablename__ = "task_photos"
+
+    id = Column(Integer, primary_key=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
+
+def allowed_image_file(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 
 def ensure_task_column_carryover():
@@ -772,20 +788,18 @@ def admin_tasks():
         return render_template(
             "admin_tasks.html",
             title="Tasks",
-            tasks=filtered_tasks,
-            groups=groups,
-            locations=locations,
+            tasks=tasks,
             users=users,
+            locations=locations,
             task_to_user_ids=task_to_user_ids,
             counts=counts,
             flt=flt,
-            urgent_tasks=urgent_tasks,
+            groups=groups,
             today=today,
+            urgent_tasks=urgent_tasks,
         )
     finally:
         db.close()
-
-
 
 @app.get("/admin/users")
 @admin_required
@@ -1071,85 +1085,66 @@ def get_or_create_user_from_email(db: Session, email: str) -> User:
 @app.get("/worker/today")
 @cf_required
 def worker_today():
-    user = request.cf_user  # type: ignore[attr-defined]
-
-    today = date.today()
-    until = today + timedelta(days=7)
-    active_module, module_filter = parse_module_arg()
-
     db = SessionLocal()
+
     try:
-        # ---------------- AUTO-UNBLOCK ----------------
-        expired_date_tasks = db.query(Task).filter(
-            Task.status == "blocked",
-            Task.blocked_until != None,
-            Task.blocked_until <= today
-        ).all()
+        user = get_current_user(db)
 
-        for t in expired_date_tasks:
-            t.status = "open"
-            t.blocked_reason = None
-            t.blocked_until = None
-            t.blocked_at = None
+        today = date.today().isoformat()
+        until = (date.today() + timedelta(days=7)).isoformat()
 
-        rain_tasks = db.query(Task).filter(
-            Task.status == "blocked",
-            Task.blocked_until.is_(None),
-            Task.blocked_at.is_not(None),
-            Task.blocked_reason.is_not(None)
-        ).all()
+        view = request.args.get("view", "today")
+        active_module = request.args.get("module")
 
-        for t in rain_tasks:
-            r = (t.blocked_reason or "").strip().lower()
-            is_rain = ("rain" in r) or ("kisa" in r) or ("kiša" in r)
-            if is_rain and t.blocked_at.date() < today:
-                t.status = "open"
-                t.blocked_reason = None
-                t.blocked_until = None
-                t.blocked_at = None
+        # -----------------------------
+        # BASE QUERY
+        # -----------------------------
 
-        db.commit()
+        q = db.query(Task).filter(Task.status != "done")
 
-        def apply_module(q):
-            return q.filter(Task.module == module_filter) if module_filter else q
+        if active_module:
+            q = q.filter(Task.module == active_module)
 
-        status_rank = case(
-            (Task.status == "in_progress", 0),
-            (Task.status == "open", 1),
-            (Task.status == "blocked", 2),
-            else_=3
-        )
+        tasks = q.all()
 
-        overdue_q = db.query(Task).filter(
-            Task.task_date < today,
-            Task.status != "done",
-            Task.next_action_date <= today
-        )
-        overdue_q = apply_module(overdue_q)
-        overdue_q = filter_my_and_unassigned(db, overdue_q, user)
-        overdue_tasks = overdue_q.order_by(status_rank.asc(), Task.task_date.asc(), Task.id.asc()).all()
+        # -----------------------------
+        # SPLIT TASKS
+        # -----------------------------
 
-        today_q = db.query(Task).filter(
-            Task.next_action_date == today,
-            Task.status != "done"
-        )
-        today_q = apply_module(today_q)
-        today_q = filter_my_and_unassigned(db, today_q, user)
-        today_tasks = today_q.order_by(status_rank.asc(), Task.id.desc()).all()
+        overdue_tasks = []
+        today_tasks = []
+        upcoming_tasks = []
 
-        upcoming_q = db.query(Task).filter(
-            Task.next_action_date > today,
-            Task.next_action_date <= until,
-            Task.status != "done"
-        )
-        upcoming_q = apply_module(upcoming_q)
-        upcoming_q = filter_my_and_unassigned(db, upcoming_q, user)
-        upcoming_tasks = upcoming_q.order_by(Task.next_action_date.asc(), status_rank.asc(), Task.id.asc()).all()
+        for t in tasks:
+
+            if not t.next_action_date:
+                upcoming_tasks.append(t)
+                continue
+
+            d = str(t.next_action_date)
+
+            if d < today:
+                overdue_tasks.append(t)
+
+            elif d == today:
+                today_tasks.append(t)
+
+            else:
+                upcoming_tasks.append(t)
+
+        # -----------------------------
+        # LOOKUPS
+        # -----------------------------
 
         locations = {l.id: l for l in db.query(Location).all()}
         users = {u.id: u for u in db.query(User).all()}
 
+        # -----------------------------
+        # RESIDENCES
+        # -----------------------------
+
         residences_by_parent = {}
+
         units = db.query(Location).filter(
             Location.kind == "unit",
             Location.is_active == True
@@ -1158,46 +1153,100 @@ def worker_today():
         for u in units:
             residences_by_parent.setdefault(u.parent_id, []).append(u)
 
-        all_ids = [t.id for t in overdue_tasks] + [t.id for t in today_tasks] + [t.id for t in upcoming_tasks]
+        # -----------------------------
+        # TASK IDS
+        # -----------------------------
+
+        all_ids = (
+            [t.id for t in overdue_tasks] +
+            [t.id for t in today_tasks] +
+            [t.id for t in upcoming_tasks]
+        )
+
+        # -----------------------------
+        # ASSIGNEES
+        # -----------------------------
+
+        rows = db.query(TaskAssignee).filter(
+            TaskAssignee.task_id.in_(all_ids)
+        ).all() if all_ids else []
+
+        task_to_user_ids = {}
+
+        for r in rows:
+            task_to_user_ids.setdefault(r.task_id, []).append(r.user_id)
+
+        # -----------------------------
+        # PHOTOS
+        # -----------------------------
+
+        photo_rows = (
+            db.query(TaskPhoto)
+            .filter(TaskPhoto.task_id.in_(all_ids))
+            .order_by(TaskPhoto.created_at.desc())
+            .all()
+        ) if all_ids else []
+
+        photo_count_by_task = {}
+        latest_photo_by_task = {}
+
+        for p in photo_rows:
+
+            photo_count_by_task[p.task_id] = photo_count_by_task.get(p.task_id, 0) + 1
+
+            if p.task_id not in latest_photo_by_task:
+                latest_photo_by_task[p.task_id] = p.file_path
+
+        # -----------------------------
+        # BLOCKS
+        # -----------------------------
 
         blocks = db.query(ResidenceBlock).filter(
             ResidenceBlock.task_id.in_(all_ids)
         ).order_by(ResidenceBlock.created_at.desc()).all() if all_ids else []
 
         blocks_by_task = {}
+
         for b in blocks:
             blocks_by_task.setdefault(b.task_id, []).append(b)
 
-        rows = db.query(TaskAssignee).filter(TaskAssignee.task_id.in_(all_ids)).all() if all_ids else []
-        task_to_user_ids = {}
-        for r in rows:
-            task_to_user_ids.setdefault(r.task_id, []).append(r.user_id)
+        # -----------------------------
+        # TEMPLATE
+        # -----------------------------
 
         return render_template(
             "worker_today.html",
             title="My tasks",
+
             autorefresh=True,
+
             overdue_tasks=overdue_tasks,
             today_tasks=today_tasks,
             upcoming_tasks=upcoming_tasks,
+
             locations=locations,
             users=users,
+
             residences_by_parent=residences_by_parent,
+
             blocks_by_task=blocks_by_task,
+
             task_to_user_ids=task_to_user_ids,
+
+            photo_count_by_task=photo_count_by_task,
+            latest_photo_by_task=latest_photo_by_task,
+
             active_module=active_module,
+
             today=today,
             until=until,
-            active_tab="tasks",
 
-            
-            
-
+            view=view,
+            module=active_module,
         )
+
     finally:
         db.close()
-
-
 @app.get("/worker/dashboard")
 @cf_required
 def worker_dashboard():
@@ -1633,6 +1682,24 @@ def admin_issue_set_status(issue_id: int):
     finally:
         db.close()
 
+@app.post("/admin/issues/<int:issue_id>/done")
+@cf_required
+def admin_issue_done(issue_id: int):
+    user = request.cf_user  # type: ignore[attr-defined]
+    if getattr(user, "role", "") != "admin":
+        abort(403)
+
+    db = SessionLocal()
+    try:
+        issue = db.get(Issue, issue_id)
+        if not issue:
+            abort(404)
+
+        issue.status = "done"
+        db.commit()
+        return redirect(url_for("admin_issues"))
+    finally:
+        db.close()
 
 @app.post("/worker/task/<int:task_id>/next_day")
 @cf_required
@@ -1695,6 +1762,60 @@ def worker_task_back_today(task_id):
         db.commit()
         flash("Task returned to today.")
         return redirect(url_for("worker_dashboard", module=module))
+    finally:
+        db.close()
+
+@app.post("/worker/task/<int:task_id>/photo")
+@cf_required
+def worker_task_add_photo(task_id: int):
+    user = request.cf_user  # type: ignore[attr-defined]
+    module = request.form.get("module") or "all"
+    view = request.form.get("view") or "today"
+    default_url = url_for("worker_today", module=module, view=view)
+
+    db = SessionLocal()
+    try:
+        t = db.get(Task, task_id)
+        if not t:
+            flash("Task not found.")
+            return redirect(default_url)
+
+        if not is_task_allowed_for_worker(db, t, user):
+            flash("You are not allowed to add photos to this task.")
+            return redirect(default_url)
+
+        f = request.files.get("photo")
+        if not f or not f.filename:
+            flash("No photo selected.")
+            return redirect(default_url)
+
+        if not allowed_image_file(f.filename):
+            flash("Unsupported image format.")
+            return redirect(default_url)
+
+        original_name = secure_filename(f.filename)
+        ext = original_name.rsplit(".", 1)[1].lower()
+        unique_name = f"{uuid4().hex}.{ext}"
+
+        upload_dir = os.path.join(app.static_folder, "uploads", "tasks", str(task_id))
+        os.makedirs(upload_dir, exist_ok=True)
+
+        abs_path = os.path.join(upload_dir, unique_name)
+        f.save(abs_path)
+
+        rel_path = f"uploads/tasks/{task_id}/{unique_name}"
+
+        db.add(TaskPhoto(
+            task_id=task_id,
+            filename=original_name,
+            file_path=rel_path,
+            uploaded_by=getattr(user, "id", None)
+        ))
+        db.commit()
+
+        flash("Photo uploaded.")
+        return redirect(default_url)
+
     finally:
         db.close()
 

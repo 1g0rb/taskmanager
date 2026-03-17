@@ -3,6 +3,7 @@
 {% set ids = task_to_user_ids.get(t.id, []) %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
 {% set is_today = (t.task_date and (t.task_date|string) == (today|string)) %}
+{% set latest_photo = (latest_photo_by_task|default({})).get(t.id) %}
 
 <article class="task-card" data-group="{{ group }}" data-status="{{ s }}">
 
@@ -11,7 +12,8 @@
     {% elif group == 'upcoming' %}accent-upcoming
     {% elif s == 'in_progress' %}accent-progress
     {% elif s == 'blocked' %}accent-blocked
-    {% else %}accent-today{% endif %}"></div>
+    {% else %}accent-today{% endif %}">
+  </div>
 
   <div class="task-body">
 
@@ -51,15 +53,14 @@
     <div class="task-subline assignees">
       <span class="meta">👤
         {% for uid in ids %}
-          {{ users[uid].username if uid in users else "?" }}{% if not loop.last %}, {% endif %}
+          {{ users[uid].username.split('@')[0] if uid in users and users[uid].username else "?" }}{% if not loop.last %}, {% endif %}
         {% endfor %}
       </span>
     </div>
     {% endif %}
 
-    <div class="task-actions">
+    <div class="task-actions-grid">
 
-      {# START #}
       {% if s == "open" %}
       <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -75,7 +76,6 @@
       </form>
       {% endif %}
 
-      {# DONE #}
       {% if s != "done" %}
       <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -87,13 +87,28 @@
       </form>
       {% endif %}
 
-      {# BLOCK / UNBLOCK #}
+      {% if group == "today" and s != "done" and s != "blocked" %}
+      <form method="post" action="{{ url_for('worker_task_next_day', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="wbtn secondary" type="submit">⏭ Next day</button>
+      </form>
+      {% elif group == "overdue" and s != "done" %}
+      <form method="post" action="{{ url_for('worker_task_back_today', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="wbtn secondary" type="submit">↩ Back to today</button>
+      </form>
+      {% else %}
+      <form>
+        <button class="wbtn secondary" type="button" disabled>⏭ Next day</button>
+      </form>
+      {% endif %}
+
       {% if s == "blocked" %}
       <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
         <button class="wbtn block" type="submit">🔓 Unblock</button>
       </form>
-      {% elif s in ["open","in_progress"] %}
+      {% elif s in ["open", "in_progress"] %}
       <form>
         <button class="wbtn block" type="button" onclick="
           const card=this.closest('.task-card');
@@ -111,6 +126,17 @@
       </form>
       {% endif %}
 
+    </div>
+
+    <div class="task-media-preview">
+      {% if latest_photo %}
+      <img
+        src="{{ url_for('static', filename=latest_photo) }}"
+        alt="Task photo"
+        class="task-photo-thumb">
+      {% else %}
+      <div class="task-photo-placeholder">No photo</div>
+      {% endif %}
     </div>
 
     <div class="task-details-link">
@@ -152,7 +178,7 @@
           <select class="input" name="blocked_location_id">
             <option value="">-- Residence (optional) --</option>
             {% for loc in residences_by_parent.get(t.location_id, []) %}
-              <option value="{{ loc.id }}">{{ loc.name }}</option>
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
             {% endfor %}
           </select>
 

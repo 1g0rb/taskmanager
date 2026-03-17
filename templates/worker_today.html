@@ -12,7 +12,7 @@
   <div class="worker-topbar">
     <div class="worker-topbar-inner">
       <div class="worker-brand">
-        <span class="brand-mark">🍃</span>
+        <span class="brand-mark">TM</span>
         <div class="brand-text">
           <div class="brand-title">TaskManager</div>
           <div class="brand-sub">Meneghetti</div>
@@ -26,17 +26,20 @@
     <div class="worker-date">{{ today }}</div>
 
     <section class="worker-stats-row" aria-label="Quick stats">
-      <a class="worker-stat-pill" href="#today">
+      <a class="worker-stat-pill {% if view == 'today' %}active{% endif %}"
+         href="{{ url_for('worker_today', module=module, view='today') }}">
         <div class="label">Today</div>
         <div class="value">{{ today_tasks|length }}</div>
       </a>
 
-      <a class="worker-stat-pill" href="#overdue">
+      <a class="worker-stat-pill {% if view == 'unfinished' %}active{% endif %}"
+         href="{{ url_for('worker_today', module=module, view='unfinished') }}">
         <div class="label">Unfinished</div>
         <div class="value danger">{{ overdue_tasks|length }}</div>
       </a>
 
-      <a class="worker-stat-pill" href="#upcoming">
+      <a class="worker-stat-pill {% if view == 'upcoming' %}active{% endif %}"
+         href="{{ url_for('worker_today', module=module, view='upcoming') }}">
         <div class="label">Upcoming</div>
         <div class="value">{{ upcoming_tasks|length }}</div>
       </a>
@@ -44,38 +47,44 @@
 
     <section class="task-list">
 
-      {% if overdue_tasks %}
-        <div id="overdue" class="group-head">UNFINISHED</div>
-        {% for t in overdue_tasks %}
-          {% set group = "overdue" %}
-          {% include "partials/_task_card_worker.html" %}
-        {% endfor %}
+      {% if view == "unfinished" %}
+        <div class="group-head">UNFINISHED</div>
+        {% if overdue_tasks %}
+          {% for t in overdue_tasks %}
+            {% set group = "overdue" %}
+            {% include "partials/_task_card_worker.html" %}
+          {% endfor %}
+        {% else %}
+          <div class="empty muted">No unfinished tasks.</div>
+        {% endif %}
       {% endif %}
 
-      <div id="today" class="group-head">TODAY</div>
-      {% if today_tasks %}
-        {% for t in today_tasks %}
-          {% set group = "today" %}
-          {% include "partials/_task_card_worker.html" %}
-        {% endfor %}
-      {% else %}
-        <div class="empty muted">No tasks for today.</div>
+      {% if view == "today" %}
+        <div class="group-head">TODAY</div>
+        {% if today_tasks %}
+          {% for t in today_tasks %}
+            {% set group = "today" %}
+            {% include "partials/_task_card_worker.html" %}
+          {% endfor %}
+        {% else %}
+          <div class="empty muted">No tasks for today.</div>
+        {% endif %}
       {% endif %}
 
-      <div id="upcoming" class="group-head">UPCOMING</div>
-      {% if upcoming_tasks %}
-        {% for t in upcoming_tasks %}
-          {% set group = "upcoming" %}
-          {% include "partials/_task_card_worker.html" %}
-        {% endfor %}
-      {% else %}
-        <div class="empty muted">No upcoming tasks.</div>
+      {% if view == "upcoming" %}
+        <div class="group-head">UPCOMING</div>
+        {% if upcoming_tasks %}
+          {% for t in upcoming_tasks %}
+            {% set group = "upcoming" %}
+            {% include "partials/_task_card_worker.html" %}
+          {% endfor %}
+        {% else %}
+          <div class="empty muted">No upcoming tasks.</div>
+        {% endif %}
       {% endif %}
 
     </section>
   </div>
-
-
 
 </div>
 
