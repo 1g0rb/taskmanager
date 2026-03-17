@@ -929,7 +929,17 @@ def admin_tasks():
         for task_id, iss in issue_by_task_id.items():
             if iss.photos:
                 linked_issue_photo_by_task_id[task_id] = iss.photos[0].file_path
+        photo_rows = (
+            db.query(TaskPhoto)
+            .filter(TaskPhoto.task_id.in_(task_ids))
+            .order_by(TaskPhoto.created_at.desc())
+            .all()
+        ) if task_ids else []
 
+        latest_task_photo_by_task_id = {}
+        for p in photo_rows:
+            if p.task_id not in latest_task_photo_by_task_id:
+                latest_task_photo_by_task_id[p.task_id] = p.file_path
         return render_template(
             "admin_tasks.html",
             title="Tasks",
@@ -944,6 +954,7 @@ def admin_tasks():
             urgent_tasks=urgent_tasks,
             issue_by_task_id=issue_by_task_id,
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
+            latest_task_photo_by_task_id=latest_task_photo_by_task_id,
         )
     finally:
         db.close()
@@ -2285,7 +2296,7 @@ def admin_tasks_batch_unblock():
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_file(e):
     flash("Image too large. Maximum size is 6MB.")
-    return redirect(request.referrer or url_for("worker_today"))
+    return redirect(request.referrer or url_for("worker_dashboard"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
