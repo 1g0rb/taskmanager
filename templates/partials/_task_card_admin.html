@@ -81,6 +81,18 @@
         {% endif %}
 
       </div>
+      {% if latest_task_photo_by_task_id.get(t.id) %}
+  <div class="task-photo-wrap" style="margin-top:12px;">
+    <div class="small" style="margin-bottom:6px;">Task photo</div>
+
+    <img
+      src="{{ url_for('static', filename=latest_task_photo_by_task_id[t.id]) }}"
+      alt="Task photo"
+      class="issue-thumb js-lightbox-image"
+      data-fullsrc="{{ url_for('static', filename=latest_task_photo_by_task_id[t.id]) }}"
+      style="width:100%; max-width:260px; height:160px; object-fit:cover; border-radius:12px; border:1px solid rgba(0,0,0,.08); display:block;">
+  </div>
+{% endif %}
 {% if linked_issue_photo_by_task_id.get(t.id) %}
   <div class="task-source-issue" style="margin-top:12px;">
     <div class="small" style="margin-bottom:6px;">
