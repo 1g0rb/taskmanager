@@ -1460,3 +1460,18 @@ body.is-worker .mobile-overlay{
     padding-top: 14px !important;
   }
 }
+
+
+/*issue booton*/
+
+.table .btn{
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,.08);
+  background: #fff;
+  cursor: pointer;
+}
+
+.table .btn:hover{
+  background: #f5f5f5;
+}
