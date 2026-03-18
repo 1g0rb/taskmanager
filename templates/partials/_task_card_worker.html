@@ -43,8 +43,7 @@
     {% endif %}
 
     <div class="task-subline">
-      <span
-        class="pill module {% if t.module == 'garden' %}garden{% elif t.module == 'horticulture' %}horti{% endif %}">
+      <span class="pill module {% if t.module == 'garden' %}garden{% elif t.module == 'horticulture' %}horti{% endif %}">
         {{ t.module }}
       </span>
       <span class="meta">📍 {{ loc_name }}</span>
@@ -54,23 +53,33 @@
     <div class="task-subline assignees">
       <span class="meta">👤
         {% for uid in ids %}
-        {{ users[uid].username.split('@')[0] if uid in users and users[uid].username else "?" }}{% if not loop.last %},
-        {% endif %}
+          {{ users[uid].username.split('@')[0] if uid in users and users[uid].username else "?" }}{% if not loop.last %}, {% endif %}
         {% endfor %}
       </span>
     </div>
     {% endif %}
-    {% if linked_issue_photo_by_task_id.get(t.id) %}
-    <div class="task-media-preview">
-      <div class="small" style="margin-bottom:6px;">
-        Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
-      </div>
 
-      <img src="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}" alt="Source issue photo"
-        class="task-photo-thumb js-lightbox-image"
-        data-fullsrc="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}">
+    <div class="task-media-preview">
+      {% if latest_photo %}
+        <img
+          src="{{ url_for('static', filename=latest_photo) }}"
+          alt="Task photo"
+          class="task-photo-thumb js-lightbox-image"
+          data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
+      {% elif linked_issue_photo_by_task_id.get(t.id) %}
+        <div class="small" style="margin-bottom:6px;">
+          Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
+        </div>
+        <img
+          src="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}"
+          alt="Source issue photo"
+          class="task-photo-thumb js-lightbox-image"
+          data-fullsrc="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}">
+      {% else %}
+        <div class="task-photo-placeholder">No photo</div>
+      {% endif %}
     </div>
-    {% endif %}
+
     <div class="task-actions-grid">
 
       {% if s == "open" %}
@@ -138,15 +147,6 @@
       </form>
       {% endif %}
 
-    </div>
-
-    <div class="task-media-preview">
-      {% if latest_photo %}
-      <img src="{{ url_for('static', filename=latest_photo) }}" alt="Task photo"
-        class="task-photo-thumb js-lightbox-image" data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
-      {% else %}
-      <div class="task-photo-placeholder">No photo</div>
-      {% endif %}
     </div>
 
     <div class="task-details-link">
