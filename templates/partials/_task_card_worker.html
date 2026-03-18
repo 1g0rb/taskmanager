@@ -60,19 +60,17 @@
       </span>
     </div>
     {% endif %}
-{% if linked_issue_photo_by_task_id.get(t.id) %}
-  <div class="task-media-preview">
-    <div class="small" style="margin-bottom:6px;">
-      Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
-    </div>
+    {% if linked_issue_photo_by_task_id.get(t.id) %}
+    <div class="task-media-preview">
+      <div class="small" style="margin-bottom:6px;">
+        Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
+      </div>
 
-    <img
-      src="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}"
-      alt="Source issue photo"
-      class="task-photo-thumb js-lightbox-image"
-      data-fullsrc="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}">
-  </div>
-{% endif %}
+      <img src="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}" alt="Source issue photo"
+        class="task-photo-thumb js-lightbox-image"
+        data-fullsrc="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}">
+    </div>
+    {% endif %}
     <div class="task-actions-grid">
 
       {% if s == "open" %}
@@ -142,15 +140,12 @@
 
     </div>
 
-       <div class="task-media-preview">
+    <div class="task-media-preview">
       {% if latest_photo %}
-        <img
-          src="{{ url_for('static', filename=latest_photo) }}"
-          alt="Task photo"
-          class="task-photo-thumb js-lightbox-image"
-          data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
+      <img src="{{ url_for('static', filename=latest_photo) }}" alt="Task photo"
+        class="task-photo-thumb js-lightbox-image" data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
       {% else %}
-        <div class="task-photo-placeholder">No photo</div>
+      <div class="task-photo-placeholder">No photo</div>
       {% endif %}
     </div>
 
