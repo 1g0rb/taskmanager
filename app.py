@@ -1473,6 +1473,17 @@ def worker_dashboard():
             today_tasks = []
         today_pretty = today.strftime("%A, %B %d, %Y")
 
+        photo_rows = (
+            db.query(TaskPhoto)
+            .filter(TaskPhoto.task_id.in_(all_ids))
+            .order_by(TaskPhoto.created_at.desc())
+            .all()
+        ) if all_ids else []
+
+        latest_task_photo_by_task_id = {}
+        for p in photo_rows:
+            if p.task_id not in latest_task_photo_by_task_id:
+                latest_task_photo_by_task_id[p.task_id] = p.file_path
         return render_template(
             "worker_dashboard.html",
             title="My tasks",
@@ -1491,6 +1502,7 @@ def worker_dashboard():
             active_tab="tasks",
             issue_by_task_id=issue_by_task_id,
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
+            latest_task_photo_by_task_id=latest_task_photo_by_task_id,
             view=view,
         )
     finally:

@@ -3,7 +3,7 @@
 {% set ids = task_to_user_ids.get(t.id, []) %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
 {% set is_today = (t.task_date and (t.task_date|string) == (today|string)) %}
-{% set latest_photo = (latest_photo_by_task|default({})).get(t.id) %}
+{% set latest_photo = (latest_task_photo_by_task_id|default({})).get(t.id) %}
 
 <article class="task-card" data-group="{{ group }}" data-status="{{ s }}">
 
@@ -142,12 +142,15 @@
 
     </div>
 
-    <div class="task-media-preview">
+       <div class="task-media-preview">
       {% if latest_photo %}
-      <img src="{{ url_for('static', filename=latest_photo) }}" alt="Task photo" class="task-photo-thumb js-task-photo"
-        data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
+        <img
+          src="{{ url_for('static', filename=latest_photo) }}"
+          alt="Task photo"
+          class="task-photo-thumb js-lightbox-image"
+          data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
       {% else %}
-      <div class="task-photo-placeholder">No photo</div>
+        <div class="task-photo-placeholder">No photo</div>
       {% endif %}
     </div>
 
