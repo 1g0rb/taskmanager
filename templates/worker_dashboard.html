@@ -30,19 +30,19 @@
   <a class="worker-stat-pill {{ 'active' if view == 'today' else '' }}"
      href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
     <div class="label">Today</div>
-    <div class="value">{{ today_tasks|length }}</div>
+    <div class="value">{{ today_count }}</div>
   </a>
 
   <a class="worker-stat-pill {{ 'active' if view == 'unfinished' else '' }}"
      href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='unfinished') }}">
     <div class="label">Unfinished</div>
-    <div class="value danger">{{ overdue_tasks|length }}</div>
+    <div class="value danger">{{ overdue_count }}</div>
   </a>
 
   <a class="worker-stat-pill {{ 'active' if view == 'upcoming' else '' }}"
      href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='upcoming') }}">
     <div class="label">Upcoming</div>
-    <div class="value">{{ upcoming_tasks|length }}</div>
+    <div class="value">{{ upcoming_count }}</div>
   </a>
 </section>
 
