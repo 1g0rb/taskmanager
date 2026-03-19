@@ -15,10 +15,20 @@ venv/
 instance/
 config.py
 
-# DB (ako ne želiš u repo)
+# Databases
 *.db
 *.sqlite
 *.sqlite3
+data/*.db
+
+# Uploads
+static/uploads/
+uploads/
+
+# Backups / archives
+*.zip
+*.backup_*
+*.bak
 
 # OS / editor
 .DS_Store
