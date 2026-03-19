@@ -1424,6 +1424,11 @@ def worker_dashboard():
             Task.id.asc()
         ).all()
 
+        # ORIGINALNI COUNTS - uvijek iz punih lista
+        overdue_count = len(overdue_tasks)
+        today_count = len(today_tasks)
+        upcoming_count = len(upcoming_tasks)
+
         locations = {l.id: l for l in db.query(Location).all()}
         users = {u.id: u for u in db.query(User).all()}
 
@@ -1462,16 +1467,6 @@ def worker_dashboard():
         for task_id, iss in issue_by_task_id.items():
             if iss.photos:
                 linked_issue_photo_by_task_id[task_id] = iss.photos[0].file_path
-        if view == "today":
-            overdue_tasks = []
-            upcoming_tasks = []
-        elif view == "unfinished":
-            today_tasks = []
-            upcoming_tasks = []
-        elif view == "upcoming":
-            overdue_tasks = []
-            today_tasks = []
-        today_pretty = today.strftime("%A, %B %d, %Y")
 
         photo_rows = (
             db.query(TaskPhoto)
@@ -1484,14 +1479,37 @@ def worker_dashboard():
         for p in photo_rows:
             if p.task_id not in latest_task_photo_by_task_id:
                 latest_task_photo_by_task_id[p.task_id] = p.file_path
+
+        # DISPLAY liste - samo za ono što se vidi na ekranu
+        display_overdue_tasks = overdue_tasks
+        display_today_tasks = today_tasks
+        display_upcoming_tasks = upcoming_tasks
+
+        if view == "today":
+            display_overdue_tasks = []
+            display_upcoming_tasks = []
+        elif view == "unfinished":
+            display_today_tasks = []
+            display_upcoming_tasks = []
+        elif view == "upcoming":
+            display_overdue_tasks = []
+            display_today_tasks = []
+        else:
+            view = "all"
+
+        today_pretty = today.strftime("%A, %B %d, %Y")
+
         return render_template(
             "worker_dashboard.html",
             title="My tasks",
             body_class="worker",
             today_pretty=today_pretty,
-            overdue_tasks=overdue_tasks,
-            today_tasks=today_tasks,
-            upcoming_tasks=upcoming_tasks,
+            overdue_tasks=display_overdue_tasks,
+            today_tasks=display_today_tasks,
+            upcoming_tasks=display_upcoming_tasks,
+            overdue_count=overdue_count,
+            today_count=today_count,
+            upcoming_count=upcoming_count,
             locations=locations,
             users=users,
             task_to_user_ids=task_to_user_ids,
@@ -1507,22 +1525,6 @@ def worker_dashboard():
         )
     finally:
         db.close()
-def safe_next_url(default: str):
-    # next dolazi iz POST forme (hidden input)
-    nxt = (request.form.get("next") or "").strip()
-    if not nxt:
-        return default
-
-    # dozvoli samo relative URL (npr. /worker/today?...), zabrani http://...
-    p = urlparse(nxt)
-    if p.scheme or p.netloc:
-        return default
-
-    # minimalna zaštita: mora početi s /
-    if not nxt.startswith("/"):
-        return default
-
-    return nxt
 
 # -------- Worker actions --------
 @app.post("/worker/task/<int:task_id>/start")
