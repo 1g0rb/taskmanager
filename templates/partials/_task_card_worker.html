@@ -59,27 +59,35 @@
     </div>
     {% endif %}
 
-    <div class="task-media-preview">
-      {% if latest_photo %}
-        <img
-          src="{{ url_for('static', filename=latest_photo) }}"
-          alt="Task photo"
-          class="task-photo-thumb js-lightbox-image"
-          data-fullsrc="{{ url_for('static', filename=latest_photo) }}">
-      {% elif linked_issue_photo_by_task_id.get(t.id) %}
-        <div class="small" style="margin-bottom:6px;">
-          Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
-        </div>
-        <img
-          src="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}"
-          alt="Source issue photo"
-          class="task-photo-thumb js-lightbox-image"
-          data-fullsrc="{{ url_for('static', filename=linked_issue_photo_by_task_id[t.id]) }}">
-      {% else %}
-        <div class="task-photo-placeholder">No photo</div>
-      {% endif %}
-    </div>
+   <div class="task-media-preview">
+  {% if latest_photo %}
+    {% set photo_file = latest_photo[7:] if latest_photo.startswith('static/') else latest_photo %}
+    <img
+      src="{{ url_for('static', filename=photo_file) }}"
+      alt="Task photo"
+      class="task-photo-thumb js-lightbox-image"
+      data-fullsrc="{{ url_for('static', filename=photo_file) }}"
+      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    <div class="task-photo-placeholder" style="display:none;">No photo</div>
 
+  {% elif linked_issue_photo_by_task_id.get(t.id) %}
+    {% set issue_photo = linked_issue_photo_by_task_id[t.id] %}
+    {% set issue_photo_file = issue_photo[7:] if issue_photo.startswith('static/') else issue_photo %}
+    <div class="small" style="margin-bottom:6px;">
+      Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
+    </div>
+    <img
+      src="{{ url_for('static', filename=issue_photo_file) }}"
+      alt="Source issue photo"
+      class="task-photo-thumb js-lightbox-image"
+      data-fullsrc="{{ url_for('static', filename=issue_photo_file) }}"
+      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    <div class="task-photo-placeholder" style="display:none;">No photo</div>
+
+  {% else %}
+    <div class="task-photo-placeholder">No photo</div>
+  {% endif %}
+</div>
     <div class="task-actions-grid">
 
       {% if s == "open" %}
