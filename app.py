@@ -198,6 +198,22 @@ class IssuePhoto(Base):
 
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
 
+def safe_next_url(default: str):
+    nxt = (request.form.get("next") or "").strip()
+
+    if not nxt:
+        return default
+
+    p = urlparse(nxt)
+
+    if p.scheme or p.netloc:
+        return default
+
+    if not nxt.startswith("/"):
+        return default
+
+    return nxt
+
 def allowed_image_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
