@@ -44,6 +44,12 @@
     {% endif %}
 
     <main class="main-content">
+      {% if dev_lan_bypass %}
+      <div class="dev-banner">
+        <strong>DEV LAN BYPASS ACTIVE</strong>
+        <span>Mobile/local network access is enabled for testing.</span>
+      </div>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
 

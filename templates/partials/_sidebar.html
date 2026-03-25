@@ -1,24 +1,33 @@
 <aside id="sidebar" class="sidebar">
   <div class="logo">
-    <div style="width:36px;height:36px;border-radius:12px;background:rgba(95,122,106,.22);display:flex;align-items:center;justify-content:center;">
+    <div
+      style="width:36px;height:36px;border-radius:12px;background:rgba(95,122,106,.22);display:flex;align-items:center;justify-content:center;">
       🌿
     </div>
     <h2>TaskManager</h2>
   </div>
 
   <nav class="nav">
-    <a class="{{ 'active' if request.endpoint=='admin_tasks' else '' }}" href="{{ url_for('admin_tasks') }}">📊 Dashboard</a>
-    <a class="{{ 'active' if request.endpoint=='admin_task_new' else '' }}" href="{{ url_for('admin_task_new') }}">➕ Create task</a>
-    <a class="{{ 'active' if request.endpoint=='admin_locations' else '' }}" href="{{ url_for('admin_locations') }}">📍 Locations</a>
-    <a class="{{ 'active' if request.endpoint=='admin_users' else '' }}" href="{{ url_for('admin_users') }}">👤 Users</a>
-    <a class="{{ 'active' if request.endpoint=='admin_issues' else '' }}"
-     href="{{ url_for('admin_issues') }}">🛠 Issues</a>
+    <a class="{{ 'active' if request.endpoint=='admin_tasks' else '' }}" href="{{ url_for('admin_tasks') }}">📊
+      Dashboard</a>
+    <a class="{{ 'active' if request.endpoint=='admin_task_new' else '' }}" href="{{ url_for('admin_task_new') }}">➕
+      Create task</a>
+    <a class="{{ 'active' if request.endpoint=='admin_locations' else '' }}" href="{{ url_for('admin_locations') }}">📍
+      Locations</a>
+    <a class="{{ 'active' if request.endpoint=='admin_users' else '' }}" href="{{ url_for('admin_users') }}">👤
+      Users</a>
+    <a class="{{ 'active' if request.endpoint=='admin_issues' else '' }}" href="{{ url_for('admin_issues') }}">🛠
+      Issues</a>
+    <a class="{{ 'active' if request.endpoint=='admin_observation_new' else '' }}"
+      href="{{ url_for('admin_observation_new') }}">
+      📝 Observations
+    </a>
 
     <hr style="margin:16px 0; opacity:.7;">
 
     <a class="sidebar-link" href="{{ url_for('worker_home', module='all') }}">
-  👨‍🌾 Worker view
-</a>
+      👨‍🌾 Worker view
+    </a>
     <a class="small-link" href="{{ url_for('logout') }}">🚪 Logout</a>
   </nav>
 </aside>

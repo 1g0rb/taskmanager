@@ -3,16 +3,27 @@
 
 <div class="worker-shell">
   <div class="worker-topbar">
-    <div class="worker-topbar-inner">
-      <div class="worker-brand">
-        <div class="brand-mark">🌿</div>
-        <div class="brand-text">
-          <div class="brand-title">TaskManager</div>
-          <div class="brand-sub">Worker panel</div>
-        </div>
+  <div class="worker-topbar-inner">
+    
+    <div class="worker-brand">
+      <div class="brand-mark">🌿</div>
+      <div class="brand-text">
+        <div class="brand-title">TaskManager</div>
+        <div class="brand-sub">Meneghetti</div>
       </div>
     </div>
+
+    <div class="worker-topbar-actions">
+      <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
+        🔔
+        {% if unread_observation_count and unread_observation_count > 0 %}
+          <span class="worker-bell-badge">{{ unread_observation_count }}</span>
+        {% endif %}
+      </a>
+    </div>
+
   </div>
+</div>
 
   <div class="worker-page">
 

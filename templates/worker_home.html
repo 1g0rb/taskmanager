@@ -4,13 +4,24 @@
 <div class="worker-shell">
   <div class="worker-topbar">
     <div class="worker-topbar-inner">
+
       <div class="worker-brand">
         <div class="brand-mark">🌿</div>
         <div class="brand-text">
           <div class="brand-title">TaskManager</div>
-          <div class="brand-sub">Worker panel</div>
+          <div class="brand-sub">Meneghetti</div>
         </div>
       </div>
+
+      <div class="worker-topbar-actions">
+        <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
+          🔔
+          {% if unread_observation_count and unread_observation_count > 0 %}
+            <span class="worker-bell-badge">{{ unread_observation_count }}</span>
+          {% endif %}
+        </a>
+      </div>
+
     </div>
   </div>
 
@@ -29,9 +40,9 @@
     <section class="worker-home-hero card">
       <div class="worker-home-hero-icon">👋</div>
       <div class="worker-home-hero-text">
-        <h2 style="margin:0 0 8px 0;">Ready for today?</h2>
+        <h2 style="margin:0 0 8px 0;">Focus on what matters today</h2>
         <p class="small" style="margin:0;">
-          Open your tasks, report an issue, or check your settings.
+          Check your next priority task, unread observations, or jump straight into your task list.
         </p>
       </div>
     </section>
@@ -51,14 +62,45 @@
       </div>
     </section>
 
+    <section class="worker-focus-grid">
+      <a class="worker-focus-card primary" href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
+        <div class="worker-focus-kicker">Next priority</div>
+        {% if priority_task %}
+          <div class="worker-focus-title">{{ priority_task.title }}</div>
+          <div class="worker-focus-text">
+            {% if priority_task.task_date %}
+              Scheduled for {{ priority_task.task_date }}
+            {% else %}
+              Open task ready to start
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="worker-focus-title">No urgent task right now</div>
+          <div class="worker-focus-text">Open your task list to review upcoming work.</div>
+        {% endif %}
+      </a>
+
+      <a class="worker-focus-card" href="{{ url_for('worker_observations') }}">
+        <div class="worker-focus-kicker">Observations</div>
+        <div class="worker-focus-title">
+          {% if unread_observation_count == 1 %}
+            1 unread observation
+          {% else %}
+            {{ unread_observation_count }} unread observations
+          {% endif %}
+        </div>
+        <div class="worker-focus-text">Open observations to read new notes from admin.</div>
+      </a>
+    </section>
+
     <section class="worker-home-actions">
       <a class="worker-home-action-card" href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
-  <div class="worker-home-action-icon">✅</div>
-  <div class="worker-home-action-body">
-    <div class="worker-home-action-title">Open My Tasks</div>
-    <div class="worker-home-action-text">See today, overdue and upcoming tasks.</div>
-  </div>
-</a>
+        <div class="worker-home-action-icon">✅</div>
+        <div class="worker-home-action-body">
+          <div class="worker-home-action-title">Open My Tasks</div>
+          <div class="worker-home-action-text">See today, overdue and upcoming tasks.</div>
+        </div>
+      </a>
 
       <a class="worker-home-action-card" href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
         <div class="worker-home-action-icon">🛠</div>

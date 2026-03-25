@@ -14,11 +14,10 @@ from urllib.parse import urlparse
 from werkzeug.security import generate_password_hash
 
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Date, or_, text, case
+    create_engine, Column, Integer, String, Boolean, Date, DateTime,
+    ForeignKey, Text, text, select, case, or_
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
-from sqlalchemy import select
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from werkzeug.exceptions import RequestEntityTooLarge
 from PIL import Image, ImageOps
 import requests
@@ -39,7 +38,7 @@ Base = declarative_base()
 
 TELEGRAM_BOT_TOKEN = os.environ.get(
     "TELEGRAM_BOT_TOKEN",
-    "8723576715:AAFztHilx8IGlIwTibaK9Pg2YGZpZcp0YYQ"
+    ""
 ).strip()
 
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get(
@@ -196,6 +195,28 @@ class IssuePhoto(Base):
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+class Observation(Base):
+    __tablename__ = "observations"
+
+    id = Column(Integer, primary_key=True)
+    note = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+
+    photo_path = Column(String(255), nullable=True)
+
+    module = Column(String(50), nullable=True)
+    location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
+
+    assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    status = Column(String(20), nullable=False, default="new")  # new / seen / done
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    location = relationship("Location")
+    assigned_user = relationship("User", foreign_keys=[assigned_user_id])
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id])
+
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
 
 def safe_next_url(default: str):
@@ -282,13 +303,28 @@ def ensure_user_column_display_name():
             conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR"))
             print("✅ Added column: users.display_name")
 
+def ensure_observation_column_is_read():
+    with engine.begin() as conn:
+        tables = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='observations'")
+        ).fetchall()
+        if not tables:
+            return
+
+        cols = conn.execute(text("PRAGMA table_info(observations)")).fetchall()
+        names = {c[1] for c in cols}
+        if "is_read" not in names:
+            conn.execute(text("ALTER TABLE observations ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
+            print("Added column: observations.is_read")
+
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
 ensure_user_column_display_name()
+ensure_observation_column_is_read()
 
 # ---------------- App ----------------
 app = Flask(__name__)
-app.secret_key = "dev-change-me"  # kasnije prebaci u ENV
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
 
 # ---------------- Cloudflare Access auth ----------------
@@ -300,13 +336,23 @@ ADMIN_EMAILS = {
     "bozicorama@gmail.com",
 }
 DEV_BYPASS = os.environ.get("DEV_BYPASS", "").lower() in ("1", "true", "yes")
+DEV_LAN_BYPASS = os.environ.get("DEV_LAN_BYPASS", "").lower() in ("1", "true", "yes")
 
 
 def redirect_back(default="admin_tasks"):
-    next_url = request.args.get("next") or request.form.get("next")
-    if next_url:
-        return redirect(next_url)
-    return redirect(url_for(default))
+    return redirect(safe_next_url(url_for(default)))
+
+def get_task_ids_from_request() -> list[int]:
+    raw_values = request.form.getlist("task_ids")
+    task_ids: list[int] = []
+
+    for raw in raw_values:
+        for part in (raw or "").split(","):
+            part = part.strip()
+            if part.isdigit():
+                task_ids.append(int(part))
+
+    return task_ids
 
 
 @app.context_processor
@@ -322,11 +368,15 @@ def inject_current_user():
                 username=u.username,
                 role=u.role,
                 lang=getattr(u, "lang", "en"),
-            )
+            ),
+            "dev_lan_bypass": DEV_LAN_BYPASS,
         }
 
     # kad nema auth (npr. /health ili 401 slučajevi)
-    return {"current_user": SimpleNamespace(is_authenticated=False, role="worker", username="")}
+    return {
+        "current_user": SimpleNamespace(is_authenticated=False, role="worker", username=""),
+        "dev_lan_bypass": DEV_LAN_BYPASS,
+    }
 
 def _random_password_hash() -> str:
     return generate_password_hash(secrets.token_urlsafe(32))
@@ -419,8 +469,14 @@ def get_current_user_or_dev(db: Session) -> User | None:
     if user:
         return user
 
-    # DEV/LAN bypass: ako je lokalni request ili ako je DEV_BYPASS upaljen
-    if DEV_BYPASS or is_local_request():
+    # local dev override: ?as_user=email@domain.com
+    if is_local_request() or (DEV_LAN_BYPASS and is_private_network_request()):
+        as_user = (request.args.get("as_user") or request.form.get("as_user") or "").strip().lower()
+        if as_user:
+            u = db.query(User).filter(User.username == as_user, User.is_active == True).first()
+            if u:
+                return u
+
         return get_local_dev_user(db)
 
     return None
@@ -619,22 +675,27 @@ def copy_assignees(db, src_task_id: int, dst_task_id: int) -> None:
 
 def is_local_request() -> bool:
     """
-    True if request is coming from localhost/LAN (dev/local testing).
-    Works both with and without reverse proxy.
+    True only for direct localhost requests in development.
     """
-    # 1) direct remote addr
-    ra = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    if not ra:
-        ra = request.remote_addr or ""
+    ra = request.remote_addr or ""
 
     try:
         ip = ip_address(ra)
     except ValueError:
         return False
 
-    # localhost + private ranges
+    return ip.is_loopback
+
+def is_private_network_request() -> bool:
+    ra = request.remote_addr or ""
+
+    try:
+        ip = ip_address(ra)
+    except ValueError:
+        return False
+
     if ip.is_loopback:
-        return True
+        return False
 
     private_nets = [
         ip_network("10.0.0.0/8"),
@@ -662,12 +723,40 @@ def save_optimized_image(file_storage, abs_path: str, max_size=(1600, 1600), qua
     img.save(abs_path, format="JPEG", quality=quality, optimize=True)
 
 @app.route("/test-telegram")
+@admin_required
 def test_telegram():
     token_ok = test_telegram_bot_token()
     sent_ok = send_telegram_message(
         f"✅ Test poruka iz TaskManagera.\n{TASKMANAGER_URL}"
     )
     return f"Token OK: {token_ok} | Telegram sent: {sent_ok}"
+
+def get_worker_unread_observation_count(db: Session, user_id: int) -> int:
+    return (
+        db.query(Observation)
+        .filter(
+            Observation.assigned_user_id == user_id,
+            Observation.is_read == False,
+        )
+        .count()
+    )
+
+def get_current_db_user(db: Session):
+    user = getattr(request, "cf_user", None)
+    if not user:
+        return None
+
+    email = (
+        getattr(user, "email", None)
+        or getattr(user, "username", None)
+        or getattr(user, "sub", None)
+    )
+
+    if not email:
+        return None
+
+    return db.query(User).filter(User.username == email).first()
+
 
 # ---------------- Health ----------------
 @app.get("/health")
@@ -828,9 +917,15 @@ def admin_tasks():
     db = SessionLocal()
     try:
         today = date.today().isoformat()
+        selected_module = (request.args.get("module") or "").strip().lower()
+        selected_location_raw = (request.args.get("location_id") or "").strip()
+        selected_assignee_raw = (request.args.get("assignee_id") or "").strip()
+        selected_location_id = int(selected_location_raw) if selected_location_raw.isdigit() else None
+        selected_assignee_id = int(selected_assignee_raw) if selected_assignee_raw.isdigit() else None
+        selected_assignee_set = {selected_assignee_id} if selected_assignee_id is not None else set()
 
         # LOAD TASKS
-        tasks = db.query(Task).all()
+        all_tasks = db.query(Task).all()
 
         # SMART SORT (command center order)
         def task_sort_key(t):
@@ -844,17 +939,20 @@ def admin_tasks():
                 return (1, d)
             return (2, d)
 
-        tasks = sorted(tasks, key=task_sort_key)[:200]
-
         # LOOKUPS
         locations = {l.id: l for l in db.query(Location).all()}
         users = {u.id: u for u in db.query(User).all()}
+        assignee_options = [
+            u for u in users.values()
+            if getattr(u, "is_active", False)
+        ]
+        assignee_options = sorted(assignee_options, key=lambda u: (u.display_name or u.username or "").lower())
 
         rows = db.query(TaskAssignee).all()
         task_to_user_ids = {}
         for r in rows:
             task_to_user_ids.setdefault(r.task_id, []).append(r.user_id)
-        all_ids = [t.id for t in tasks if t.id]
+        all_ids = [t.id for t in all_tasks if t.id]
         task_ids = all_ids
 
         linked_issues = (
@@ -874,6 +972,18 @@ def admin_tasks():
             if iss.photos:
                 linked_issue_photo_by_task_id[task_id] = iss.photos[0].file_path
         
+        def matches_admin_filters(task: Task) -> bool:
+            if selected_module and (task.module or "").lower() != selected_module:
+                return False
+            if selected_location_id is not None and task.location_id != selected_location_id:
+                return False
+            if selected_assignee_set and not selected_assignee_set.intersection(task_to_user_ids.get(task.id, [])):
+                return False
+            return True
+
+        tasks = [t for t in all_tasks if matches_admin_filters(t)]
+        tasks = sorted(tasks, key=task_sort_key)[:200]
+
         # FILTER PARAM
         flt = request.args.get("filter", "all")
 
@@ -924,6 +1034,34 @@ def admin_tasks():
             else:
                 groups["upcoming"].append(t)
 
+        done_history_groups = []
+        done_bucket = {}
+
+        def done_group_date(task: Task):
+            return task.finished_at.date() if task.finished_at else task.task_date
+
+        def done_group_sort_key(task: Task):
+            if task.finished_at:
+                return task.finished_at
+            if task.task_date:
+                return datetime.combine(task.task_date, datetime.min.time())
+            return datetime.min
+
+        for t in groups["done"]:
+            group_date = done_group_date(t)
+            if not group_date:
+                continue
+            done_bucket.setdefault(group_date, []).append(t)
+
+        for group_date in sorted(done_bucket.keys(), reverse=True):
+            items = sorted(done_bucket[group_date], key=done_group_sort_key, reverse=True)
+            done_history_groups.append({
+                "key": group_date.isoformat(),
+                "label": group_date.strftime("%A, %Y-%m-%d"),
+                "count": len(items),
+                "items": items,
+            })
+
         # -----------------------------
         # LINKED ISSUE + ISSUE PHOTO MAP
         # -----------------------------
@@ -963,9 +1101,14 @@ def admin_tasks():
             users=users,
             locations=locations,
             task_to_user_ids=task_to_user_ids,
+            assignee_options=assignee_options,
             counts=counts,
             flt=flt,
             groups=groups,
+            done_history_groups=done_history_groups,
+            selected_module=selected_module,
+            selected_location_id=selected_location_id,
+            selected_assignee_id=selected_assignee_id,
             today=today,
             urgent_tasks=urgent_tasks,
             issue_by_task_id=issue_by_task_id,
@@ -1364,6 +1507,8 @@ def worker_home():
         ).all()
 
         today_pretty = today.strftime("%A, %B %d, %Y")
+        unread_observation_count = get_worker_unread_observation_count(db, user.id)
+        priority_task = overdue_tasks[0] if overdue_tasks else (today_tasks[0] if today_tasks else None)
 
         return render_template(
             "worker_home.html",
@@ -1377,6 +1522,8 @@ def worker_home():
             today=today_iso,
             until=until.isoformat(),
             active_tab="home",
+            unread_observation_count=unread_observation_count,
+            priority_task=priority_task,
         )
     finally:
         db.close()
@@ -1514,6 +1661,7 @@ def worker_dashboard():
             view = "all"
 
         today_pretty = today.strftime("%A, %B %d, %Y")
+        unread_observation_count = get_worker_unread_observation_count(db, user.id)
 
         return render_template(
             "worker_dashboard.html",
@@ -1538,6 +1686,7 @@ def worker_dashboard():
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
             latest_task_photo_by_task_id=latest_task_photo_by_task_id,
             view=view,
+            unread_observation_count=unread_observation_count,
         )
     finally:
         db.close()
@@ -2208,11 +2357,9 @@ def admin_task_assign(task_id: int):
 def admin_tasks_batch_done():
     db = SessionLocal()
     try:
-        ids = request.form.getlist("task_ids")
-        if not ids:
+        task_ids = get_task_ids_from_request()
+        if not task_ids:
             return redirect_back()
-
-        task_ids = [int(x) for x in ids]
 
         db.query(Task).filter(Task.id.in_(task_ids)).update(
             {Task.status: "done"},
@@ -2233,13 +2380,12 @@ def admin_tasks_batch_done():
 def admin_tasks_batch_assign():
     db = SessionLocal()
     try:
-        ids = request.form.getlist("task_ids")
+        task_ids = get_task_ids_from_request()
         user_id = request.form.get("user_id")
 
-        if not ids or not user_id:
+        if not task_ids or not user_id:
             return redirect_back()
 
-        task_ids = [int(x) for x in ids]
         user_id = int(user_id)
 
         # insert if not exists
@@ -2264,11 +2410,9 @@ def admin_tasks_batch_assign():
 def admin_tasks_batch_next_day():
     db = SessionLocal()
     try:
-        ids = request.form.getlist("task_ids")
-        if not ids:
+        task_ids = get_task_ids_from_request()
+        if not task_ids:
             return redirect_back()
-
-        task_ids = [int(x) for x in ids]
         rows = db.query(Task).filter(Task.id.in_(task_ids)).all()
 
         for t in rows:
@@ -2288,11 +2432,9 @@ def admin_tasks_batch_next_day():
 def admin_tasks_batch_block():
     db = SessionLocal()
     try:
-        ids = request.form.getlist("task_ids")
-        if not ids:
+        task_ids = get_task_ids_from_request()
+        if not task_ids:
             return redirect_back()
-
-        task_ids = [int(x) for x in ids]
         db.query(Task).filter(
             Task.id.in_(task_ids),
             Task.status != "done"
@@ -2303,17 +2445,200 @@ def admin_tasks_batch_block():
     finally:
         db.close()
 
+@app.route("/admin/observations/new", methods=["GET", "POST"])
+@cf_required
+@admin_required
+def admin_observation_new():
+    db = SessionLocal()
+    try:
+        worker_users = (
+            db.query(User)
+            .filter(User.is_active == True, User.role == "worker")
+            .order_by(User.username.asc())
+            .all()
+        )
+        users = worker_users
+        user_picker_mode = "workers"
+
+        if not users:
+            users = (
+                db.query(User)
+                .filter(User.is_active == True)
+                .order_by(User.username.asc())
+                .all()
+            )
+            user_picker_mode = "all_active"
+
+        locations = (
+            db.query(Location)
+            .filter(Location.is_active == True)
+            .order_by(Location.module.asc(), Location.name.asc())
+            .all()
+        )
+
+        if request.method == "POST":
+            print("\n=== DEBUG POST /admin/observations/new ===")
+
+            note = (request.form.get("note") or "").strip()
+            module = (request.form.get("module") or "").strip() or None
+            loc_raw = (request.form.get("location_id") or "").strip()
+            assigned_raw = (request.form.get("assigned_user_id") or "").strip()
+
+            print("DEBUG note:", repr(note))
+            print("DEBUG module:", repr(module))
+            print("DEBUG loc_raw:", repr(loc_raw))
+            print("DEBUG assigned_raw:", repr(assigned_raw))
+
+            location_id = int(loc_raw) if loc_raw.isdigit() else None
+            assigned_user_id = int(assigned_raw) if assigned_raw.isdigit() else None
+
+            print("DEBUG location_id:", location_id)
+            print("DEBUG assigned_user_id:", assigned_user_id)
+
+            # VALIDACIJE
+            if not note:
+                print("❌ FAIL: note missing")
+                flash("Observation note is required.")
+                return render_template(
+                    "admin_observation_new.html",
+                    title="New observation",
+                    users=users,
+                    user_picker_mode=user_picker_mode,
+                    locations=locations,
+                )
+
+            if not assigned_user_id:
+                print("❌ FAIL: assigned_user_id missing or invalid")
+                flash("Please select a worker.")
+                return render_template(
+                    "admin_observation_new.html",
+                    title="New observation",
+                    users=users,
+                    user_picker_mode=user_picker_mode,
+                    locations=locations,
+                )
+
+            # PHOTO UPLOAD
+            photo_path = None
+            f = request.files.get("photo")
+
+            if f:
+                print("DEBUG photo filename:", f.filename)
+
+            if f and f.filename:
+                ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+
+                print("DEBUG photo extension:", ext)
+
+                if ext not in ALLOWED_IMAGE_EXTENSIONS:
+                    print("❌ FAIL: unsupported image format:", ext)
+                    flash("Unsupported image format.")
+                    return render_template(
+                        "admin_observation_new.html",
+                        title="New observation",
+                        users=users,
+                        user_picker_mode=user_picker_mode,
+                        locations=locations,
+                    )
+
+                filename = secure_filename(f.filename)
+                unique_name = f"{uuid4().hex}_{filename}"
+
+                upload_dir = os.path.join(app.static_folder, "uploads", "observations")
+                os.makedirs(upload_dir, exist_ok=True)
+
+                abs_path = os.path.join(upload_dir, unique_name)
+                f.save(abs_path)
+
+                photo_path = f"/static/uploads/observations/{unique_name}"
+
+                print("DEBUG photo saved to:", photo_path)
+
+            # CURRENT USER
+            current_user = request.cf_user  # type: ignore[attr-defined]
+
+            print("DEBUG current_user:", current_user.id if current_user else None)
+
+            # CREATE OBSERVATION
+            obs = Observation(
+                note=note,
+                module=module,
+                location_id=location_id,
+                assigned_user_id=assigned_user_id,
+                created_by_user_id=current_user.id if current_user else None,
+                photo_path=photo_path,
+                is_read=False,
+                status="new",
+            )
+
+            print("DEBUG about to save observation for user:", assigned_user_id)
+
+            db.add(obs)
+            db.commit()
+
+            print("✅ SUCCESS: observation saved with id:", obs.id)
+            print("=== END DEBUG ===\n")
+
+            flash("Observation created.")
+            return redirect(url_for("admin_tasks"))
+        
+        print("\n=== DEBUG USERS (GET) ===")
+        print("DEBUG users count:", len(users))
+        for u in users:
+            print("DEBUG user:", u.id, u.username, u.role, u.is_active)
+        print("=== END DEBUG USERS ===\n")
+
+        return render_template(
+            "admin_observation_new.html",
+            title="New observation",
+            users=users,
+            user_picker_mode=user_picker_mode,
+            locations=locations,
+        )
+
+    finally:
+        db.close()
+
+@app.route("/worker/observations")
+@cf_required
+def worker_observations():
+    db = SessionLocal()
+    try:
+        current_user = request.cf_user  # type: ignore[attr-defined]
+
+        db.query(Observation).filter(
+            Observation.assigned_user_id == current_user.id,
+            Observation.is_read == False,
+        ).update({Observation.is_read: True}, synchronize_session=False)
+        db.commit()
+
+        observations = (
+            db.query(Observation)
+            .filter(Observation.assigned_user_id == current_user.id)
+            .order_by(Observation.created_at.desc())
+            .all()
+        )
+
+        unread_count = get_worker_unread_observation_count(db, current_user.id)
+
+        return render_template(
+            "worker_observations.html",
+            title="Observations",
+            observations=observations,
+            unread_count=unread_count,
+            active_tab="observations",
+        )
+    finally:
+        db.close()
+
 @app.post("/admin/tasks/batch/unblock")
 @admin_required
 def admin_tasks_batch_unblock():
     db = SessionLocal()
     try:
-        ids = request.form.getlist("task_ids")
-        if not ids:
+        task_ids = get_task_ids_from_request()
+        if not task_ids:
             return redirect_back()
-
-
-        task_ids = [int(x) for x in ids]
         db.query(Task).filter(
             Task.id.in_(task_ids),
             Task.status != "done"
@@ -2323,6 +2648,48 @@ def admin_tasks_batch_unblock():
         return redirect_back()
     finally:
         db.close()
+
+@app.post("/admin/tasks/<int:task_id>/delete")
+@admin_required
+def admin_task_delete(task_id: int):
+    db = SessionLocal()
+    try:
+        task = db.get(Task, task_id)
+        if not task:
+            flash("Task not found.")
+            return redirect_back()
+
+        task_photos = db.query(TaskPhoto).filter(TaskPhoto.task_id == task_id).all()
+        for photo in task_photos:
+            file_path = (photo.file_path or "").strip()
+            if file_path:
+                abs_path = os.path.join(app.static_folder, file_path)
+                if os.path.exists(abs_path):
+                    try:
+                        os.remove(abs_path)
+                    except OSError:
+                        pass
+
+        db.query(TaskAssignee).filter(TaskAssignee.task_id == task_id).delete(synchronize_session=False)
+        db.query(TaskPhoto).filter(TaskPhoto.task_id == task_id).delete(synchronize_session=False)
+        db.query(ResidenceBlock).filter(ResidenceBlock.task_id == task_id).delete(synchronize_session=False)
+        db.query(Issue).filter(Issue.linked_task_id == task_id).update(
+            {Issue.linked_task_id: None},
+            synchronize_session=False,
+        )
+        db.query(Task).filter(Task.carryover_from_task_id == task_id).update(
+            {Task.carryover_from_task_id: None},
+            synchronize_session=False,
+        )
+
+        db.delete(task)
+        db.commit()
+
+        flash("Task deleted.")
+        return redirect_back()
+    finally:
+        db.close()
+
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_file(e):
     flash("Image too large. Maximum size is 6MB.")

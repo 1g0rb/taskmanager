@@ -5,83 +5,137 @@
 
   <div class="dash-stats">
 
-  <a class="dash-stat {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today') }}">
-    <div class="dash-stat-label">Today</div>
-    <div class="dash-stat-value">{{ counts['today'] }}</div>
-    <div class="dash-stat-ico">📅</div>
-  </a>
+    <a class="dash-stat {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
+      <div class="dash-stat-label">Today</div>
+      <div class="dash-stat-value">{{ counts['today'] }}</div>
+      <div class="dash-stat-ico">📅</div>
+    </a>
 
-  <a class="dash-stat {{ 'active' if flt=='unfinished' else '' }}" href="{{ url_for('admin_tasks', filter='unfinished') }}">
-    <div class="dash-stat-label">Unfinished</div>
-    <div class="dash-stat-value danger">{{ counts['unfinished'] }}</div>
-    <div class="dash-stat-ico">⏳</div>
-  </a>
+    <a class="dash-stat {{ 'active' if flt=='unfinished' else '' }}" href="{{ url_for('admin_tasks', filter='unfinished', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
+      <div class="dash-stat-label">Unfinished</div>
+      <div class="dash-stat-value danger">{{ counts['unfinished'] }}</div>
+      <div class="dash-stat-ico">⏳</div>
+    </a>
 
-  <a class="dash-stat {{ 'active' if flt=='upcoming' else '' }}" href="{{ url_for('admin_tasks', filter='upcoming') }}">
-    <div class="dash-stat-label">Upcoming</div>
-    <div class="dash-stat-value">{{ counts['upcoming'] }}</div>
-    <div class="dash-stat-ico">🟣</div>
-  </a>
+    <a class="dash-stat {{ 'active' if flt=='upcoming' else '' }}" href="{{ url_for('admin_tasks', filter='upcoming', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
+      <div class="dash-stat-label">Upcoming</div>
+      <div class="dash-stat-value">{{ counts['upcoming'] }}</div>
+      <div class="dash-stat-ico">🟣</div>
+    </a>
 
-  <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done') }}">
-    <div class="dash-stat-label">Done</div>
-    <div class="dash-stat-value">{{ counts['done'] }}</div>
-    <div class="dash-stat-ico">✅</div>
-  </a>
-
-
-</div>
-
-
-    <div class="dash-filters">
-      <div class="dash-selects">
-        <select class="select">
-          <option>All modules</option>
-          <option>Horticulture</option>
-          <option>Garden</option>
-        </select>
-
-        <select class="select">
-          <option>All locations</option>
-        </select>
-
-        <select class="select">
-          <option>All assignees</option>
-        </select>
-      </div>
-    </div>
+    <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
+      <div class="dash-stat-label">Done</div>
+      <div class="dash-stat-value">{{ counts['done'] }}</div>
+      <div class="dash-stat-ico">✅</div>
+    </a>
 
   </div>
 
-  {% for key, title in [
-    ("unfinished", "🔥 Unfinished"),
-    ("today", "📅 Today"),
-    ("upcoming", "🟢 Upcoming"),
-    ("done", "✅ Done")
-  ] %}
+  <form method="get" class="dash-filters">
+    <input type="hidden" name="filter" value="{{ flt }}">
 
-    {% set items = groups.get(key, []) %}
+    <div class="dash-filters-row">
+      <div class="dash-selects">
+        <select class="select" name="module" onchange="this.form.submit()">
+          <option value="">All modules</option>
+          <option value="horticulture" {{ 'selected' if selected_module == 'horticulture' else '' }}>Horticulture</option>
+          <option value="garden" {{ 'selected' if selected_module == 'garden' else '' }}>Garden</option>
+        </select>
 
-    {% if items %}
-      <div class="group">
-
-        <div class="group-header" id="group-head-{{ key }}" onclick="toggleGroup('{{ key }}')">
-          <span>{{ title }} ({{ items|length }})</span>
-          <span class="group-toggle">▼</span>
-        </div>
-
-        <div class="group-body" id="group-{{ key }}">
-          {% for t in items %}
-            {% include "partials/_task_card_admin.html" %}
+        <select class="select" name="location_id" onchange="this.form.submit()">
+          <option value="">All locations</option>
+          {% for loc in locations.values()|list|sort(attribute='name') %}
+            <option value="{{ loc.id }}" {{ 'selected' if selected_location_id == loc.id else '' }}>
+              {{ loc.module|capitalize }} / {{ loc.name }}
+            </option>
           {% endfor %}
-        </div>
+        </select>
 
+        <select class="select" name="assignee_id" onchange="this.form.submit()">
+          <option value="">All assignees</option>
+          {% for u in assignee_options %}
+            <option value="{{ u.id }}" {{ 'selected' if selected_assignee_id == u.id else '' }}>
+              {{ u.display_name or u.username }}
+            </option>
+          {% endfor %}
+        </select>
       </div>
-    {% endif %}
 
-  {% endfor %}
+      {% if selected_module or selected_location_id or selected_assignee_id %}
+        <div class="dash-filter-actions">
+          <a class="btn btn-secondary" href="{{ url_for('admin_tasks', filter=flt) }}">Clear filters</a>
+        </div>
+      {% endif %}
+    </div>
+  </form>
 
 </div>
+
+{% for key, title in [
+  ("unfinished", "🔥 Unfinished"),
+  ("today", "📅 Today"),
+  ("upcoming", "🟢 Upcoming")
+] %}
+
+  {% set items = groups.get(key, []) %}
+
+  {% if items %}
+    <div class="group">
+      <div class="group-header" id="group-head-{{ key }}" onclick="toggleGroup('{{ key }}')">
+        <span>{{ title }} ({{ items|length }})</span>
+        <span class="group-toggle">▾</span>
+      </div>
+
+      <div class="group-body" id="group-{{ key }}">
+        {% for t in items %}
+          {% include "partials/_task_card_admin.html" %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+{% endfor %}
+
+{% if done_history_groups %}
+  <div class="group">
+    <div class="group-header" id="group-head-done" onclick="toggleGroup('done')">
+      <span>✅ Done History ({{ counts['done'] }})</span>
+      <span class="group-toggle">▾</span>
+    </div>
+
+    <div class="group-body" id="group-done">
+      <div class="done-history">
+        {% for day in done_history_groups %}
+          <div class="done-day-group">
+            <button
+              type="button"
+              class="done-day-head {% if not loop.first %}collapsed{% endif %}"
+              id="done-day-head-{{ day['key'] }}"
+              onclick="toggleDoneDay('{{ day['key'] }}')"
+            >
+              <span class="done-day-label">{{ day['label'] }}</span>
+              <span class="done-day-count">{{ day['count'] }}</span>
+              <span class="done-day-caret">▾</span>
+            </button>
+
+            <div class="done-day-body {% if not loop.first %}collapsed{% endif %}" id="done-day-{{ day['key'] }}">
+              {% for t in day['items'] %}
+                {% include "partials/_task_done_row_admin.html" %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% if not groups['unfinished'] and not groups['today'] and not groups['upcoming'] and not done_history_groups %}
+  <div class="card admin-empty-state">
+    <div class="done-row-title" style="margin-bottom:6px;">No tasks match these filters</div>
+    <div class="muted">Try clearing one or more filters, or switch to another task view.</div>
+  </div>
+{% endif %}
 
 <script>
 function toggleGroup(key){
@@ -89,6 +143,14 @@ function toggleGroup(key){
   if (body) body.classList.toggle("collapsed");
 
   const head = document.getElementById("group-head-" + key);
+  if (head) head.classList.toggle("collapsed");
+}
+
+function toggleDoneDay(key){
+  const body = document.getElementById("done-day-" + key);
+  if (body) body.classList.toggle("collapsed");
+
+  const head = document.getElementById("done-day-head-" + key);
   if (head) head.classList.toggle("collapsed");
 }
 </script>
