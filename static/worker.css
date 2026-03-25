@@ -285,22 +285,26 @@ body.worker .main-content{
 }
 
 /* ---------- main actions ---------- */
-.task-actions{
+.task-actions,
+.task-actions-grid{
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 10px;
 }
 
-.task-actions > *{
+.task-actions > *,
+.task-actions-grid > *{
   width: 100%;
 }
 
-.task-actions form{
+.task-actions form,
+.task-actions-grid form{
   margin: 0;
 }
 
-.task-actions > :last-child{
+.task-actions > :last-child,
+.task-actions-grid > :last-child{
   grid-column: 1 / -1;
 }
 
