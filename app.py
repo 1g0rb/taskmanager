@@ -658,7 +658,7 @@ def filter_my_and_unassigned(db, query, user: User):
     )
 
 
-def pick_worker_priority_task(user: User, today_tasks, overdue_tasks, upcoming_tasks, assigned_task_ids: set[int]):
+def pick_worker_priority_task(today_tasks, overdue_tasks, upcoming_tasks, assigned_task_ids: set[int]):
     def first_assigned(tasks):
         for task in tasks:
             if task.id in assigned_task_ids:
@@ -1534,7 +1534,6 @@ def worker_home():
             ).all()
         ) if candidate_ids else set()
         priority_task = pick_worker_priority_task(
-            user,
             today_tasks,
             overdue_tasks,
             upcoming_tasks,
@@ -2375,7 +2374,8 @@ def admin_task_assign(task_id: int):
 
         if not exists:
             db.add(TaskAssignee(task_id=task_id, user_id=user_id))
-            db.commit()
+
+        db.commit()
 
         return redirect_back()
 
