@@ -53,7 +53,7 @@
         <div class="value">{{ today_tasks|length }}</div>
       </div>
       <div class="worker-stat-pill">
-        <div class="label">Overdue</div>
+        <div class="label">Unfinished</div>
         <div class="value danger">{{ overdue_tasks|length }}</div>
       </div>
       <div class="worker-stat-pill">
@@ -63,7 +63,7 @@
     </section>
 
     <section class="worker-focus-grid">
-      <a class="worker-focus-card primary" href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
+      <a class="worker-focus-card primary" href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
         <div class="worker-focus-kicker">Next priority</div>
         {% if priority_task %}
           <div class="worker-focus-title">{{ priority_task.title }}</div>
@@ -98,7 +98,7 @@
         <div class="worker-home-action-icon">✅</div>
         <div class="worker-home-action-body">
           <div class="worker-home-action-title">Open My Tasks</div>
-          <div class="worker-home-action-text">See today, overdue and upcoming tasks.</div>
+          <div class="worker-home-action-text">See today, unfinished and upcoming tasks.</div>
         </div>
       </a>
 
