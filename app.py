@@ -658,6 +658,23 @@ def filter_my_and_unassigned(db, query, user: User):
     )
 
 
+def pick_worker_priority_task(user: User, today_tasks, overdue_tasks, upcoming_tasks, assigned_task_ids: set[int]):
+    def first_assigned(tasks):
+        for task in tasks:
+            if task.id in assigned_task_ids:
+                return task
+        return None
+
+    return (
+        first_assigned(today_tasks)
+        or (today_tasks[0] if today_tasks else None)
+        or first_assigned(overdue_tasks)
+        or (overdue_tasks[0] if overdue_tasks else None)
+        or first_assigned(upcoming_tasks)
+        or (upcoming_tasks[0] if upcoming_tasks else None)
+    )
+
+
 def is_task_allowed_for_worker(db, task: Task, user: User) -> bool:
     if user.role == "admin" or user.username.lower() in ADMIN_EMAILS:
         return True
@@ -1508,7 +1525,21 @@ def worker_home():
 
         today_pretty = today.strftime("%A, %B %d, %Y")
         unread_observation_count = get_worker_unread_observation_count(db, user.id)
-        priority_task = overdue_tasks[0] if overdue_tasks else (today_tasks[0] if today_tasks else None)
+        candidate_ids = [t.id for t in today_tasks] + [t.id for t in overdue_tasks] + [t.id for t in upcoming_tasks]
+        assigned_task_ids = set(
+            r.task_id
+            for r in db.query(TaskAssignee).filter(
+                TaskAssignee.user_id == user.id,
+                TaskAssignee.task_id.in_(candidate_ids)
+            ).all()
+        ) if candidate_ids else set()
+        priority_task = pick_worker_priority_task(
+            user,
+            today_tasks,
+            overdue_tasks,
+            upcoming_tasks,
+            assigned_task_ids,
+        )
 
         return render_template(
             "worker_home.html",
