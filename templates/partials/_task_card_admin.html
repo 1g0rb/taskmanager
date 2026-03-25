@@ -110,10 +110,6 @@
       <div class="taskv2-actions">
 
         <div class="taskv2-left">
-          <label class="select-box">
-            <input class="task-select" type="checkbox" value="{{ t.id }}">
-          </label>
-
           {# Single-assign via existing batch_assign #}
           <form method="post" action="{{ url_for('admin_tasks_batch_assign') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -164,6 +160,15 @@
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
             <button class="btn mini" type="submit">Next day</button>
+          </form>
+
+          <form
+            method="post"
+            action="{{ url_for('admin_task_delete', task_id=t.id) }}"
+            onsubmit="return confirm('Delete this task? This action cannot be undone.')"
+          >
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="btn mini warn" type="submit">Delete</button>
           </form>
 
           {% endif %}

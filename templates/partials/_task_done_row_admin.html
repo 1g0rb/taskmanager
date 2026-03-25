@@ -1,0 +1,126 @@
+{% set ids = task_to_user_ids.get(t.id, []) %}
+{% set location = locations[t.location_id] if t.location_id in locations else None %}
+{% set task_photo = latest_task_photo_by_task_id.get(t.id) %}
+{% set issue_photo = linked_issue_photo_by_task_id.get(t.id) %}
+{% set linked_issue = issue_by_task_id.get(t.id) %}
+
+<details class="done-row" id="done-task-{{ t.id }}">
+  <summary class="done-row-summary">
+    <div class="done-row-main">
+      <div class="done-row-title">{{ t.title }}</div>
+      <div class="done-row-sub">
+        <span>{{ location.name if location else "Unknown location" }}</span>
+        <span>{{ "Garden" if (t.module or "")|lower == "garden" else "Horticulture" }}</span>
+        {% if t.finished_at %}
+          <span>{{ t.finished_at.strftime("%H:%M") }}</span>
+        {% elif t.task_date %}
+          <span>{{ t.task_date }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="done-row-meta">
+      {% if ids %}
+        <span class="done-row-chip">{{ ids|length }} assignee{{ "" if ids|length == 1 else "s" }}</span>
+      {% else %}
+        <span class="done-row-chip warn">Unassigned</span>
+      {% endif %}
+
+      {% if task_photo or issue_photo %}
+        <span class="done-row-chip">Photo</span>
+      {% endif %}
+
+      {% if t.notes %}
+        <span class="done-row-chip">Note</span>
+      {% endif %}
+
+      <span class="done-row-caret">▾</span>
+    </div>
+  </summary>
+
+  <div class="done-row-detail">
+    <div class="done-row-detail-grid">
+      <div class="done-detail-card">
+        <div class="done-detail-label">Location</div>
+        <div class="done-detail-value">{{ location.name if location else "Unknown location" }}</div>
+      </div>
+
+      <div class="done-detail-card">
+        <div class="done-detail-label">Module</div>
+        <div class="done-detail-value">{{ "Garden" if (t.module or "")|lower == "garden" else "Horticulture" }}</div>
+      </div>
+
+      <div class="done-detail-card">
+        <div class="done-detail-label">Finished</div>
+        <div class="done-detail-value">
+          {% if t.finished_at %}
+            {{ t.finished_at.strftime("%Y-%m-%d %H:%M") }}
+          {% else %}
+            {{ t.task_date if t.task_date else "Not set" }}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="done-detail-card">
+        <div class="done-detail-label">Assigned</div>
+        <div class="done-detail-value">
+          {% if ids %}
+            {% for uid in ids %}
+              <span class="pill user">{{ users[uid].username if uid in users else "?" }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="pill warn">Unassigned</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if t.notes %}
+      <div class="done-notes">
+        <div class="done-detail-label">Notes</div>
+        <div class="done-detail-text">{{ t.notes }}</div>
+      </div>
+    {% endif %}
+
+    {% if task_photo or issue_photo %}
+      <div class="done-photo-grid">
+        {% if task_photo %}
+          <div class="done-photo-card">
+            <div class="done-detail-label">Task photo</div>
+            <img
+              src="{{ url_for('static', filename=task_photo) }}"
+              alt="Task photo"
+              class="done-photo js-lightbox-image"
+              data-fullsrc="{{ url_for('static', filename=task_photo) }}"
+            >
+          </div>
+        {% endif %}
+
+        {% if issue_photo %}
+          <div class="done-photo-card">
+            <div class="done-detail-label">
+              Source issue{% if linked_issue %} #{{ linked_issue.id }}{% endif %}
+            </div>
+            <img
+              src="{{ url_for('static', filename=issue_photo) }}"
+              alt="Source issue photo"
+              class="done-photo js-lightbox-image"
+              data-fullsrc="{{ url_for('static', filename=issue_photo) }}"
+            >
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="done-row-actions">
+      <form
+        method="post"
+        action="{{ url_for('admin_task_delete', task_id=t.id) }}"
+        onsubmit="return confirm('Delete this task? This action cannot be undone.')"
+      >
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="btn mini warn" type="submit">Delete task</button>
+      </form>
+    </div>
+  </div>
+</details>

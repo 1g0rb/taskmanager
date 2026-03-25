@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="worker-shell">
+  <div class="worker-topbar">
+    <div class="worker-topbar-inner">
+      <div class="worker-brand">
+        <div class="brand-mark">🌿</div>
+        <div class="brand-text">
+          <div class="brand-title">TaskManager</div>
+          <div class="brand-sub">Observations</div>
+        </div>
+      </div>
+      <div class="worker-topbar-actions">
+        <a class="worker-logout" href="{{ url_for('worker_home', module=active_module|default('all')) }}">Home</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="worker-page worker-observations-page">
+    <header class="worker-head">
+      <div class="worker-head-row">
+        <div>
+          <h1 class="worker-title">Observations</h1>
+          <div class="worker-date">
+            {% if unread_count == 1 %}
+              You have 1 unread observation.
+            {% else %}
+              You have {{ unread_count }} unread observations.
+            {% endif %}
+          </div>
+          <div class="worker-observation-helper">Opening this page marks your assigned observations as read.</div>
+        </div>
+      </div>
+    </header>
+
+    {% if observations %}
+      <section class="worker-observation-list">
+        {% for o in observations %}
+          <article class="worker-observation-card">
+            <div class="worker-observation-top">
+              <div>
+                <div class="worker-observation-location">{{ o.location.name if o.location else "General observation" }}</div>
+                <div class="worker-observation-meta">
+                  {% if o.module %}
+                    <span class="pill module {{ 'horti' if o.module == 'horticulture' else 'garden' }}">{{ o.module }}</span>
+                  {% endif %}
+                  <span class="pill {{ 'danger' if not o.is_read else 'ghost' }}">
+                    {{ "Unread" if not o.is_read else "Read" }}
+                  </span>
+                </div>
+              </div>
+              <div class="worker-observation-time">
+                {{ o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "" }}
+              </div>
+            </div>
+
+            {% if o.photo_path %}
+              <div class="worker-observation-photo-wrap">
+                <img
+                  src="{{ o.photo_path }}"
+                  alt="Observation photo"
+                  class="worker-observation-photo js-lightbox-image"
+                  data-fullsrc="{{ o.photo_path }}"
+                >
+              </div>
+            {% endif %}
+
+            <div class="worker-observation-note">{{ o.note }}</div>
+          </article>
+        {% endfor %}
+      </section>
+    {% else %}
+      <div class="worker-empty">
+        <div class="worker-empty-icon">📝</div>
+        <div class="worker-empty-title">No observations right now</div>
+        <div class="worker-empty-text">You currently have no observations assigned.</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

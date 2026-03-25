@@ -49,15 +49,19 @@
       <span class="meta">📍 {{ loc_name }}</span>
     </div>
 
-    {% if ids %}
-    <div class="task-subline assignees">
-      <span class="meta">👤
-        {% for uid in ids %}
-          {{ users[uid].username.split('@')[0] if uid in users and users[uid].username else "?" }}{% if not loop.last %}, {% endif %}
-        {% endfor %}
-      </span>
-    </div>
-    {% endif %}
+   {% if ids %}
+<div class="task-subline assignees">
+  <span class="meta">👤
+    {% for uid in ids %}
+      {% if uid in users %}
+        {{ users[uid].display_name or users[uid].username.split('@')[0] }}
+      {% else %}
+        ?
+      {% endif %}{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  </span>
+</div>
+{% endif %}
 
    <div class="task-media-preview">
   {% if latest_photo %}
