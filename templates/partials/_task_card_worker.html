@@ -68,13 +68,6 @@
       </div>
     </div>
 
-    {% if t.notes %}
-    <div class="worker-note-card">
-      <span class="worker-note-icon">📝</span>
-      <span class="worker-note-text">{{ t.notes }}</span>
-    </div>
-    {% endif %}
-
     <div class="task-media-preview">
       {% if latest_photo %}
         {% set photo_file = latest_photo[7:] if latest_photo.startswith('static/') else latest_photo %}
@@ -104,6 +97,13 @@
         <div class="task-photo-placeholder">No photo</div>
       {% endif %}
     </div>
+
+    {% if t.notes %}
+    <div class="worker-note-card">
+      <span class="worker-note-icon">📝</span>
+      <span class="worker-note-text">{{ t.notes }}</span>
+    </div>
+    {% endif %}
 
     <div class="task-actions-grid">
 
