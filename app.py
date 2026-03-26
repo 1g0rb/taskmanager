@@ -641,6 +641,46 @@ def parse_module_arg() -> tuple[str, str | None]:
     return "all", None
 
 
+def get_task_schedule_date(task: Task) -> date | None:
+    return task.task_date or task.next_action_date
+
+
+def load_worker_task_groups(db: Session, user: User, module_filter: str | None, today: date, until: date):
+    query = db.query(Task).filter(Task.status != "done")
+    if module_filter:
+        query = query.filter(Task.module == module_filter)
+    query = filter_my_and_unassigned(db, query, user)
+
+    status_order = {"in_progress": 0, "open": 1, "blocked": 2}
+
+    def sort_key(task: Task):
+        schedule_date = get_task_schedule_date(task) or date.max
+        return (
+            schedule_date,
+            status_order.get(task.status or "open", 3),
+            -(task.id or 0),
+        )
+
+    all_tasks = sorted(query.all(), key=sort_key)
+
+    overdue_tasks = []
+    today_tasks = []
+    upcoming_tasks = []
+
+    for task in all_tasks:
+        schedule_date = get_task_schedule_date(task)
+        if not schedule_date:
+            continue
+        if schedule_date < today:
+            overdue_tasks.append(task)
+        elif schedule_date == today:
+            today_tasks.append(task)
+        elif schedule_date <= until:
+            upcoming_tasks.append(task)
+
+    return overdue_tasks, today_tasks, upcoming_tasks
+
+
 def filter_my_and_unassigned(db, query, user: User):
     if user.role == "admin" or user.username.lower() in ADMIN_EMAILS:
         return query
@@ -1476,52 +1516,9 @@ def worker_home():
 
     db = SessionLocal()
     try:
-        def apply_module(q):
-            return q.filter(Task.module == module_filter) if module_filter else q
-
-        status_rank = case(
-            (Task.status == "in_progress", 0),
-            (Task.status == "open", 1),
-            (Task.status == "blocked", 2),
-            else_=3
+        overdue_tasks, today_tasks, upcoming_tasks = load_worker_task_groups(
+            db, user, module_filter, today, until
         )
-
-        overdue_q = db.query(Task).filter(
-            Task.task_date < today,
-            Task.status != "done",
-            Task.next_action_date <= today
-        )
-        overdue_q = apply_module(overdue_q)
-        overdue_q = filter_my_and_unassigned(db, overdue_q, user)
-        overdue_tasks = overdue_q.order_by(
-            status_rank.asc(),
-            Task.task_date.asc(),
-            Task.id.asc()
-        ).all()
-
-        today_q = db.query(Task).filter(
-            Task.next_action_date == today,
-            Task.status != "done"
-        )
-        today_q = apply_module(today_q)
-        today_q = filter_my_and_unassigned(db, today_q, user)
-        today_tasks = today_q.order_by(
-            status_rank.asc(),
-            Task.id.desc()
-        ).all()
-
-        upcoming_q = db.query(Task).filter(
-            Task.next_action_date > today,
-            Task.next_action_date <= until,
-            Task.status != "done"
-        )
-        upcoming_q = apply_module(upcoming_q)
-        upcoming_q = filter_my_and_unassigned(db, upcoming_q, user)
-        upcoming_tasks = upcoming_q.order_by(
-            Task.next_action_date.asc(),
-            status_rank.asc(),
-            Task.id.asc()
-        ).all()
 
         today_pretty = today.strftime("%A, %B %d, %Y")
         unread_observation_count = get_worker_unread_observation_count(db, user.id)
@@ -1570,52 +1567,9 @@ def worker_dashboard():
 
     db = SessionLocal()
     try:
-        def apply_module(q):
-            return q.filter(Task.module == module_filter) if module_filter else q
-
-        status_rank = case(
-            (Task.status == "in_progress", 0),
-            (Task.status == "open", 1),
-            (Task.status == "blocked", 2),
-            else_=3
+        overdue_tasks, today_tasks, upcoming_tasks = load_worker_task_groups(
+            db, user, module_filter, today, until
         )
-
-        overdue_q = db.query(Task).filter(
-            Task.task_date < today,
-            Task.status != "done",
-            Task.next_action_date <= today
-        )
-        overdue_q = apply_module(overdue_q)
-        overdue_q = filter_my_and_unassigned(db, overdue_q, user)
-        overdue_tasks = overdue_q.order_by(
-            status_rank.asc(),
-            Task.task_date.asc(),
-            Task.id.asc()
-        ).all()
-
-        today_q = db.query(Task).filter(
-            Task.next_action_date == today,
-            Task.status != "done"
-        )
-        today_q = apply_module(today_q)
-        today_q = filter_my_and_unassigned(db, today_q, user)
-        today_tasks = today_q.order_by(
-            status_rank.asc(),
-            Task.id.desc()
-        ).all()
-
-        upcoming_q = db.query(Task).filter(
-            Task.next_action_date > today,
-            Task.next_action_date <= until,
-            Task.status != "done"
-        )
-        upcoming_q = apply_module(upcoming_q)
-        upcoming_q = filter_my_and_unassigned(db, upcoming_q, user)
-        upcoming_tasks = upcoming_q.order_by(
-            Task.next_action_date.asc(),
-            status_rank.asc(),
-            Task.id.asc()
-        ).all()
 
         # ORIGINALNI COUNTS - uvijek iz punih lista
         overdue_count = len(overdue_tasks)
