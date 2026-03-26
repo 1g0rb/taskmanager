@@ -262,6 +262,29 @@ body.worker .main-content{
   color: rgba(15,23,42,.72);
 }
 
+.worker-note-card{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:10px;
+  padding:12px 14px;
+  border-radius:14px;
+  background: rgba(124,58,237,.06);
+  border: 1px solid rgba(124,58,237,.10);
+}
+
+.worker-note-icon{
+  flex: 0 0 auto;
+  line-height: 1.2;
+}
+
+.worker-note-text{
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(15,23,42,.78);
+  white-space: pre-wrap;
+}
+
 .pill.module{
   display: inline-flex;
   align-items: center;
@@ -505,6 +528,33 @@ body.worker .main-content{
     padding: 12px 12px 96px;
   }
 
+  .task-body{
+    padding: 12px 12px 12px;
+  }
+
+  .task-top{
+    gap: 10px;
+  }
+
+  .task-title{
+    font-size: 15px;
+    line-height: 1.2;
+  }
+
+  .task-actions-grid{
+    gap: 8px;
+  }
+
+  .wbtn{
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  .wbtn.secondary{
+    min-height: 40px;
+  }
+
   .worker-title{
     font-size: 28px;
   }
@@ -686,6 +736,44 @@ body.worker .main-content{
 @media (min-width: 768px) {
   .worker-home-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1024px){
+  .worker-page{
+    max-width: 1180px;
+    padding: 28px 32px 112px;
+  }
+
+  .worker-topbar{
+    padding: 22px 32px;
+  }
+
+  .worker-topbar-inner{
+    max-width: 1180px;
+  }
+
+  .worker-stats-row{
+    overflow: visible;
+  }
+
+  .worker-home-page{
+    gap: 22px;
+  }
+
+  .worker-focus-grid{
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
+    align-items: stretch;
+  }
+
+  .worker-home-actions{
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .worker-home-action-card{
+    align-items: flex-start;
+    min-height: 132px;
   }
 }
 
