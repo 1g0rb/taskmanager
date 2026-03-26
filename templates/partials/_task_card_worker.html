@@ -1,5 +1,6 @@
 {# partials/_task_card_worker.html #}
 {% set s = (t.status or "open") %}
+{% set ids = task_to_user_ids.get(t.id, []) %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
 {% set schedule_date = t.task_date or t.next_action_date %}
 {% set is_today = (schedule_date and (schedule_date|string) == (today|string)) %}
@@ -42,11 +43,29 @@
     </div>
     {% endif %}
 
-    <div class="task-subline">
-      <span class="pill module {% if t.module == 'garden' %}garden{% elif t.module == 'horticulture' %}horti{% endif %}">
-        {{ t.module }}
-      </span>
-      <span class="meta">📍 {{ loc_name }}</span>
+    <div class="worker-meta-grid">
+      <div class="worker-meta-box">
+        <div class="task-subline" style="margin-top:0;">
+          <span class="pill module {% if t.module == 'garden' %}garden{% elif t.module == 'horticulture' %}horti{% endif %}">
+            {{ t.module }}
+          </span>
+          <span class="meta">📍 {{ loc_name }}</span>
+        </div>
+      </div>
+      <div class="worker-meta-box">
+        <div class="worker-assignees">
+          <span class="meta">👥</span>
+          <div class="worker-assignee-list">
+            {% if ids %}
+              {% for uid in ids %}
+                <span class="pill user">{{ (users[uid].display_name or users[uid].username.split('@')[0]) if uid in users else "?" }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="pill warn">Unassigned</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
     </div>
 
     {% if t.notes %}
