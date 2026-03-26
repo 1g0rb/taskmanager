@@ -254,7 +254,7 @@ body.worker .main-content{
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .task-subline .meta{
@@ -266,7 +266,7 @@ body.worker .main-content{
   display:grid;
   grid-template-columns: 1fr 1fr;
   gap:10px;
-  margin-top:8px;
+  margin-top:14px;
 }
 
 .worker-meta-box{
@@ -279,7 +279,7 @@ body.worker .main-content{
 
 .worker-assignees{
   display:flex;
-  align-items:flex-start;
+  align-items:center;
   gap:8px;
 }
 
@@ -294,7 +294,7 @@ body.worker .main-content{
   display:flex;
   align-items:flex-start;
   gap:10px;
-  margin-top:10px;
+  margin-top:12px;
   padding:12px 14px;
   border-radius:14px;
   background: rgba(124,58,237,.06);
