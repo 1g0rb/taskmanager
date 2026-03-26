@@ -1820,7 +1820,7 @@ def worker_task_done(task_id: int):
                 title=f"{t.title} ({res_name})",
                 module=t.module,
                 status="open",
-                task_date=today,
+                task_date=follow_date,
                 next_action_date=follow_date,
                 location_id=b.residence_id,
                 notes=f"[Carryover] Blocked residence {res_name} ({b.reason}){until_txt}",
@@ -2259,7 +2259,9 @@ def worker_task_next_day(task_id):
             flash("Not allowed.")
             return redirect(url_for("worker_dashboard", module=module))
 
-        t.next_action_date = today + timedelta(days=1)
+        moved_to_date = today + timedelta(days=1)
+        t.task_date = moved_to_date
+        t.next_action_date = moved_to_date
 
         if t.status == "in_progress":
             t.status = "open"
@@ -2298,6 +2300,7 @@ def worker_task_back_today(task_id):
             flash("Task already done.")
             return redirect(url_for("worker_dashboard", module=module))
 
+        t.task_date = today
         t.next_action_date = today
         db.commit()
         flash("Task returned to today.")
@@ -2449,8 +2452,17 @@ def admin_tasks_batch_next_day():
         for t in rows:
             if t.status == "done":
                 continue
+            moved_to_date = None
             if t.task_date:
-                t.task_date = t.task_date + timedelta(days=1)
+                moved_to_date = t.task_date + timedelta(days=1)
+                t.task_date = moved_to_date
+            elif t.next_action_date:
+                moved_to_date = t.next_action_date + timedelta(days=1)
+
+            # Worker dashboard groups tasks by next_action_date, so keep both
+            # dates aligned when admin intentionally pushes a task forward.
+            if moved_to_date:
+                t.next_action_date = moved_to_date
 
 
         db.commit()
