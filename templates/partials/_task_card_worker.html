@@ -1,6 +1,5 @@
 {# partials/_task_card_worker.html #}
 {% set s = (t.status or "open") %}
-{% set ids = task_to_user_ids.get(t.id, []) %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
 {% set schedule_date = t.task_date or t.next_action_date %}
 {% set is_today = (schedule_date and (schedule_date|string) == (today|string)) %}
@@ -50,97 +49,91 @@
       <span class="meta">📍 {{ loc_name }}</span>
     </div>
 
-   {% if ids %}
-<div class="task-subline assignees">
-  <span class="meta">👤
-    {% for uid in ids %}
-      {% if uid in users %}
-        {{ users[uid].display_name or users[uid].username.split('@')[0] }}
-      {% else %}
-        ?
-      {% endif %}{% if not loop.last %}, {% endif %}
-    {% endfor %}
-  </span>
-</div>
-{% endif %}
-
-   <div class="task-media-preview">
-  {% if latest_photo %}
-    {% set photo_file = latest_photo[7:] if latest_photo.startswith('static/') else latest_photo %}
-    <img
-      src="{{ url_for('static', filename=photo_file) }}"
-      alt="Task photo"
-      class="task-photo-thumb js-lightbox-image"
-      data-fullsrc="{{ url_for('static', filename=photo_file) }}"
-      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-    <div class="task-photo-placeholder" style="display:none;">No photo</div>
-
-  {% elif linked_issue_photo_by_task_id.get(t.id) %}
-    {% set issue_photo = linked_issue_photo_by_task_id[t.id] %}
-    {% set issue_photo_file = issue_photo[7:] if issue_photo.startswith('static/') else issue_photo %}
-    <div class="small" style="margin-bottom:6px;">
-      Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
+    {% if t.notes %}
+    <div class="worker-note-card">
+      <span class="worker-note-icon">📝</span>
+      <span class="worker-note-text">{{ t.notes }}</span>
     </div>
-    <img
-      src="{{ url_for('static', filename=issue_photo_file) }}"
-      alt="Source issue photo"
-      class="task-photo-thumb js-lightbox-image"
-      data-fullsrc="{{ url_for('static', filename=issue_photo_file) }}"
-      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-    <div class="task-photo-placeholder" style="display:none;">No photo</div>
+    {% endif %}
 
-  {% else %}
-    <div class="task-photo-placeholder">No photo</div>
-  {% endif %}
-</div>
+    <div class="task-media-preview">
+      {% if latest_photo %}
+        {% set photo_file = latest_photo[7:] if latest_photo.startswith('static/') else latest_photo %}
+        <img
+          src="{{ url_for('static', filename=photo_file) }}"
+          alt="Task photo"
+          class="task-photo-thumb js-lightbox-image"
+          data-fullsrc="{{ url_for('static', filename=photo_file) }}"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="task-photo-placeholder" style="display:none;">No photo</div>
+
+      {% elif linked_issue_photo_by_task_id.get(t.id) %}
+        {% set issue_photo = linked_issue_photo_by_task_id[t.id] %}
+        {% set issue_photo_file = issue_photo[7:] if issue_photo.startswith('static/') else issue_photo %}
+        <div class="small" style="margin-bottom:6px;">
+          Source issue #{{ issue_by_task_id[t.id].id }} - {{ issue_by_task_id[t.id].title }}
+        </div>
+        <img
+          src="{{ url_for('static', filename=issue_photo_file) }}"
+          alt="Source issue photo"
+          class="task-photo-thumb js-lightbox-image"
+          data-fullsrc="{{ url_for('static', filename=issue_photo_file) }}"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="task-photo-placeholder" style="display:none;">No photo</div>
+
+      {% else %}
+        <div class="task-photo-placeholder">No photo</div>
+      {% endif %}
+    </div>
+
     <div class="task-actions-grid">
 
       {% if s == "open" %}
       <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn start" type="submit">▶ Start</button>
+        <button class="wbtn start" type="submit">Start</button>
       </form>
       {% elif s == "in_progress" %}
       <form>
-        <button class="wbtn start active" type="button" disabled>▶ Started</button>
+        <button class="wbtn start active" type="button" disabled>Started</button>
       </form>
       {% else %}
       <form>
-        <button class="wbtn start" type="button" disabled>▶ Start</button>
+        <button class="wbtn start" type="button" disabled>Start</button>
       </form>
       {% endif %}
 
       {% if s != "done" %}
       <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn done" type="submit">✅ Done</button>
+        <button class="wbtn done" type="submit">Done</button>
       </form>
       {% else %}
       <form>
-        <button class="wbtn done" type="button" disabled>✅ Done</button>
+        <button class="wbtn done" type="button" disabled>Done</button>
       </form>
       {% endif %}
 
       {% if group == "today" and s != "done" and s != "blocked" %}
       <form method="post" action="{{ url_for('worker_task_next_day', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn secondary" type="submit">⏭ Next day</button>
+        <button class="wbtn secondary" type="submit">Next day</button>
       </form>
       {% elif group == "overdue" and s != "done" %}
       <form method="post" action="{{ url_for('worker_task_back_today', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn secondary" type="submit">↩ Back to today</button>
+        <button class="wbtn secondary" type="submit">Back to today</button>
       </form>
       {% else %}
       <form>
-        <button class="wbtn secondary" type="button" disabled>⏭ Next day</button>
+        <button class="wbtn secondary" type="button" disabled>Next day</button>
       </form>
       {% endif %}
 
       {% if s == "blocked" %}
       <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn block" type="submit">🔓 Unblock</button>
+        <button class="wbtn block" type="submit">Unblock</button>
       </form>
       {% elif s in ["open", "in_progress"] %}
       <form>
@@ -151,12 +144,12 @@
           const bf=card.querySelector('.block-form');
           if (bf) bf.hidden=false;
         ">
-          ⛔ Block
+          Block
         </button>
       </form>
       {% else %}
       <form>
-        <button class="wbtn block" type="button" disabled>⛔ Block</button>
+        <button class="wbtn block" type="button" disabled>Block</button>
       </form>
       {% endif %}
 
@@ -167,16 +160,20 @@
         const card=this.closest('.task-card');
         card.querySelector('.task-details').open=true;
         return false;
-      ">▸ Details</a>
+      ">Details</a>
     </div>
 
     <details class="task-details">
       <summary class="sr-only">Details</summary>
 
-      <div class="detail-line">Start task: {{ t.started_at if t.started_at else "—" }}</div>
+      <div class="detail-line">Start task: {{ t.started_at if t.started_at else "-" }}</div>
 
       {% if t.next_action_date %}
       <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
+      {% endif %}
+
+      {% if t.notes %}
+      <div class="detail-line">Notes: {{ t.notes }}</div>
       {% endif %}
 
       {% if s == "blocked" and t.blocked_reason %}
@@ -208,7 +205,7 @@
           <div class="detail-line" style="margin-top:10px; font-weight:800;">Blocked until (optional)</div>
           <input class="input" type="date" name="blocked_until">
 
-          <button class="wbtn block" type="submit" style="margin-top:10px;">⛔ Confirm block</button>
+          <button class="wbtn block" type="submit" style="margin-top:10px;">Confirm block</button>
         </form>
       </div>
 
