@@ -35,12 +35,13 @@
   <div style="overflow:auto;">
     <table class="users-table">
       <colgroup>
-        <col style="width:26%">
-        <col style="width:18%">
-        <col style="width:24%">
+        <col style="width:22%">
         <col style="width:14%">
-        <col style="width:10%">
-        <col style="width:8%">
+        <col style="width:19%">
+        <col style="width:16%">
+        <col style="width:17%">
+        <col style="width:6%">
+        <col style="width:6%">
       </colgroup>
 
       <thead>
@@ -49,6 +50,7 @@
           <th>Name</th>
           <th>Role</th>
           <th>Team</th>
+          <th>Telegram</th>
           <th>Active</th>
           <th>Actions</th>
         </tr>
@@ -90,6 +92,20 @@
                 </select>
               </form>
             </div>
+          </td>
+
+          <td>
+            <form method="post" action="{{ url_for('admin_user_set_telegram_chat_id', user_id=u.id) }}">
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input
+                  class="input users-select-compact"
+                  type="text"
+                  name="telegram_chat_id"
+                  value="{{ u.telegram_chat_id or '' }}"
+                  placeholder="chat id">
+                <button class="btn" type="submit">Save</button>
+              </div>
+            </form>
           </td>
 
           <td>

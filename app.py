@@ -63,6 +63,7 @@ class User(Base):
     role = Column(String, default="worker")
     lang = Column(String, default="en")
     is_active = Column(Boolean, default=True)
+    telegram_chat_id = Column(String, nullable=True)
 
 
 
@@ -275,6 +276,18 @@ def send_telegram_message(text, chat_id=None):
         print("=== TELEGRAM SEND END ===")
         return False
 
+
+def send_user_telegram_message(user: User | None, text: str) -> bool:
+    if not user:
+        return False
+
+    chat_id = (getattr(user, "telegram_chat_id", None) or "").strip()
+    if not chat_id:
+        print(f"TELEGRAM SKIP: user {getattr(user, 'username', '?')} has no telegram_chat_id")
+        return False
+
+    return send_telegram_message(text, chat_id=chat_id)
+
 def test_telegram_bot_token():
     token = (TELEGRAM_BOT_TOKEN or "").strip()
     url = f"https://api.telegram.org/bot{token}/getMe"
@@ -303,6 +316,15 @@ def ensure_user_column_display_name():
             conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR"))
             print("✅ Added column: users.display_name")
 
+
+def ensure_user_column_telegram_chat_id():
+    with engine.begin() as conn:
+        cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+        names = {c[1] for c in cols}
+        if "telegram_chat_id" not in names:
+            conn.execute(text("ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR"))
+            print("✅ Added column: users.telegram_chat_id")
+
 def ensure_observation_column_is_read():
     with engine.begin() as conn:
         tables = conn.execute(
@@ -320,6 +342,7 @@ def ensure_observation_column_is_read():
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
 ensure_user_column_display_name()
+ensure_user_column_telegram_chat_id()
 ensure_observation_column_is_read()
 
 # ---------------- App ----------------
@@ -643,6 +666,46 @@ def parse_module_arg() -> tuple[str, str | None]:
 
 def get_task_schedule_date(task: Task) -> date | None:
     return task.task_date or task.next_action_date
+
+
+def build_task_notification_text(task: Task, label: str, location_name: str | None = None) -> str:
+    schedule_date = get_task_schedule_date(task)
+    schedule_text = schedule_date.isoformat() if schedule_date else "unscheduled"
+    location_text = f"\nLocation: {location_name}" if location_name else ""
+    return (
+        f"📌 Task {label}\n"
+        f"{task.title}\n"
+        f"Date: {schedule_text}{location_text}\n"
+        f"{TASKMANAGER_URL}worker/dashboard"
+    )
+
+
+def notify_task_users(db: Session, task: Task, user_ids: list[int], label: str) -> None:
+    schedule_date = get_task_schedule_date(task)
+    if not schedule_date:
+        return
+
+    today = date.today()
+    if schedule_date < today:
+        return
+
+    users = db.query(User).filter(User.id.in_(user_ids), User.is_active == True).all() if user_ids else []
+    location = db.get(Location, task.location_id) if task.location_id else None
+    location_name = location.name if location else None
+
+    for user in users:
+        send_user_telegram_message(
+            user,
+            build_task_notification_text(task, label=label, location_name=location_name)
+        )
+
+
+def notify_task_assignees(db: Session, task: Task, label: str) -> None:
+    assignee_ids = [
+        row.user_id
+        for row in db.query(TaskAssignee).filter(TaskAssignee.task_id == task.id).all()
+    ]
+    notify_task_users(db, task, assignee_ids, label=label)
 
 
 def load_worker_task_groups(db: Session, user: User, module_filter: str | None, today: date, until: date):
@@ -1296,6 +1359,26 @@ def admin_user_set_team(user_id: int):
         db.close()
 
 
+@app.post("/admin/users/<int:user_id>/set_telegram_chat_id")
+@admin_required
+def admin_user_set_telegram_chat_id(user_id: int):
+    telegram_chat_id = (request.form.get("telegram_chat_id") or "").strip() or None
+
+    db = SessionLocal()
+    try:
+        u = db.get(User, user_id)
+        if not u:
+            flash("User not found.")
+            return redirect(url_for("admin_users"))
+
+        u.telegram_chat_id = telegram_chat_id
+        db.commit()
+        flash("Telegram chat ID updated.")
+        return redirect(url_for("admin_users"))
+    finally:
+        db.close()
+
+
 @app.route("/admin/tasks/new", methods=["GET", "POST"])
 @admin_required
 def admin_task_new():
@@ -1421,6 +1504,7 @@ def admin_task_new():
                 db.add(TaskAssignee(task_id=t.id, user_id=uid))
 
             db.commit()
+            notify_task_users(db, t, assigned_ids, label="assigned")
 
             # TELEGRAM NOTIFICATION
                        
@@ -2257,6 +2341,7 @@ def worker_task_back_today(task_id):
         t.task_date = today
         t.next_action_date = today
         db.commit()
+        notify_task_assignees(db, t, label="moved to today")
         flash("Task returned to today.")
         return redirect(url_for("worker_dashboard", module=module))
     finally:
@@ -2333,6 +2418,9 @@ def admin_task_assign(task_id: int):
             db.add(TaskAssignee(task_id=task_id, user_id=user_id))
 
         db.commit()
+        task = db.get(Task, task_id)
+        if task:
+            notify_task_users(db, task, [user_id], label="assigned")
 
         return redirect_back()
 
@@ -2389,6 +2477,9 @@ def admin_tasks_batch_assign():
                 db.add(TaskAssignee(task_id=tid, user_id=user_id))
 
         db.commit()
+        tasks = db.query(Task).filter(Task.id.in_(task_ids)).all()
+        for task in tasks:
+            notify_task_users(db, task, [user_id], label="assigned")
         return redirect_back()
     finally:
         db.close()
@@ -2420,6 +2511,10 @@ def admin_tasks_batch_next_day():
 
 
         db.commit()
+        for t in rows:
+            if t.status == "done":
+                continue
+            notify_task_assignees(db, t, label="rescheduled")
         return redirect_back()
     finally:
         db.close()
@@ -2572,6 +2667,18 @@ def admin_observation_new():
 
             db.add(obs)
             db.commit()
+
+            assigned_user = db.get(User, assigned_user_id) if assigned_user_id else None
+            location = db.get(Location, location_id) if location_id else None
+            location_text = f"\nLocation: {location.name}" if location else ""
+            send_user_telegram_message(
+                assigned_user,
+                (
+                    f"📝 New observation\n"
+                    f"{note}{location_text}\n"
+                    f"{TASKMANAGER_URL}worker/observations"
+                ),
+            )
 
             print("✅ SUCCESS: observation saved with id:", obs.id)
             print("=== END DEBUG ===\n")
