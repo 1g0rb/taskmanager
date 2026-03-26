@@ -1359,6 +1359,26 @@ def admin_user_set_team(user_id: int):
         db.close()
 
 
+@app.post("/admin/users/<int:user_id>/set_display_name")
+@admin_required
+def admin_user_set_display_name(user_id: int):
+    display_name = (request.form.get("display_name") or "").strip() or None
+
+    db = SessionLocal()
+    try:
+        u = db.get(User, user_id)
+        if not u:
+            flash("User not found.")
+            return redirect(url_for("admin_users"))
+
+        u.display_name = display_name
+        db.commit()
+        flash("Name updated.")
+        return redirect(url_for("admin_users"))
+    finally:
+        db.close()
+
+
 @app.post("/admin/users/<int:user_id>/set_telegram_chat_id")
 @admin_required
 def admin_user_set_telegram_chat_id(user_id: int):

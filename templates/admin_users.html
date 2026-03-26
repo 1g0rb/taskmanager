@@ -61,7 +61,19 @@
         {% set is_me = (current_user.is_authenticated and current_user.id == u.id) %}
         <tr class="{{ 'muted' if not u.is_active else '' }}">
 
-          <td>{{ u.display_name or u.username.split('@')[0] }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_user_set_display_name', user_id=u.id) }}">
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input
+                  class="input users-select-compact"
+                  type="text"
+                  name="display_name"
+                  value="{{ u.display_name or '' }}"
+                  placeholder="{{ u.username.split('@')[0] }}">
+                <button class="btn" type="submit">Save</button>
+              </div>
+            </form>
+          </td>
           <td><span class="small">{{ u.username }}</span></td>
 
           <td>
