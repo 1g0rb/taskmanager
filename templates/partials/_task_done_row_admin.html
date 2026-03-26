@@ -66,7 +66,7 @@
         <div class="done-detail-value">
           {% if ids %}
             {% for uid in ids %}
-              <span class="pill user">{{ users[uid].username if uid in users else "?" }}</span>
+              <span class="pill user">{{ (users[uid].display_name or users[uid].username.split('@')[0]) if uid in users else "?" }}</span>
             {% endfor %}
           {% else %}
             <span class="pill warn">Unassigned</span>

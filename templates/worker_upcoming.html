@@ -41,7 +41,7 @@
           <div class="small" style="margin-top:6px;">
             👥 Assigned:
             {% for uid in ids %}
-              {{ users[uid].username if uid in users else "?" }}{% if not loop.last %}, {% endif %}
+              {{ (users[uid].display_name or users[uid].username.split('@')[0]) if uid in users else "?" }}{% if not loop.last %}, {% endif %}
             {% endfor %}
           </div>
         {% else %}

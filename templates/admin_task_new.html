@@ -105,7 +105,7 @@
         <label>Assign people (optional, multi)</label>
         <select class="input" name="assigned_user_ids" multiple size="7">
           {% for w in workers %}
-          <option value="{{ w.id }}">{{ w.username }} ({{ w.role }})</option>
+          <option value="{{ w.id }}">{{ w.display_name or w.username.split('@')[0] }} ({{ w.role }})</option>
           {% endfor %}
         </select>
         <div class="small" style="margin-top:6px;">
