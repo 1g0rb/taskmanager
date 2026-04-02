@@ -4,7 +4,7 @@
 {% set is_unfinished = (t.status != "done" and d and d < today) %}
 {% set is_today = (t.status != "done" and d and d == today) %}
 {% set is_upcoming = (t.status != "done" and d and d > today) %}
-
+{% set work_summary = task_work_summary_by_task_id.get(t.id, {}) %}
 
 <div class="taskv2" id="task-{{ t.id }}">
 
@@ -34,6 +34,9 @@
           {% endif %}
 
           <span class="pill ghost">{{ s|replace('_',' ') }}</span>
+          {% if work_summary.get('active_count', 0) %}
+          <span class="pill ok">Active now</span>
+          {% endif %}
         </div>
       </div>
 
@@ -50,7 +53,7 @@
         </div>
 
         <div class="meta-line">
-          <span class="meta-ico">🏷</span>
+          <span class="meta-ico">🌷</span>
           <span class="meta-txt">
             {% if (t.module or '')|lower == 'garden' %}
             <span class="pill module garden">Garden</span>
@@ -71,6 +74,16 @@
             <span class="pill warn">Unassigned</span>
             {% endif %}
           </span>
+        </div>
+
+        <div class="meta-line">
+          <span class="meta-ico">⏱</span>
+          <span class="meta-txt">{{ format_duration_minutes(work_summary.get('total_duration_minutes', 0)) }}</span>
+        </div>
+
+        <div class="meta-line">
+          <span class="meta-ico">🧑</span>
+          <span class="meta-txt">{{ work_summary.get('worker_count', 0) }} worker{{ '' if work_summary.get('worker_count', 0) == 1 else 's' }}</span>
         </div>
 
         {% if t.notes %}
@@ -110,13 +123,12 @@
       <div class="taskv2-actions">
 
         <div class="taskv2-left">
-          {# Single-assign via existing batch_assign #}
           <form method="post" action="{{ url_for('admin_tasks_batch_assign') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
 
             <select name="user_id" class="assign-select">
-              <option value="">Assign…</option>
+              <option value="">Assign...</option>
               {% for u in users.values() %}
               <option value="{{ u.id }}">{{ u.display_name or u.username.split('@')[0] }}</option>
               {% endfor %}
@@ -129,33 +141,28 @@
         <div class="taskv2-right-actions">
 
           {% if t.status == "done" %}
-          {# DONE = read-only. Ne dozvoli block/unblock/next day #}
-          <span class="pill ghost">✅ done</span>
+          <span class="pill ghost">done</span>
 
           {% else %}
 
-          {# Done (single) via batch_done #}
           <form method="post" action="{{ url_for('admin_tasks_batch_done') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
             <button class="btn mini ok" type="submit">Done</button>
           </form>
 
-          {# Block (single) via batch_block #}
           <form method="post" action="{{ url_for('admin_tasks_batch_block') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
             <button class="btn mini warn" type="submit">Block</button>
           </form>
 
-          {# Unblock (single) via batch_unblock #}
           <form method="post" action="{{ url_for('admin_tasks_batch_unblock') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
             <button class="btn mini" type="submit">Unblock</button>
           </form>
 
-          {# Next day (single) via batch_next_day #}
           <form method="post" action="{{ url_for('admin_tasks_batch_next_day') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
@@ -177,6 +184,11 @@
 
 
       </div>
+
+      <details class="taskv2-work-details">
+        <summary>Work sessions</summary>
+        {% include "partials/_task_work_sessions_admin.html" %}
+      </details>
 
     </div>
   </div>

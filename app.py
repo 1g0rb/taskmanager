@@ -115,6 +115,19 @@ class TaskAssignee(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
 
+class TaskWorkSession(Base):
+    __tablename__ = "task_work_sessions"
+
+    id = Column(Integer, primary_key=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    started_at = Column(DateTime, nullable=False, index=True)
+    finished_at = Column(DateTime, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    status = Column(String(20), nullable=False, default="active")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Issue(Base):
     __tablename__ = "issues"
 
@@ -378,12 +391,43 @@ def ensure_user_activity_schema():
             text("CREATE INDEX IF NOT EXISTS ix_user_activity_user_email ON user_activity (user_email)")
         )
 
+
+def ensure_task_work_session_schema():
+    with engine.begin() as conn:
+        tables = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='task_work_sessions'")
+        ).fetchall()
+        if tables:
+            cols = conn.execute(text("PRAGMA table_info(task_work_sessions)")).fetchall()
+            names = {c[1] for c in cols}
+            if "status" not in names:
+                conn.execute(
+                    text("ALTER TABLE task_work_sessions ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'")
+                )
+                print("Added column: task_work_sessions.status")
+            if "duration_minutes" not in names:
+                conn.execute(
+                    text("ALTER TABLE task_work_sessions ADD COLUMN duration_minutes INTEGER")
+                )
+                print("Added column: task_work_sessions.duration_minutes")
+
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_task_work_sessions_task_id ON task_work_sessions (task_id)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_task_work_sessions_user_id ON task_work_sessions (user_id)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_task_work_sessions_started_at ON task_work_sessions (started_at)")
+        )
+
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
 ensure_user_column_display_name()
 ensure_user_column_telegram_chat_id()
 ensure_observation_column_is_read()
 ensure_user_activity_schema()
+ensure_task_work_session_schema()
 
 # ---------------- App ----------------
 app = Flask(__name__)
@@ -441,6 +485,13 @@ def inject_current_user():
     return {
         "current_user": SimpleNamespace(is_authenticated=False, role="worker", username=""),
         "dev_lan_bypass": DEV_LAN_BYPASS,
+    }
+
+
+@app.context_processor
+def inject_template_helpers():
+    return {
+        "format_duration_minutes": format_duration_minutes,
     }
 
 def _random_password_hash() -> str:
@@ -990,6 +1041,195 @@ def get_current_db_user(db: Session):
     return db.query(User).filter(User.username == email).first()
 
 
+def format_duration_minutes(minutes: int | None) -> str:
+    if minutes is None:
+        return "In progress"
+
+    total_minutes = max(int(minutes), 0)
+    if total_minutes < 60:
+        return f"{total_minutes} min"
+
+    hours, rem = divmod(total_minutes, 60)
+    if rem == 0:
+        return f"{hours} h"
+    return f"{hours} h {rem} min"
+
+
+def _duration_minutes_between(started_at: datetime, finished_at: datetime) -> int:
+    delta = finished_at - started_at
+    return max(int(delta.total_seconds() // 60), 0)
+
+
+def finish_work_session(session: TaskWorkSession, finished_at: datetime | None = None) -> TaskWorkSession:
+    finished_value = finished_at or datetime.utcnow()
+    session.finished_at = finished_value
+    session.duration_minutes = _duration_minutes_between(session.started_at, finished_value)
+    session.status = "done"
+    return session
+
+
+def start_task_work_session(db: Session, task_id: int, user_id: int, started_at: datetime | None = None):
+    now = started_at or datetime.utcnow()
+
+    active_same_task = (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.task_id == task_id,
+            TaskWorkSession.user_id == user_id,
+            TaskWorkSession.status == "active",
+            TaskWorkSession.finished_at.is_(None),
+        )
+        .order_by(TaskWorkSession.started_at.desc())
+        .first()
+    )
+    if active_same_task:
+        return active_same_task, False
+
+    # MVP safeguard: one worker should not keep multiple active sessions open.
+    other_active_sessions = (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.user_id == user_id,
+            TaskWorkSession.task_id != task_id,
+            TaskWorkSession.status == "active",
+            TaskWorkSession.finished_at.is_(None),
+        )
+        .all()
+    )
+    for session in other_active_sessions:
+        finish_work_session(session, now)
+
+    session = TaskWorkSession(
+        task_id=task_id,
+        user_id=user_id,
+        started_at=now,
+        status="active",
+    )
+    db.add(session)
+    return session, True
+
+
+def finish_task_work_session(
+    db: Session,
+    task_id: int,
+    user_id: int,
+    finished_at: datetime | None = None,
+    create_fallback: bool = True,
+):
+    now = finished_at or datetime.utcnow()
+    active_session = (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.task_id == task_id,
+            TaskWorkSession.user_id == user_id,
+            TaskWorkSession.status == "active",
+            TaskWorkSession.finished_at.is_(None),
+        )
+        .order_by(TaskWorkSession.started_at.desc())
+        .first()
+    )
+    if active_session:
+        return finish_work_session(active_session, now), False
+
+    if not create_fallback:
+        return None, False
+
+    fallback_session = TaskWorkSession(
+        task_id=task_id,
+        user_id=user_id,
+        started_at=now,
+        finished_at=now,
+        duration_minutes=0,
+        status="done",
+    )
+    db.add(fallback_session)
+    return fallback_session, True
+
+
+def finish_active_sessions_for_tasks(db: Session, task_ids: list[int], finished_at: datetime | None = None) -> int:
+    if not task_ids:
+        return 0
+
+    now = finished_at or datetime.utcnow()
+    active_sessions = (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.task_id.in_(task_ids),
+            TaskWorkSession.status == "active",
+            TaskWorkSession.finished_at.is_(None),
+        )
+        .all()
+    )
+    for session in active_sessions:
+        finish_work_session(session, now)
+    return len(active_sessions)
+
+
+def build_task_work_session_data(db: Session, task_ids: list[int]):
+    sessions_by_task_id: dict[int, list[TaskWorkSession]] = {}
+    summary_by_task_id: dict[int, dict[str, object]] = {}
+    active_session_by_task_id: dict[int, list[TaskWorkSession]] = {}
+    active_session_by_task_user: dict[tuple[int, int], TaskWorkSession] = {}
+
+    if not task_ids:
+        return sessions_by_task_id, summary_by_task_id, active_session_by_task_id, active_session_by_task_user
+
+    rows = (
+        db.query(TaskWorkSession)
+        .filter(TaskWorkSession.task_id.in_(task_ids))
+        .order_by(TaskWorkSession.started_at.desc(), TaskWorkSession.id.desc())
+        .all()
+    )
+
+    for task_id in task_ids:
+        summary_by_task_id[task_id] = {
+            "total_sessions": 0,
+            "total_duration_minutes": 0,
+            "worker_count": 0,
+            "first_start": None,
+            "last_finish": None,
+            "active_count": 0,
+        }
+
+    worker_sets: dict[int, set[int]] = {task_id: set() for task_id in task_ids}
+
+    for row in rows:
+        sessions_by_task_id.setdefault(row.task_id, []).append(row)
+        summary = summary_by_task_id.setdefault(row.task_id, {
+            "total_sessions": 0,
+            "total_duration_minutes": 0,
+            "worker_count": 0,
+            "first_start": None,
+            "last_finish": None,
+            "active_count": 0,
+        })
+
+        summary["total_sessions"] += 1
+        if row.duration_minutes is not None:
+            summary["total_duration_minutes"] += row.duration_minutes
+
+        current_first_start = summary["first_start"]
+        if current_first_start is None or row.started_at < current_first_start:
+            summary["first_start"] = row.started_at
+
+        if row.finished_at:
+            current_last_finish = summary["last_finish"]
+            if current_last_finish is None or row.finished_at > current_last_finish:
+                summary["last_finish"] = row.finished_at
+
+        worker_sets.setdefault(row.task_id, set()).add(row.user_id)
+
+        if row.status == "active" and row.finished_at is None:
+            summary["active_count"] += 1
+            active_session_by_task_id.setdefault(row.task_id, []).append(row)
+            active_session_by_task_user[(row.task_id, row.user_id)] = row
+
+    for task_id, workers in worker_sets.items():
+        summary_by_task_id[task_id]["worker_count"] = len(workers)
+
+    return sessions_by_task_id, summary_by_task_id, active_session_by_task_id, active_session_by_task_user
+
+
 def start_of_current_week(today_value: date) -> date:
     return today_value - timedelta(days=today_value.weekday())
 
@@ -1261,6 +1501,7 @@ def admin_tasks():
     db = SessionLocal()
     try:
         today = date.today().isoformat()
+        today_start = datetime.combine(date.today(), datetime.min.time())
         selected_module = (request.args.get("module") or "").strip().lower()
         selected_location_raw = (request.args.get("location_id") or "").strip()
         selected_assignee_raw = (request.args.get("assignee_id") or "").strip()
@@ -1438,6 +1679,41 @@ def admin_tasks():
         for p in photo_rows:
             if p.task_id not in latest_task_photo_by_task_id:
                 latest_task_photo_by_task_id[p.task_id] = p.file_path
+
+        task_work_sessions_by_task_id, task_work_summary_by_task_id, active_work_sessions_by_task_id, _ = (
+            build_task_work_session_data(db, task_ids)
+        )
+
+        recent_work_sessions = (
+            db.query(TaskWorkSession)
+            .filter(TaskWorkSession.finished_at.isnot(None))
+            .order_by(TaskWorkSession.finished_at.desc(), TaskWorkSession.id.desc())
+            .limit(10)
+            .all()
+        )
+        recent_work_session_task_ids = [session.task_id for session in recent_work_sessions]
+        recent_work_session_tasks = {
+            task.id: task
+            for task in db.query(Task).filter(Task.id.in_(recent_work_session_task_ids)).all()
+        } if recent_work_session_task_ids else {}
+
+        work_session_stats = {
+            "sessions_today": (
+                db.query(TaskWorkSession)
+                .filter(TaskWorkSession.started_at >= today_start)
+                .count()
+            ),
+            "finished_sessions_today": (
+                db.query(TaskWorkSession)
+                .filter(TaskWorkSession.finished_at.isnot(None), TaskWorkSession.finished_at >= today_start)
+                .count()
+            ),
+            "active_sessions_now": (
+                db.query(TaskWorkSession)
+                .filter(TaskWorkSession.status == "active", TaskWorkSession.finished_at.is_(None))
+                .count()
+            ),
+        }
         return render_template(
             "admin_tasks.html",
             title="Tasks",
@@ -1458,6 +1734,12 @@ def admin_tasks():
             issue_by_task_id=issue_by_task_id,
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
             latest_task_photo_by_task_id=latest_task_photo_by_task_id,
+            task_work_sessions_by_task_id=task_work_sessions_by_task_id,
+            task_work_summary_by_task_id=task_work_summary_by_task_id,
+            active_work_sessions_by_task_id=active_work_sessions_by_task_id,
+            recent_work_sessions=recent_work_sessions,
+            recent_work_session_tasks=recent_work_session_tasks,
+            work_session_stats=work_session_stats,
         )
     finally:
         db.close()
@@ -2022,6 +2304,13 @@ def worker_dashboard():
             if p.task_id not in latest_task_photo_by_task_id:
                 latest_task_photo_by_task_id[p.task_id] = p.file_path
 
+        _, _, _, active_work_session_by_task_user = build_task_work_session_data(db, all_ids)
+        worker_active_session_by_task_id = {
+            task_id: session
+            for (task_id, session_user_id), session in active_work_session_by_task_user.items()
+            if session_user_id == user.id
+        }
+
         # DISPLAY liste - samo za ono što se vidi na ekranu
         display_overdue_tasks = overdue_tasks
         display_today_tasks = today_tasks
@@ -2064,6 +2353,7 @@ def worker_dashboard():
             issue_by_task_id=issue_by_task_id,
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
             latest_task_photo_by_task_id=latest_task_photo_by_task_id,
+            worker_active_session_by_task_id=worker_active_session_by_task_id,
             view=view,
             unread_observation_count=unread_observation_count,
         )
@@ -2076,6 +2366,7 @@ def worker_dashboard():
 def worker_task_start(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
+    now = datetime.utcnow()
 
     default_url = url_for("worker_dashboard", module=module)
     next_url = safe_next_url(default_url)
@@ -2103,7 +2394,9 @@ def worker_task_start(task_id: int):
 
         t.status = "in_progress"
         if not t.started_at:
-            t.started_at = datetime.utcnow()
+            t.started_at = now
+
+        start_task_work_session(db, t.id, user.id, started_at=now)
 
         db.commit()
         return redirect(next_url)
@@ -2117,6 +2410,7 @@ def worker_task_done(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
     today = date.today()
+    now = datetime.utcnow()
 
     default_url = url_for("worker_dashboard", module=module)
     next_url = safe_next_url(default_url)
@@ -2143,8 +2437,9 @@ def worker_task_done(task_id: int):
 
             t.status = "done"
             if not t.started_at:
-                t.started_at = datetime.utcnow()
-            t.finished_at = datetime.utcnow()
+                t.started_at = now
+            t.finished_at = now
+            finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=True)
 
             db.commit()
 
@@ -2187,13 +2482,14 @@ def worker_task_done(task_id: int):
 
         t.status = "done"
         if not t.started_at:
-            t.started_at = datetime.utcnow()
-        t.finished_at = datetime.utcnow()
+            t.started_at = now
+        t.finished_at = now
 
         t.blocked_reason = None
         t.blocked_until = None
         t.blocked_at = None
         t.blocked_location_id = None
+        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=True)
 
         db.commit()
 
@@ -2211,6 +2507,7 @@ def worker_task_done(task_id: int):
 def worker_task_blocked(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
+    now = datetime.utcnow()
 
     default_url = url_for("worker_dashboard", module=module)
     next_url = safe_next_url(default_url)
@@ -2255,12 +2552,13 @@ def worker_task_blocked(task_id: int):
         t.status = "blocked"
         t.blocked_reason = reason
         t.blocked_until = blocked_until
-        t.blocked_at = datetime.utcnow()
+        t.blocked_at = now
         t.blocked_location_id = None
 
         if not t.started_at:
-            t.started_at = datetime.utcnow()
+            t.started_at = now
         t.finished_at = None
+        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
 
         db.commit()
         return redirect(next_url)
@@ -2596,6 +2894,7 @@ def worker_task_next_day(task_id):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all")
     today = date.today()
+    now = datetime.utcnow()
 
     db = SessionLocal()
     try:
@@ -2614,6 +2913,7 @@ def worker_task_next_day(task_id):
 
         if t.status == "in_progress":
             t.status = "open"
+            finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
         if t.notes:
             if "[carryover]" not in t.notes.lower():
                 t.notes = f"[Carryover] {t.notes}"
@@ -2748,10 +3048,15 @@ def admin_tasks_batch_done():
         if not task_ids:
             return redirect_back()
 
-        db.query(Task).filter(Task.id.in_(task_ids)).update(
-            {Task.status: "done"},
-            synchronize_session=False
-        )
+        now = datetime.utcnow()
+        rows = db.query(Task).filter(Task.id.in_(task_ids)).all()
+        for task in rows:
+            task.status = "done"
+            if not task.started_at:
+                task.started_at = now
+            task.finished_at = now
+
+        finish_active_sessions_for_tasks(db, task_ids, finished_at=now)
         db.commit()
 
         send_telegram_message(
@@ -3086,6 +3391,7 @@ def admin_task_delete(task_id: int):
                         pass
 
         db.query(TaskAssignee).filter(TaskAssignee.task_id == task_id).delete(synchronize_session=False)
+        db.query(TaskWorkSession).filter(TaskWorkSession.task_id == task_id).delete(synchronize_session=False)
         db.query(TaskPhoto).filter(TaskPhoto.task_id == task_id).delete(synchronize_session=False)
         db.query(ResidenceBlock).filter(ResidenceBlock.task_id == task_id).delete(synchronize_session=False)
         db.query(Issue).filter(Issue.linked_task_id == task_id).update(

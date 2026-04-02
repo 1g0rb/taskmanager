@@ -1,0 +1,103 @@
+{% set work_summary = task_work_summary_by_task_id.get(t.id, {}) %}
+{% set work_sessions = task_work_sessions_by_task_id.get(t.id, []) %}
+
+<div class="work-session-block">
+  <div class="done-detail-label">Work sessions</div>
+
+  <div class="work-session-summary-grid">
+    <div class="done-detail-card">
+      <div class="done-detail-label">Total sessions</div>
+      <div class="done-detail-value">{{ work_summary.get('total_sessions', 0) }}</div>
+    </div>
+
+    <div class="done-detail-card">
+      <div class="done-detail-label">Total tracked time</div>
+      <div class="done-detail-value">{{ format_duration_minutes(work_summary.get('total_duration_minutes', 0)) }}</div>
+    </div>
+
+    <div class="done-detail-card">
+      <div class="done-detail-label">Workers involved</div>
+      <div class="done-detail-value">{{ work_summary.get('worker_count', 0) }}</div>
+    </div>
+
+    <div class="done-detail-card">
+      <div class="done-detail-label">First start</div>
+      <div class="done-detail-value">
+        {% if work_summary.get('first_start') %}
+          {{ work_summary.get('first_start').strftime("%Y-%m-%d %H:%M") }}
+        {% else %}
+          -
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="done-detail-card">
+      <div class="done-detail-label">Last finish</div>
+      <div class="done-detail-value">
+        {% if work_summary.get('last_finish') %}
+          {{ work_summary.get('last_finish').strftime("%Y-%m-%d %H:%M") }}
+        {% else %}
+          -
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="done-detail-card">
+      <div class="done-detail-label">Active now</div>
+      <div class="done-detail-value">
+        {% if work_summary.get('active_count', 0) %}
+          <span class="pill ok">{{ work_summary.get('active_count', 0) }}</span>
+        {% else %}
+          <span class="pill ghost">0</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="work-session-table-wrap">
+    <table class="users-table activity-table work-session-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Worker</th>
+          <th>Started</th>
+          <th>Finished</th>
+          <th>Duration</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for session in work_sessions %}
+        <tr>
+          <td>{{ session.started_at.strftime("%Y-%m-%d") }}</td>
+          <td>
+            {% if session.user_id in users %}
+              {{ users[session.user_id].display_name or users[session.user_id].username.split('@')[0] }}
+            {% else %}
+              User #{{ session.user_id }}
+            {% endif %}
+          </td>
+          <td>{{ session.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td>
+            {% if session.finished_at %}
+              {{ session.finished_at.strftime("%Y-%m-%d %H:%M") }}
+            {% else %}
+              In progress
+            {% endif %}
+          </td>
+          <td>{{ format_duration_minutes(session.duration_minutes) }}</td>
+          <td>
+            <span class="users-badge {{ 'worker' if session.status == 'done' else 'admin' }}">
+              {{ session.status }}
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6"><span class="small">No work sessions tracked yet.</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

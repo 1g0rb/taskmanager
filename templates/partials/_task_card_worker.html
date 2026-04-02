@@ -5,6 +5,7 @@
 {% set schedule_date = t.task_date or t.next_action_date %}
 {% set is_today = (schedule_date and (schedule_date|string) == (today|string)) %}
 {% set latest_photo = (latest_task_photo_by_task_id|default({})).get(t.id) %}
+{% set active_session = (worker_active_session_by_task_id|default({})).get(t.id) %}
 
 <article class="task-card" data-group="{{ group }}" data-status="{{ s }}">
 
@@ -40,6 +41,12 @@
     {% if schedule_date %}
     <div class="task-subline">
       <span class="meta">📅 {{ "Today" if is_today else schedule_date }}</span>
+    </div>
+    {% endif %}
+
+    {% if active_session %}
+    <div class="task-subline">
+      <span class="meta">Started at {{ active_session.started_at.strftime("%Y-%m-%d %H:%M") }}</span>
     </div>
     {% endif %}
 
@@ -186,6 +193,9 @@
       <summary class="sr-only">Details</summary>
 
       <div class="detail-line">Start task: {{ t.started_at if t.started_at else "-" }}</div>
+      {% if active_session %}
+      <div class="detail-line">My active session: {{ active_session.started_at.strftime("%Y-%m-%d %H:%M") }}</div>
+      {% endif %}
 
       {% if t.next_action_date %}
       <div class="detail-line">Deadline: {{ t.next_action_date }}</div>

@@ -3,6 +3,7 @@
 {% set task_photo = latest_task_photo_by_task_id.get(t.id) %}
 {% set issue_photo = linked_issue_photo_by_task_id.get(t.id) %}
 {% set linked_issue = issue_by_task_id.get(t.id) %}
+{% set work_summary = task_work_summary_by_task_id.get(t.id, {}) %}
 
 <details class="done-row" id="done-task-{{ t.id }}">
   <summary class="done-row-summary">
@@ -32,6 +33,10 @@
 
       {% if t.notes %}
         <span class="done-row-chip">Note</span>
+      {% endif %}
+
+      {% if work_summary.get('total_sessions', 0) %}
+        <span class="done-row-chip">{{ format_duration_minutes(work_summary.get('total_duration_minutes', 0)) }}</span>
       {% endif %}
 
       <span class="done-row-caret">▾</span>
@@ -81,6 +86,8 @@
         <div class="done-detail-text">{{ t.notes }}</div>
       </div>
     {% endif %}
+
+    {% include "partials/_task_work_sessions_admin.html" %}
 
     {% if task_photo or issue_photo %}
       <div class="done-photo-grid">
