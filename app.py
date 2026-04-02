@@ -15,7 +15,7 @@ from werkzeug.security import generate_password_hash
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Boolean, Date, DateTime,
-    ForeignKey, Text, text, select, case, or_
+    ForeignKey, Text, text, select, case, or_, func
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -218,6 +218,20 @@ class Observation(Base):
     assigned_user = relationship("User", foreign_keys=[assigned_user_id])
     created_by_user = relationship("User", foreign_keys=[created_by_user_id])
 
+
+class UserActivity(Base):
+    __tablename__ = "user_activity"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_email = Column(String, nullable=True, index=True)
+    user_name = Column(String, nullable=True)
+    path = Column(String, nullable=False)
+    method = Column(String(10), nullable=False)
+    activity_type = Column(String(20), nullable=False, default="view")
+    ip_address = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
 
 def safe_next_url(default: str):
@@ -339,11 +353,37 @@ def ensure_observation_column_is_read():
             conn.execute(text("ALTER TABLE observations ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
             print("Added column: observations.is_read")
 
+
+def ensure_user_activity_schema():
+    with engine.begin() as conn:
+        tables = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='user_activity'")
+        ).fetchall()
+        if tables:
+            cols = conn.execute(text("PRAGMA table_info(user_activity)")).fetchall()
+            names = {c[1] for c in cols}
+            if "activity_type" not in names:
+                conn.execute(
+                    text("ALTER TABLE user_activity ADD COLUMN activity_type VARCHAR(20) NOT NULL DEFAULT 'view'")
+                )
+                print("Added column: user_activity.activity_type")
+
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_activity_user_id ON user_activity (user_id)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_activity_created_at ON user_activity (created_at)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_activity_user_email ON user_activity (user_email)")
+        )
+
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
 ensure_user_column_display_name()
 ensure_user_column_telegram_chat_id()
 ensure_observation_column_is_read()
+ensure_user_activity_schema()
 
 # ---------------- App ----------------
 app = Flask(__name__)
@@ -360,6 +400,8 @@ ADMIN_EMAILS = {
 }
 DEV_BYPASS = os.environ.get("DEV_BYPASS", "").lower() in ("1", "true", "yes")
 DEV_LAN_BYPASS = os.environ.get("DEV_LAN_BYPASS", "").lower() in ("1", "true", "yes")
+IGNORED_ACTIVITY_PATH_PREFIXES = ("/static/", "/cdn-cgi/")
+IGNORED_ACTIVITY_PATHS = {"/favicon.ico", "/health"}
 
 
 def redirect_back(default="admin_tasks"):
@@ -419,6 +461,71 @@ def get_cf_name() -> str | None:
     name = name.strip()
     return name or None
 
+
+def get_request_ip() -> str | None:
+    cf_ip = (request.headers.get("CF-Connecting-IP") or "").strip()
+    if cf_ip:
+        return cf_ip
+
+    forwarded_for = (request.headers.get("X-Forwarded-For") or "").strip()
+    if forwarded_for:
+        first_ip = forwarded_for.split(",")[0].strip()
+        if first_ip:
+            return first_ip
+
+    return request.remote_addr
+
+
+def should_log_user_activity() -> bool:
+    if request.method == "OPTIONS":
+        return False
+
+    path = request.path or ""
+    if path in IGNORED_ACTIVITY_PATHS:
+        return False
+
+    if any(path.startswith(prefix) for prefix in IGNORED_ACTIVITY_PATH_PREFIXES):
+        return False
+
+    endpoint = request.endpoint or ""
+    if endpoint in {"static", "health"}:
+        return False
+
+    return bool(endpoint)
+
+
+def log_user_activity() -> None:
+    if not should_log_user_activity():
+        return
+
+    user_email = get_cf_email()
+    user_name = get_cf_name()
+
+    if not user_email and not user_name:
+        return
+
+    db = SessionLocal()
+    try:
+        matched_user = None
+        if user_email:
+            matched_user = db.query(User).filter(User.username == user_email).first()
+
+        activity = UserActivity(
+            user_id=matched_user.id if matched_user else None,
+            user_email=user_email,
+            user_name=user_name or (matched_user.display_name if matched_user else None),
+            path=request.path,
+            method=request.method,
+            activity_type="view" if request.method == "GET" else "action",
+            ip_address=get_request_ip(),
+        )
+        db.add(activity)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
 def get_current_user(db: Session) -> User | None:
     email = get_cf_email()
     if not email:
@@ -464,6 +571,11 @@ def get_current_user(db: Session) -> User | None:
         db.commit()
 
     return user
+
+
+@app.before_request
+def track_user_activity():
+    log_user_activity()
 
 def get_local_dev_user(db: Session) -> User:
     # probaj uzeti prvog aktivnog admina
@@ -878,6 +990,118 @@ def get_current_db_user(db: Session):
     return db.query(User).filter(User.username == email).first()
 
 
+def start_of_current_week(today_value: date) -> date:
+    return today_value - timedelta(days=today_value.weekday())
+
+
+def build_activity_stats(db: Session, users: list[User], today_value: date):
+    stats = {
+        user.id: {"last_seen": None, "today_count": 0, "week_count": 0}
+        for user in users
+    }
+    if not users:
+        return stats
+
+    user_ids = [user.id for user in users]
+    email_to_user_id = {
+        (user.username or "").strip().lower(): user.id
+        for user in users
+        if (user.username or "").strip()
+    }
+    user_emails = list(email_to_user_id.keys())
+    start_today = datetime.combine(today_value, datetime.min.time())
+    start_week = datetime.combine(start_of_current_week(today_value), datetime.min.time())
+
+    last_seen_rows = (
+        db.query(UserActivity.user_id, func.max(UserActivity.created_at))
+        .filter(
+            UserActivity.user_id.in_(user_ids),
+            UserActivity.user_id.isnot(None),
+        )
+        .group_by(UserActivity.user_id)
+        .all()
+    )
+    for user_id, last_seen in last_seen_rows:
+        if user_id in stats:
+            stats[user_id]["last_seen"] = last_seen
+
+    email_last_seen_rows = (
+        db.query(UserActivity.user_email, func.max(UserActivity.created_at))
+        .filter(
+            UserActivity.user_id.is_(None),
+            UserActivity.user_email.in_(user_emails),
+        )
+        .group_by(UserActivity.user_email)
+        .all()
+    )
+    for user_email, last_seen in email_last_seen_rows:
+        mapped_user_id = email_to_user_id.get((user_email or "").strip().lower())
+        if mapped_user_id and (
+            not stats[mapped_user_id]["last_seen"] or last_seen > stats[mapped_user_id]["last_seen"]
+        ):
+            stats[mapped_user_id]["last_seen"] = last_seen
+
+    today_rows = (
+        db.query(UserActivity.user_id, func.count(UserActivity.id))
+        .filter(
+            UserActivity.user_id.in_(user_ids),
+            UserActivity.user_id.isnot(None),
+            UserActivity.created_at >= start_today,
+        )
+        .group_by(UserActivity.user_id)
+        .all()
+    )
+    for user_id, count in today_rows:
+        if user_id in stats:
+            stats[user_id]["today_count"] = count
+
+    today_email_rows = (
+        db.query(UserActivity.user_email, func.count(UserActivity.id))
+        .filter(
+            UserActivity.user_id.is_(None),
+            UserActivity.user_email.in_(user_emails),
+            UserActivity.created_at >= start_today,
+        )
+        .group_by(UserActivity.user_email)
+        .all()
+    )
+    for user_email, count in today_email_rows:
+        mapped_user_id = email_to_user_id.get((user_email or "").strip().lower())
+        if mapped_user_id in stats:
+            stats[mapped_user_id]["today_count"] += count
+
+    week_rows = (
+        db.query(UserActivity.user_id, func.count(UserActivity.id))
+        .filter(
+            UserActivity.user_id.in_(user_ids),
+            UserActivity.user_id.isnot(None),
+            UserActivity.created_at >= start_week,
+        )
+        .group_by(UserActivity.user_id)
+        .all()
+    )
+    for user_id, count in week_rows:
+        if user_id in stats:
+            stats[user_id]["week_count"] = count
+
+    week_email_rows = (
+        db.query(UserActivity.user_email, func.count(UserActivity.id))
+        .filter(
+            UserActivity.user_id.is_(None),
+            UserActivity.user_email.in_(user_emails),
+            UserActivity.created_at >= start_week,
+        )
+        .group_by(UserActivity.user_email)
+        .all()
+    )
+    for user_email, count in week_email_rows:
+        mapped_user_id = email_to_user_id.get((user_email or "").strip().lower())
+        if mapped_user_id in stats:
+            stats[mapped_user_id]["week_count"] += count
+
+    return stats
+
+
 # ---------------- Health ----------------
 @app.get("/health")
 def health():
@@ -1284,6 +1508,73 @@ def admin_users():
             q=q,
             status=status,
             team_id=team_id,
+        )
+    finally:
+        db.close()
+
+
+@app.get("/admin/activity")
+@admin_required
+def admin_activity():
+    db = SessionLocal()
+    try:
+        workers = (
+            db.query(User)
+            .filter(User.role == "worker")
+            .order_by(User.is_active.desc(), func.lower(func.coalesce(User.display_name, User.username)))
+            .all()
+        )
+
+        today_value = date.today()
+        stats_by_user_id = build_activity_stats(db, workers, today_value)
+
+        return render_template(
+            "admin_activity.html",
+            title="User Activity",
+            workers=workers,
+            stats_by_user_id=stats_by_user_id,
+            today=today_value,
+        )
+    finally:
+        db.close()
+
+
+@app.get("/admin/activity/<int:user_id>")
+@admin_required
+def admin_activity_detail(user_id: int):
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if not user:
+            flash("User not found.")
+            return redirect(url_for("admin_activity"))
+
+        today_value = date.today()
+        stats = build_activity_stats(db, [user], today_value).get(
+            user.id,
+            {"last_seen": None, "today_count": 0, "week_count": 0},
+        )
+
+        activities = (
+            db.query(UserActivity)
+            .filter(
+                or_(
+                    UserActivity.user_id == user.id,
+                    (UserActivity.user_id.is_(None) & (UserActivity.user_email == user.username)),
+                )
+            )
+            .order_by(UserActivity.created_at.desc())
+            .limit(50)
+            .all()
+        )
+
+        return render_template(
+            "admin_activity_detail.html",
+            title="User Activity Detail",
+            user=user,
+            stats=stats,
+            activities=activities,
+            today=today_value,
         )
     finally:
         db.close()

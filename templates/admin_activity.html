@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="card">
+  <div class="page-head">
+    <div class="page-title">
+      <h2>User Activity</h2>
+      <div class="small">Pregled worker aktivnosti i zadnjeg pristupa aplikaciji.</div>
+    </div>
+  </div>
+
+  <div style="overflow:auto;">
+    <table class="users-table activity-table">
+      <colgroup>
+        <col style="width:30%">
+        <col style="width:22%">
+        <col style="width:18%">
+        <col style="width:14%">
+        <col style="width:16%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Ime / email</th>
+          <th>Last seen</th>
+          <th>Aktivnosti danas</th>
+          <th>Ovaj tjedan</th>
+          <th>Detalji</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for worker in workers %}
+        {% set stats = stats_by_user_id.get(worker.id, {}) %}
+        <tr class="{{ 'muted' if not worker.is_active else '' }}">
+          <td>
+            <div class="activity-user-cell">
+              <strong>{{ worker.display_name or worker.username.split('@')[0] }}</strong>
+              <span class="small">{{ worker.username }}</span>
+            </div>
+          </td>
+          <td>
+            {% if stats.last_seen %}
+              <div class="activity-user-cell">
+                <strong>{{ stats.last_seen.strftime("%Y-%m-%d %H:%M") }}</strong>
+                <span class="small">{{ stats.last_seen.strftime("%A") }}</span>
+              </div>
+            {% else %}
+              <span class="small">No activity yet</span>
+            {% endif %}
+          </td>
+          <td><span class="pill users-pill">{{ stats.today_count or 0 }}</span></td>
+          <td><span class="pill users-pill">{{ stats.week_count or 0 }}</span></td>
+          <td>
+            <a class="btn" href="{{ url_for('admin_activity_detail', user_id=worker.id) }}">Details</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

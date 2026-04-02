@@ -2246,3 +2246,25 @@ body.is-worker .mobile-overlay{
     grid-template-columns: 1fr;
   }
 }
+
+.activity-table td,
+.activity-table th{
+  white-space: normal;
+}
+
+.activity-user-cell{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.activity-path-cell{
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+}
+
+.activity-stat-text{
+  font-size: 20px;
+  line-height: 1.3;
+}
