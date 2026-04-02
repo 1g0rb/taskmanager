@@ -16,6 +16,8 @@
       Locations</a>
     <a class="{{ 'active' if request.endpoint=='admin_users' else '' }}" href="{{ url_for('admin_users') }}">👤
       Users</a>
+    <a class="{{ 'active' if request.endpoint in ['admin_activity', 'admin_activity_detail'] else '' }}" href="{{ url_for('admin_activity') }}">📈
+      User Activity</a>
     <a class="{{ 'active' if request.endpoint=='admin_issues' else '' }}" href="{{ url_for('admin_issues') }}">🛠
       Issues</a>
     <a class="{{ 'active' if request.endpoint=='admin_observation_new' else '' }}"
