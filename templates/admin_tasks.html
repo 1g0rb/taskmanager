@@ -71,6 +71,72 @@
 
 </div>
 
+<div class="card work-session-dashboard-card">
+  <div class="page-head">
+    <div class="page-title">
+      <h2 style="font-size:24px;">Recent work sessions</h2>
+      <div class="small">Zadnjih 10 završenih sessiona i brzi pregled rada.</div>
+    </div>
+  </div>
+
+  <div class="stats stats-3 work-session-top-stats">
+    <div class="stat">
+      <div>
+        <div class="stat-label">Sessions today</div>
+        <div class="stat-value">{{ work_session_stats['sessions_today'] }}</div>
+      </div>
+    </div>
+    <div class="stat">
+      <div>
+        <div class="stat-label">Finished today</div>
+        <div class="stat-value">{{ work_session_stats['finished_sessions_today'] }}</div>
+      </div>
+    </div>
+    <div class="stat">
+      <div>
+        <div class="stat-label">Active now</div>
+        <div class="stat-value">{{ work_session_stats['active_sessions_now'] }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="overflow:auto;">
+    <table class="users-table activity-table work-session-table">
+      <thead>
+        <tr>
+          <th>Worker</th>
+          <th>Task</th>
+          <th>Started</th>
+          <th>Finished</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for session in recent_work_sessions %}
+        {% set task = recent_work_session_tasks.get(session.task_id) %}
+        <tr>
+          <td>
+            {% if session.user_id in users %}
+              {{ users[session.user_id].display_name or users[session.user_id].username.split('@')[0] }}
+            {% else %}
+              User #{{ session.user_id }}
+            {% endif %}
+          </td>
+          <td>{{ task.title if task else ('Task #' ~ session.task_id) }}</td>
+          <td>{{ session.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td>{{ session.finished_at.strftime("%Y-%m-%d %H:%M") if session.finished_at else "In progress" }}</td>
+          <td>{{ format_duration_minutes(session.duration_minutes) }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5"><span class="small">No finished work sessions yet.</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% for key, title in [
   ("unfinished", "🔥 Unfinished"),
   ("today", "📅 Today"),

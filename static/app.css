@@ -2268,3 +2268,61 @@ body.is-worker .mobile-overlay{
   font-size: 20px;
   line-height: 1.3;
 }
+
+.work-session-dashboard-card{
+  margin-top: 16px;
+}
+
+.work-session-top-stats{
+  margin-bottom: 18px;
+}
+
+.work-session-block{
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(15,23,42,.08);
+}
+
+.work-session-summary-grid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.work-session-table-wrap{
+  overflow:auto;
+}
+
+.work-session-table td,
+.work-session-table th{
+  font-size: 13px;
+}
+
+.taskv2-work-details{
+  margin-top: 14px;
+  border-top: 1px solid rgba(15,23,42,.08);
+  padding-top: 12px;
+}
+
+.taskv2-work-details summary{
+  cursor:pointer;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+.taskv2-work-details[open] summary{
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px){
+  .work-session-summary-grid{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px){
+  .work-session-summary-grid{
+    grid-template-columns: 1fr;
+  }
+}
