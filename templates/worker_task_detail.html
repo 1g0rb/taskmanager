@@ -225,8 +225,9 @@
         action="{{ url_for('worker_task_start', task_id=task.id) }}?module={{ active_module }}"
         class="worker-detail-primary-form"
         data-start-form
-        data-finish-action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
+        data-finish-action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}"
+        data-finish-next="{{ back_url }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}" data-primary-next>
         <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary" type="submit" data-primary-button>
           <span class="worker-detail-dock-icon" aria-hidden="true">&#9654;</span>
           <span data-primary-label>Start Task</span>
@@ -239,7 +240,7 @@
         class="worker-detail-primary-form"
         data-start-form
         data-finish-action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <input type="hidden" name="next" value="{{ back_url }}" data-primary-next>
         <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary is-active" type="submit" data-primary-button>
           <span class="worker-detail-dock-icon" aria-hidden="true">&#9654;</span>
           <span data-primary-label>Finish Task</span>
@@ -295,11 +296,16 @@
     const dock = document.querySelector(".worker-detail-action-dock");
     const button = document.querySelector("[data-primary-button]");
     const label = document.querySelector("[data-primary-label]");
-    if (!form || !dock || !button || !label) return;
+    const nextInput = document.querySelector("[data-primary-next]");
+    if (!form || !dock || !button || !label || !nextInput) return;
 
     if (dock.dataset.taskStatus !== "open") return;
 
     form.addEventListener("submit", async function (event) {
+      if (dock.dataset.taskStatus !== "open") {
+        return;
+      }
+
       event.preventDefault();
       if (button.disabled) return;
 
@@ -320,6 +326,7 @@
 
         dock.dataset.taskStatus = "in_progress";
         form.action = form.dataset.finishAction || form.action;
+        nextInput.value = form.dataset.finishNext || nextInput.value;
         button.classList.add("is-active");
         label.textContent = "Finish Task";
       } catch (error) {
