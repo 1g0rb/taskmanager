@@ -3,30 +3,27 @@
 
 <div class="worker-shell">
   <div class="worker-topbar">
-  <div class="worker-topbar-inner">
-    
-    <div class="worker-brand">
-      <div class="brand-mark">🌿</div>
-      <div class="brand-text">
-        <div class="brand-title">TaskManager</div>
-        <div class="brand-sub">Meneghetti</div>
+    <div class="worker-topbar-inner">
+      <div class="worker-brand">
+        <div class="brand-mark">TM</div>
+        <div class="brand-text">
+          <div class="brand-title">TaskManager</div>
+          <div class="brand-sub">Meneghetti</div>
+        </div>
+      </div>
+
+      <div class="worker-topbar-actions">
+        <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
+          Obs
+          {% if unread_observation_count and unread_observation_count > 0 %}
+            <span class="worker-bell-badge">{{ unread_observation_count }}</span>
+          {% endif %}
+        </a>
       </div>
     </div>
-
-    <div class="worker-topbar-actions">
-      <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
-        🔔
-        {% if unread_observation_count and unread_observation_count > 0 %}
-          <span class="worker-bell-badge">{{ unread_observation_count }}</span>
-        {% endif %}
-      </a>
-    </div>
-
   </div>
-</div>
 
   <div class="worker-page">
-
     <header class="worker-head">
       <div class="worker-head-row">
         <div>
@@ -38,29 +35,28 @@
     </header>
 
     <section class="worker-stats-row">
-  <a class="worker-stat-pill {{ 'active' if view == 'today' else '' }}"
-     href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
-    <div class="label">Today</div>
-    <div class="value">{{ today_count }}</div>
-  </a>
+      <a class="worker-stat-pill {{ 'active' if view == 'today' else '' }}"
+         href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
+        <div class="label">Today</div>
+        <div class="value">{{ today_count }}</div>
+      </a>
 
-  <a class="worker-stat-pill {{ 'active' if view == 'unfinished' else '' }}"
-     href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='unfinished') }}">
-    <div class="label">Unfinished</div>
-    <div class="value danger">{{ overdue_count }}</div>
-  </a>
+      <a class="worker-stat-pill {{ 'active' if view == 'unfinished' else '' }}"
+         href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='unfinished') }}">
+        <div class="label">Unfinished</div>
+        <div class="value danger">{{ overdue_count }}</div>
+      </a>
 
-  <a class="worker-stat-pill {{ 'active' if view == 'upcoming' else '' }}"
-     href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='upcoming') }}">
-    <div class="label">Upcoming</div>
-    <div class="value">{{ upcoming_count }}</div>
-  </a>
-</section>
+      <a class="worker-stat-pill {{ 'active' if view == 'upcoming' else '' }}"
+         href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='upcoming') }}">
+        <div class="label">Upcoming</div>
+        <div class="value">{{ upcoming_count }}</div>
+      </a>
+    </section>
 
     <section class="task-list">
-
       {% if overdue_tasks %}
-        <div class="group-head">UNFINISHED</div>
+        <div class="group-head">Unfinished</div>
         {% for t in overdue_tasks %}
           {% set group = "overdue" %}
           {% include "partials/_task_card_worker.html" %}
@@ -68,7 +64,7 @@
       {% endif %}
 
       {% if today_tasks %}
-        <div class="group-head">TODAY</div>
+        <div class="group-head">Today</div>
         {% for t in today_tasks %}
           {% set group = "today" %}
           {% include "partials/_task_card_worker.html" %}
@@ -76,7 +72,7 @@
       {% endif %}
 
       {% if upcoming_tasks %}
-        <div class="group-head">UPCOMING</div>
+        <div class="group-head">Upcoming</div>
         {% for t in upcoming_tasks %}
           {% set group = "upcoming" %}
           {% include "partials/_task_card_worker.html" %}
@@ -85,12 +81,11 @@
 
       {% if not overdue_tasks and not today_tasks and not upcoming_tasks %}
         <div class="worker-empty">
-          <div class="worker-empty-icon">✅</div>
+          <div class="worker-empty-icon">OK</div>
           <div class="worker-empty-title">No tasks right now</div>
           <div class="worker-empty-text">You currently have no assigned tasks in this period.</div>
         </div>
       {% endif %}
-
     </section>
   </div>
 </div>

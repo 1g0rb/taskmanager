@@ -4,9 +4,8 @@
 <div class="worker-shell">
   <div class="worker-topbar">
     <div class="worker-topbar-inner">
-
       <div class="worker-brand">
-        <div class="brand-mark">🌿</div>
+        <div class="brand-mark">TM</div>
         <div class="brand-text">
           <div class="brand-title">TaskManager</div>
           <div class="brand-sub">Meneghetti</div>
@@ -15,18 +14,16 @@
 
       <div class="worker-topbar-actions">
         <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
-          🔔
+          Obs
           {% if unread_observation_count and unread_observation_count > 0 %}
             <span class="worker-bell-badge">{{ unread_observation_count }}</span>
           {% endif %}
         </a>
       </div>
-
     </div>
   </div>
 
   <div class="worker-page worker-home-page">
-
     <header class="worker-head">
       <div class="worker-head-row">
         <div>
@@ -37,11 +34,11 @@
       </div>
     </header>
 
-    <section class="worker-home-hero card">
-      <div class="worker-home-hero-icon">👋</div>
+    <section class="worker-home-hero">
+      <div class="worker-home-hero-icon">Go</div>
       <div class="worker-home-hero-text">
-        <h2 style="margin:0 0 8px 0;">Focus on what matters today</h2>
-        <p class="small" style="margin:0;">
+        <h2 class="worker-home-hero-title">Focus on what matters today</h2>
+        <p class="worker-home-hero-copy">
           Check your next priority task, unread observations, or jump straight into your task list.
         </p>
       </div>
@@ -95,7 +92,7 @@
 
     <section class="worker-home-actions">
       <a class="worker-home-action-card" href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
-        <div class="worker-home-action-icon">✅</div>
+        <div class="worker-home-action-icon">Do</div>
         <div class="worker-home-action-body">
           <div class="worker-home-action-title">Open My Tasks</div>
           <div class="worker-home-action-text">See today, unfinished and upcoming tasks.</div>
@@ -103,7 +100,7 @@
       </a>
 
       <a class="worker-home-action-card" href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
-        <div class="worker-home-action-icon">🛠</div>
+        <div class="worker-home-action-icon">Rep</div>
         <div class="worker-home-action-body">
           <div class="worker-home-action-title">Report Issue</div>
           <div class="worker-home-action-text">Send a new issue with details and photo.</div>
@@ -111,14 +108,13 @@
       </a>
 
       <a class="worker-home-action-card" href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
-        <div class="worker-home-action-icon">⚙️</div>
+        <div class="worker-home-action-icon">Set</div>
         <div class="worker-home-action-body">
           <div class="worker-home-action-title">Settings</div>
           <div class="worker-home-action-text">Change module and worker preferences.</div>
         </div>
       </a>
     </section>
-
   </div>
 </div>
 
