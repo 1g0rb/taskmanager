@@ -5,12 +5,10 @@
   <title>{{ title or "TaskManager" }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Base CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v=1004">
 
-  <!-- Worker CSS (only on /worker routes) -->
   {% if request.path.startswith('/worker') %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='worker.css') }}?v=2003">
+  <link rel="stylesheet" href="{{ url_for('static', filename='worker.css') }}?v=2004">
   {% endif %}
 
   {% block head_extra %}{% endblock %}
@@ -23,20 +21,17 @@
         and current_user.role == 'admin'
         and not request.path.startswith('/worker') %}
 
-    <!-- Mobile topbar (ADMIN only) -->
     <div class="mobile-topbar">
-      <button class="mobile-burger" id="navToggle" type="button">☰</button>
+      <button class="mobile-burger" id="navToggle" type="button">&#9776;</button>
       <div class="mobile-title">TaskManager</div>
     </div>
 
-    <!-- Mobile overlay -->
     <div class="mobile-overlay" id="navOverlay" hidden></div>
 
   {% endif %}
 
   <div class="app-shell">
 
-    <!-- Admin sidebar (NOT on worker pages) -->
     {% if current_user.is_authenticated
           and current_user.role == 'admin'
           and not request.path.startswith('/worker') %}
@@ -53,37 +48,58 @@
       {% block content %}{% endblock %}
     </main>
 
-  </div> <!-- end .app-shell -->
+  </div>
 
-  <!-- Worker footer (ONLY on worker pages) -->
   {% if current_user.is_authenticated and request.path.startswith('/worker') %}
   <footer class="worker-footer">
 
-  <a class="worker-navitem {{ 'active' if active_tab=='home' else '' }}"
-     href="{{ url_for('worker_home', module=active_module|default('all')) }}">
-    <span class="nav-ico">🏠</span>
-    <span>Home</span>
-  </a>
+    <a class="worker-navitem {{ 'active' if active_tab=='home' else '' }}"
+       href="{{ url_for('worker_home', module=active_module|default('all')) }}">
+      <span class="nav-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="worker-icon worker-icon-nav">
+          <path d="M4 11.5 12 5l8 6.5" />
+          <path d="M7.5 10.5V19h9v-8.5" />
+        </svg>
+      </span>
+      <span class="nav-label">Home</span>
+    </a>
 
-  <a class="worker-navitem {{ 'active' if active_tab=='tasks' else '' }}"
-     href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
-    <span class="nav-ico">✅</span>
-    <span>Tasks</span>
-  </a>
+    <a class="worker-navitem {{ 'active' if active_tab=='tasks' else '' }}"
+       href="{{ url_for('worker_dashboard', module=active_module|default('all')) }}">
+      <span class="nav-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="worker-icon worker-icon-nav">
+          <rect x="5" y="4.5" width="14" height="15" rx="2" ry="2" />
+          <path d="M8 9.5h8M8 13h6" />
+          <path d="m8 7.5 1.2 1.2L11.5 6.5" />
+        </svg>
+      </span>
+      <span class="nav-label">Tasks</span>
+    </a>
 
-  <a class="worker-navitem {{ 'active' if active_tab=='issues' else '' }}"
-     href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
-    <span class="nav-ico">🛠</span>
-    <span>Issues</span>
-  </a>
+    <a class="worker-navitem {{ 'active' if active_tab=='issues' else '' }}"
+       href="{{ url_for('worker_issue_new', module=active_module|default('all')) }}">
+      <span class="nav-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="worker-icon worker-icon-nav">
+          <path d="M12 5.5 19 18H5l7-12.5Z" />
+          <path d="M12 9v4.5" />
+          <circle cx="12" cy="16" r=".8" />
+        </svg>
+      </span>
+      <span class="nav-label">Issues</span>
+    </a>
 
-  <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
-     href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
-    <span class="nav-ico">⚙️</span>
-    <span>Settings</span>
-  </a>
+    <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
+       href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
+      <span class="nav-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="worker-icon worker-icon-nav">
+          <path d="M12 12.25a3.25 3.25 0 1 0-3.25-3.25A3.25 3.25 0 0 0 12 12.25Z" />
+          <path d="M5.5 18.5a6.5 6.5 0 0 1 13 0" />
+        </svg>
+      </span>
+      <span class="nav-label">Settings</span>
+    </a>
 
-</footer>
+  </footer>
   {% endif %}
 
   <script defer>
@@ -91,7 +107,6 @@
       const enabled = document.body?.dataset?.autorefresh === "1";
       if (!enabled) return;
 
-      // Do not auto-refresh worker pages
       if (document.querySelector(".worker-footer")) return;
 
       const intervalMs = 30000;
@@ -145,70 +160,62 @@
       });
     })();
   </script>
-<script>
+  <script>
+    const photoInput = document.getElementById("issue-photo");
+    const preview = document.getElementById("photo-preview");
 
-const photoInput = document.getElementById("issue-photo")
-const preview = document.getElementById("photo-preview")
+    if (photoInput) {
+      photoInput.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
 
-if(photoInput){
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = "block";
+      });
+    }
+  </script>
 
-  photoInput.addEventListener("change", function(e){
+  <script>
+    document.addEventListener("click", function (e) {
+      const thumb = e.target.closest(".js-lightbox-image, .js-task-photo");
+      const lightbox = document.getElementById("image-lightbox");
+      const lightboxImg = document.getElementById("image-lightbox-img");
+      const closeBtn = document.getElementById("image-lightbox-close");
 
-    const file = e.target.files[0]
-    if(!file) return
+      if (thumb && lightbox && lightboxImg) {
+        lightboxImg.src = thumb.dataset.fullsrc || thumb.src;
+        lightbox.hidden = false;
+        document.body.style.overflow = "hidden";
+        return;
+      }
 
-    preview.src = URL.createObjectURL(file)
-    preview.style.display = "block"
+      if (!lightbox || lightbox.hidden) {
+        return;
+      }
 
-  })
+      if (e.target === lightbox || e.target === closeBtn) {
+        lightbox.hidden = true;
+        lightboxImg.src = "";
+        document.body.style.overflow = "";
+      }
+    });
 
-}
+    document.addEventListener("keydown", function (e) {
+      const lightbox = document.getElementById("image-lightbox");
+      const lightboxImg = document.getElementById("image-lightbox-img");
 
-</script>
+      if (e.key === "Escape" && lightbox && !lightbox.hidden) {
+        lightbox.hidden = true;
+        lightboxImg.src = "";
+        document.body.style.overflow = "";
+      }
+    });
+  </script>
 
-<script>
-document.addEventListener("click", function(e){
-
-  const thumb = e.target.closest(".js-lightbox-image, .js-task-photo")
-  const lightbox = document.getElementById("image-lightbox")
-  const lightboxImg = document.getElementById("image-lightbox-img")
-  const closeBtn = document.getElementById("image-lightbox-close")
-
-  if(thumb && lightbox && lightboxImg){
-    lightboxImg.src = thumb.dataset.fullsrc || thumb.src
-    lightbox.hidden = false
-    document.body.style.overflow = "hidden"
-    return
-  }
-
-  if(!lightbox || lightbox.hidden){
-    return
-  }
-
-  if(e.target === lightbox || e.target === closeBtn){
-    lightbox.hidden = true
-    lightboxImg.src = ""
-    document.body.style.overflow = ""
-  }
-
-})
-
-document.addEventListener("keydown", function(e){
-  const lightbox = document.getElementById("image-lightbox")
-  const lightboxImg = document.getElementById("image-lightbox-img")
-
-  if(e.key === "Escape" && lightbox && !lightbox.hidden){
-    lightbox.hidden = true
-    lightboxImg.src = ""
-    document.body.style.overflow = ""
-  }
-})
-</script>
-
-<div id="image-lightbox" class="image-lightbox" hidden>
-  <button id="image-lightbox-close" class="image-lightbox-close" type="button">✕</button>
-  <img id="image-lightbox-img" class="image-lightbox-img" src="" alt="Full image">
-</div>
+  <div id="image-lightbox" class="image-lightbox" hidden>
+    <button id="image-lightbox-close" class="image-lightbox-close" type="button">&#10005;</button>
+    <img id="image-lightbox-img" class="image-lightbox-img" src="" alt="Full image">
+  </div>
 
 </body>
 </html>

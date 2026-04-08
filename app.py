@@ -649,6 +649,27 @@ def get_local_dev_user(db: Session) -> User:
     return u
 
 
+def is_dev_auth_bypass_enabled() -> bool:
+    flask_env = (os.environ.get("FLASK_ENV") or "").strip().lower()
+    return bool(app.debug or DEV_BYPASS or flask_env == "development")
+
+
+def can_use_dev_auth_bypass() -> bool:
+    # Only use fallback auth when Cloudflare headers are absent.
+    if get_cf_email():
+        return False
+
+    if not is_dev_auth_bypass_enabled():
+        return False
+
+    # Safe default: localhost only.
+    if is_local_request():
+        return True
+
+    # Optional LAN bypass remains opt-in and unchanged.
+    return DEV_LAN_BYPASS and is_private_network_request()
+
+
 def get_current_user_or_dev(db: Session) -> User | None:
     # normalno: Cloudflare Access user
     user = get_current_user(db)
@@ -656,7 +677,7 @@ def get_current_user_or_dev(db: Session) -> User | None:
         return user
 
     # local dev override: ?as_user=email@domain.com
-    if is_local_request() or (DEV_LAN_BYPASS and is_private_network_request()):
+    if can_use_dev_auth_bypass():
         as_user = (request.args.get("as_user") or request.form.get("as_user") or "").strip().lower()
         if as_user:
             u = db.query(User).filter(User.username == as_user, User.is_active == True).first()
@@ -1361,7 +1382,7 @@ def index():
         if is_admin:
             return redirect(url_for("admin_tasks"))
 
-        return redirect(url_for("worker_home"))
+        return redirect(url_for("worker_dashboard"))
     finally:
         db.close()
 
@@ -2183,54 +2204,8 @@ def get_or_create_user_from_email(db: Session, email: str) -> User:
 @app.get("/worker/home")
 @cf_required
 def worker_home():
-    user = request.cf_user  # type: ignore[attr-defined]
-
-    today = date.today()
-    until = today + timedelta(days=7)
-    today_iso = today.isoformat()
-
-    active_module, module_filter = parse_module_arg()
-
-    db = SessionLocal()
-    try:
-        overdue_tasks, today_tasks, upcoming_tasks = load_worker_task_groups(
-            db, user, module_filter, today, until
-        )
-
-        today_pretty = today.strftime("%A, %B %d, %Y")
-        unread_observation_count = get_worker_unread_observation_count(db, user.id)
-        candidate_ids = [t.id for t in today_tasks] + [t.id for t in overdue_tasks] + [t.id for t in upcoming_tasks]
-        assigned_task_ids = set(
-            r.task_id
-            for r in db.query(TaskAssignee).filter(
-                TaskAssignee.user_id == user.id,
-                TaskAssignee.task_id.in_(candidate_ids)
-            ).all()
-        ) if candidate_ids else set()
-        priority_task = pick_worker_priority_task(
-            today_tasks,
-            overdue_tasks,
-            upcoming_tasks,
-            assigned_task_ids,
-        )
-
-        return render_template(
-            "worker_home.html",
-            title="Worker Home",
-            body_class="worker",
-            today_pretty=today_pretty,
-            overdue_tasks=overdue_tasks,
-            today_tasks=today_tasks,
-            upcoming_tasks=upcoming_tasks,
-            active_module=active_module,
-            today=today_iso,
-            until=until.isoformat(),
-            active_tab="home",
-            unread_observation_count=unread_observation_count,
-            priority_task=priority_task,
-        )
-    finally:
-        db.close()
+    active_module, _ = parse_module_arg()
+    return redirect(url_for("worker_dashboard", module=active_module))
 # -------- Worker dashboard --------
 @app.get("/worker/dashboard")
 @cf_required

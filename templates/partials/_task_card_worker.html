@@ -16,26 +16,44 @@
     {% else %}accent-today{% endif %}">
   </div>
 
-  <div class="task-card-main-row">
+  <div class="task-card-body">
     <a
       class="task-card-main"
       href="{{ url_for('worker_task_detail', task_id=t.id, module=active_module, view=view) }}">
-      <div class="task-card-topline">
-        <span class="task-location-label">{{ loc_name }}</span>
-      </div>
+      <div class="task-card-content">
+        <div class="task-card-location-row">
+          <span class="task-card-inline-icon task-card-inline-icon-location" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="worker-icon worker-icon-pin">
+              <path d="M12 21s-5-5.2-5-10a5 5 0 1 1 10 0c0 4.8-5 10-5 10Z" />
+              <circle cx="12" cy="11" r="1.8" />
+            </svg>
+          </span>
+          <span class="task-location-text">{{ loc_name }}</span>
+        </div>
 
-      <div class="task-title">{{ t.title }}</div>
+        <div class="task-card-copy">
+          <div class="task-title">{{ t.title }}</div>
 
-      <div class="task-description{% if not t.notes %} is-empty{% endif %}">
-        {{ t.notes if t.notes else "No description provided." }}
-      </div>
+          <div class="task-description{% if not t.notes %} is-empty{% endif %}">
+            {{ t.notes if t.notes else "No description provided." }}
+          </div>
 
-      <div class="task-assignees-line">
-        {% if assignee_names %}
-          {{ assignee_names|join(", ") }}
-        {% else %}
-          Unassigned
-        {% endif %}
+          <div class="task-assignees-line">
+            <span class="task-card-inline-icon task-card-inline-icon-user" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="worker-icon worker-icon-user">
+                <path d="M12 12a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 12 12Z" />
+                <path d="M5 18.5a6.7 6.7 0 0 1 14 0" />
+              </svg>
+            </span>
+            <span class="task-assignees-text">
+              {% if assignee_names %}
+                {{ assignee_names|join(", ") }}
+              {% else %}
+                Unassigned
+              {% endif %}
+            </span>
+          </div>
+        </div>
       </div>
     </a>
 
@@ -43,15 +61,13 @@
       {% if s != "done" %}
       <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn done task-done-btn" type="submit" aria-label="Mark {{ t.title }} as done">
-          <span class="task-done-icon" aria-hidden="true">&#10003;</span>
-          <span>DONE</span>
+        <button class="task-done-circle" type="submit" aria-label="Mark {{ t.title }} as done">
+          <span class="task-done-circle-icon" aria-hidden="true">&#10003;</span>
         </button>
       </form>
       {% else %}
-      <button class="wbtn done task-done-btn is-complete" type="button" disabled aria-label="{{ t.title }} already done">
-        <span class="task-done-icon" aria-hidden="true">&#10003;</span>
-        <span>DONE</span>
+      <button class="task-done-circle is-complete" type="button" disabled aria-label="{{ t.title }} already done">
+        <span class="task-done-circle-icon" aria-hidden="true">&#10003;</span>
       </button>
       {% endif %}
     </div>

@@ -2,61 +2,60 @@
 {% block content %}
 
 <div class="worker-shell">
-  <div class="worker-topbar">
-    <div class="worker-topbar-inner">
-      <div class="worker-brand">
-        <div class="brand-mark">TM</div>
-        <div class="brand-text">
-          <div class="brand-title">TaskManager</div>
-          <div class="brand-sub">Meneghetti</div>
+  <div class="worker-page worker-tasklist-page">
+    <header class="worker-taskscreen-header">
+      <div class="worker-taskscreen-topbar">
+        <div class="worker-taskscreen-topbar-left">
+          <span class="worker-taskscreen-menu" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="worker-icon worker-icon-menu">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </span>
+          <h1 class="worker-taskscreen-title">Tasks</h1>
+        </div>
+
+        <div class="worker-taskscreen-actions">
+          <a href="{{ url_for('worker_observations') }}" class="worker-taskscreen-bell" aria-label="Observations">
+            <span class="worker-taskscreen-bell-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="worker-icon worker-icon-bell">
+                <path d="M15 17H5.5a1 1 0 0 1-.8-1.6L6 13.7V10a6 6 0 1 1 12 0v3.7l1.3 1.7a1 1 0 0 1-.8 1.6H15Z" />
+                <path d="M10 19a2 2 0 0 0 4 0" />
+              </svg>
+            </span>
+            {% if unread_observation_count and unread_observation_count > 0 %}
+              <span class="worker-taskscreen-bell-dot" aria-hidden="true"></span>
+            {% endif %}
+          </a>
         </div>
       </div>
 
-      <div class="worker-topbar-actions">
-        <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
-          Obs
-          {% if unread_observation_count and unread_observation_count > 0 %}
-            <span class="worker-bell-badge">{{ unread_observation_count }}</span>
-          {% endif %}
+      <section class="worker-stats-row worker-stats-row-dashboard">
+        <a class="worker-stat-pill {{ 'active' if view == 'today' else '' }}"
+           href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
+          <div class="label">Today</div>
+          <div class="value">{{ today_count }}</div>
         </a>
-      </div>
-    </div>
-  </div>
 
-  <div class="worker-page">
-    <header class="worker-head">
-      <div class="worker-head-row">
-        <div>
-          <h1 class="worker-title">My Tasks</h1>
-          <div class="worker-date">{{ today_pretty }}</div>
-        </div>
-        <a class="worker-logout" href="{{ url_for('logout') }}">Logout</a>
-      </div>
+        <a class="worker-stat-pill {{ 'active' if view == 'unfinished' else '' }}"
+           href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='unfinished') }}">
+          <div class="label">Unfinished</div>
+          <div class="value danger">{{ overdue_count }}</div>
+        </a>
+
+        <a class="worker-stat-pill {{ 'active' if view == 'upcoming' else '' }}"
+           href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='upcoming') }}">
+          <div class="label">Upcoming</div>
+          <div class="value">{{ upcoming_count }}</div>
+        </a>
+      </section>
     </header>
 
-    <section class="worker-stats-row">
-      <a class="worker-stat-pill {{ 'active' if view == 'today' else '' }}"
-         href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='today') }}">
-        <div class="label">Today</div>
-        <div class="value">{{ today_count }}</div>
-      </a>
-
-      <a class="worker-stat-pill {{ 'active' if view == 'unfinished' else '' }}"
-         href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='unfinished') }}">
-        <div class="label">Unfinished</div>
-        <div class="value danger">{{ overdue_count }}</div>
-      </a>
-
-      <a class="worker-stat-pill {{ 'active' if view == 'upcoming' else '' }}"
-         href="{{ url_for('worker_dashboard', module=active_module|default('all'), view='upcoming') }}">
-        <div class="label">Upcoming</div>
-        <div class="value">{{ upcoming_count }}</div>
-      </a>
-    </section>
-
-    <section class="task-list">
+    <section class="task-list worker-tasklist-section">
       {% if overdue_tasks %}
-        <div class="group-head">Unfinished</div>
+        <div class="worker-task-section-head">
+          <div class="worker-task-section-title">Unfinished</div>
+          <div class="worker-task-section-meta">{{ overdue_tasks|length }} tasks</div>
+        </div>
         {% for t in overdue_tasks %}
           {% set group = "overdue" %}
           {% include "partials/_task_card_worker.html" %}
@@ -64,7 +63,10 @@
       {% endif %}
 
       {% if today_tasks %}
-        <div class="group-head">Today</div>
+        <div class="worker-task-section-head">
+          <div class="worker-task-section-title">Pending tasks</div>
+          <div class="worker-task-section-meta">{{ today_tasks|length }} tasks</div>
+        </div>
         {% for t in today_tasks %}
           {% set group = "today" %}
           {% include "partials/_task_card_worker.html" %}
@@ -72,7 +74,10 @@
       {% endif %}
 
       {% if upcoming_tasks %}
-        <div class="group-head">Upcoming</div>
+        <div class="worker-task-section-head">
+          <div class="worker-task-section-title">Upcoming</div>
+          <div class="worker-task-section-meta">{{ upcoming_tasks|length }} tasks</div>
+        </div>
         {% for t in upcoming_tasks %}
           {% set group = "upcoming" %}
           {% include "partials/_task_card_worker.html" %}
@@ -82,8 +87,8 @@
       {% if not overdue_tasks and not today_tasks and not upcoming_tasks %}
         <div class="worker-empty">
           <div class="worker-empty-icon">OK</div>
-          <div class="worker-empty-title">No tasks right now</div>
-          <div class="worker-empty-text">You currently have no assigned tasks in this period.</div>
+          <div class="worker-empty-title">No tasks</div>
+          <div class="worker-empty-text">There are currently no assigned tasks for this period.</div>
         </div>
       {% endif %}
     </section>
