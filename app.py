@@ -1,10 +1,11 @@
 # app.py
 from __future__ import annotations
 import os
+import calendar
 from ipaddress import ip_address, ip_network
 from uuid import uuid4
 from werkzeug.utils import secure_filename
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from functools import wraps
 import secrets
 from sqlalchemy.exc import IntegrityError
@@ -49,6 +50,7 @@ TELEGRAM_ADMIN_CHAT_ID = os.environ.get(
 TASKMANAGER_URL = "https://task.ordoapps.app/"
 TASK_URL = TASKMANAGER_URL + "admin/tasks"
 TASK_URL = TASKMANAGER_URL + "worker/dashboard"
+WORKDAY_END_HOUR = 15
 
 class User(Base):
     __tablename__ = "users"
@@ -626,6 +628,21 @@ def get_current_user(db: Session) -> User | None:
 
 @app.before_request
 def track_user_activity():
+    if not request.path.startswith("/static/"):
+        db = SessionLocal()
+        try:
+            closed_sessions = auto_close_sessions(db)
+            if closed_sessions:
+                db.commit()
+                print(f"Auto-closed {closed_sessions} work session(s) at end of day.")
+            else:
+                db.rollback()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     log_user_activity()
 
 def get_local_dev_user(db: Session) -> User:
@@ -1079,6 +1096,40 @@ def format_duration_minutes(minutes: int | None) -> str:
 def _duration_minutes_between(started_at: datetime, finished_at: datetime) -> int:
     delta = finished_at - started_at
     return max(int(delta.total_seconds() // 60), 0)
+
+
+def _utc_naive_to_local(value: datetime) -> datetime:
+    return datetime.fromtimestamp(calendar.timegm(value.timetuple()))
+
+
+def _local_workday_end_to_utc_naive(local_day: date) -> datetime:
+    local_cutoff = datetime.combine(local_day, time(hour=WORKDAY_END_HOUR))
+    return datetime.utcfromtimestamp(local_cutoff.timestamp())
+
+
+def auto_close_sessions(db: Session, now: datetime | None = None) -> int:
+    current_time = now or datetime.utcnow()
+    active_sessions = (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.status == "active",
+            TaskWorkSession.finished_at.is_(None),
+        )
+        .all()
+    )
+
+    closed_sessions = 0
+    for session in active_sessions:
+        session_local_started_at = _utc_naive_to_local(session.started_at)
+        session_cutoff = _local_workday_end_to_utc_naive(session_local_started_at.date())
+        if current_time < session_cutoff:
+            continue
+
+        finished_at = max(session.started_at, session_cutoff)
+        finish_work_session(session, finished_at)
+        closed_sessions += 1
+
+    return closed_sessions
 
 
 def finish_work_session(session: TaskWorkSession, finished_at: datetime | None = None) -> TaskWorkSession:
