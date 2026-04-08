@@ -2,13 +2,12 @@
 {% set s = (t.status or "open") %}
 {% set ids = task_to_user_ids.get(t.id, []) %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
-{% set schedule_date = t.task_date or t.next_action_date %}
-{% set is_today = (schedule_date and (schedule_date|string) == (today|string)) %}
-{% set latest_photo = (latest_task_photo_by_task_id|default({})).get(t.id) %}
-{% set active_session = (worker_active_session_by_task_id|default({})).get(t.id) %}
+{% set assignee_names = [] %}
+{% for uid in ids %}
+  {% set _ = assignee_names.append((users[uid].display_name or users[uid].username.split('@')[0]) if uid in users else "?") %}
+{% endfor %}
 
-<article class="task-card" data-group="{{ group }}" data-status="{{ s }}">
-
+<article class="task-card task-card-compact" data-group="{{ group }}" data-status="{{ s }}">
   <div class="accent
     {% if group == 'overdue' %}accent-overdue
     {% elif group == 'upcoming' %}accent-upcoming
@@ -17,127 +16,92 @@
     {% else %}accent-today{% endif %}">
   </div>
 
-  <div class="task-body">
-
-    <div class="task-top">
-      <div class="task-main">
-        <div class="task-title">{{ t.title }}</div>
+  <div class="task-card-main-row">
+    <button
+      class="task-card-main"
+      type="button"
+      aria-expanded="false"
+      onclick="
+        const card=this.closest('.task-card');
+        const details=card.querySelector('.task-details');
+        const nextState=!details.open;
+        details.open=nextState;
+        this.setAttribute('aria-expanded', nextState ? 'true' : 'false');
+      ">
+      <div class="task-card-topline">
+        <span class="task-location-label">{{ loc_name }}</span>
       </div>
 
-      <div class="task-right">
-        <span class="badge
-          {% if s == 'done' %}badge-done
-          {% elif s == 'blocked' %}badge-blocked
-          {% elif s == 'in_progress' %}badge-progress
-          {% else %}badge-open{% endif %}">
-          {% if s == 'done' %}Done
-          {% elif s == 'blocked' %}Blocked
-          {% elif s == 'in_progress' %}Started
-          {% else %}Open{% endif %}
-        </span>
+      <div class="task-title">{{ t.title }}</div>
+
+      <div class="task-description{% if not t.notes %} is-empty{% endif %}">
+        {{ t.notes if t.notes else "No description provided." }}
       </div>
-    </div>
 
-    {% if schedule_date %}
-    <div class="task-subline">
-      <span class="meta">📅 {{ "Today" if is_today else schedule_date }}</span>
-    </div>
-    {% endif %}
-
-    {% if active_session %}
-    <div class="task-subline">
-      <span class="meta">Started at {{ active_session.started_at.strftime("%Y-%m-%d %H:%M") }}</span>
-    </div>
-    {% endif %}
-
-    <div class="worker-meta-grid">
-      <div class="worker-meta-box">
-        <div class="task-subline" style="margin-top:0;">
-          <span class="pill module {% if t.module == 'garden' %}garden{% elif t.module == 'horticulture' %}horti{% endif %}">
-            {{ t.module }}
-          </span>
-          <span class="meta">📍 {{ loc_name }}</span>
-        </div>
+      <div class="task-assignees-line">
+        {% if assignee_names %}
+          {{ assignee_names|join(", ") }}
+        {% else %}
+          Unassigned
+        {% endif %}
       </div>
-      <div class="worker-meta-box">
-        <div class="worker-assignees">
-          <span class="meta">👥</span>
-          <div class="worker-assignee-list">
-            {% if ids %}
-              {% for uid in ids %}
-                <span class="pill user">{{ (users[uid].display_name or users[uid].username.split('@')[0]) if uid in users else "?" }}</span>
-              {% endfor %}
-            {% else %}
-              <span class="pill warn">Unassigned</span>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
+    </button>
 
-    <div class="task-media-preview">
-      {% if latest_photo %}
-        {% set photo_file = latest_photo[7:] if latest_photo.startswith('static/') else latest_photo %}
-        <img
-          src="{{ url_for('static', filename=photo_file) }}"
-          alt="Task photo"
-          class="task-photo-thumb js-lightbox-image"
-          data-fullsrc="{{ url_for('static', filename=photo_file) }}"
-          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-        <div class="task-photo-placeholder" style="display:none;">No photo</div>
-
-      {% elif linked_issue_photo_by_task_id.get(t.id) %}
-        {% set issue_photo = linked_issue_photo_by_task_id[t.id] %}
-        {% set issue_photo_file = issue_photo[7:] if issue_photo.startswith('static/') else issue_photo %}
-        <div class="small" style="margin-bottom:6px;">
-          Source issue #{{ issue_by_task_id[t.id].id }} - {{ issue_by_task_id[t.id].title }}
-        </div>
-        <img
-          src="{{ url_for('static', filename=issue_photo_file) }}"
-          alt="Source issue photo"
-          class="task-photo-thumb js-lightbox-image"
-          data-fullsrc="{{ url_for('static', filename=issue_photo_file) }}"
-          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-        <div class="task-photo-placeholder" style="display:none;">No photo</div>
-
-      {% else %}
-        <div class="task-photo-placeholder">No photo</div>
-      {% endif %}
-    </div>
-
-    {% if t.notes %}
-    <div class="worker-note-card">
-      <span class="worker-note-icon">📝</span>
-      <span class="worker-note-text">{{ t.notes }}</span>
-    </div>
-    {% endif %}
-
-    <div class="task-actions-grid">
-
-      {% if s == "open" %}
-      <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn start" type="submit">Start</button>
-      </form>
-      {% elif s == "in_progress" %}
-      <form>
-        <button class="wbtn start active" type="button" disabled>Started</button>
-      </form>
-      {% else %}
-      <form>
-        <button class="wbtn start" type="button" disabled>Start</button>
-      </form>
-      {% endif %}
-
+    <div class="task-primary-action">
       {% if s != "done" %}
       <form method="post" action="{{ url_for('worker_task_done', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn done" type="submit">Done</button>
+        <button class="wbtn done task-done-btn" type="submit" aria-label="Mark {{ t.title }} as done">
+          <span class="task-done-icon" aria-hidden="true">&#10003;</span>
+          <span>DONE</span>
+        </button>
       </form>
       {% else %}
-      <form>
-        <button class="wbtn done" type="button" disabled>Done</button>
+      <button class="wbtn done task-done-btn is-complete" type="button" disabled aria-label="{{ t.title }} already done">
+        <span class="task-done-icon" aria-hidden="true">&#10003;</span>
+        <span>DONE</span>
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <details class="task-details">
+    <summary class="sr-only">Details</summary>
+
+    <div class="task-details-status-row">
+      <span class="badge
+        {% if s == 'done' %}badge-done
+        {% elif s == 'blocked' %}badge-blocked
+        {% elif s == 'in_progress' %}badge-progress
+        {% else %}badge-open{% endif %}">
+        {% if s == 'done' %}Done
+        {% elif s == 'blocked' %}Blocked
+        {% elif s == 'in_progress' %}Started
+        {% else %}Open{% endif %}
+      </span>
+      <span class="task-details-hint">Extra actions stay here so the list stays fast.</span>
+    </div>
+
+    {% if t.started_at %}
+    <div class="detail-line">Start task: {{ t.started_at }}</div>
+    {% endif %}
+
+    {% if t.next_action_date %}
+    <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
+    {% endif %}
+
+    {% if s == "blocked" and t.blocked_reason %}
+    <div class="detail-line">Blocked: {{ t.blocked_reason }}</div>
+    {% endif %}
+
+    <div class="task-detail-actions">
+      {% if s == "open" %}
+      <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="wbtn secondary" type="submit">Start</button>
       </form>
+      {% elif s == "in_progress" %}
+      <button class="wbtn secondary" type="button" disabled>Started</button>
       {% endif %}
 
       {% if group == "today" and s != "done" and s != "blocked" %}
@@ -150,95 +114,49 @@
         <input type="hidden" name="next" value="{{ request.full_path }}">
         <button class="wbtn secondary" type="submit">Back to today</button>
       </form>
-      {% else %}
-      <form>
-        <button class="wbtn secondary" type="button" disabled>Next day</button>
-      </form>
       {% endif %}
 
       {% if s == "blocked" %}
       <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn block" type="submit">Unblock</button>
+        <button class="wbtn secondary" type="submit">Unblock</button>
       </form>
       {% elif s in ["open", "in_progress"] %}
-      <form>
-        <button class="wbtn block" type="button" onclick="
-          const card=this.closest('.task-card');
-          const d=card.querySelector('.task-details');
-          d.open=true;
-          const bf=card.querySelector('.block-form');
-          if (bf) bf.hidden=false;
-        ">
-          Block
-        </button>
-      </form>
-      {% else %}
-      <form>
-        <button class="wbtn block" type="button" disabled>Block</button>
-      </form>
-      {% endif %}
-
-    </div>
-
-    <div class="task-details-link">
-      <a href="#" onclick="
+      <button class="wbtn secondary" type="button" onclick="
         const card=this.closest('.task-card');
-        card.querySelector('.task-details').open=true;
-        return false;
-      ">Details</a>
+        const bf=card.querySelector('.block-form');
+        if (bf) bf.hidden=false;
+      ">Block</button>
+      {% endif %}
     </div>
 
-    <details class="task-details">
-      <summary class="sr-only">Details</summary>
+    <div class="block-form" hidden>
+      <form method="post" action="{{ url_for('worker_task_blocked', task_id=t.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
 
-      <div class="detail-line">Start task: {{ t.started_at if t.started_at else "-" }}</div>
-      {% if active_session %}
-      <div class="detail-line">My active session: {{ active_session.started_at.strftime("%Y-%m-%d %H:%M") }}</div>
-      {% endif %}
+        <div class="detail-line detail-label">Reason</div>
+        <select class="input" name="reason" required>
+          <option value="">-- Reason --</option>
+          <option value="guest">Guest</option>
+          <option value="rain">Rain</option>
+          <option value="access">No access</option>
+          <option value="equipment">Equipment</option>
+          <option value="other">Other</option>
+        </select>
 
-      {% if t.next_action_date %}
-      <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
-      {% endif %}
+        <div class="detail-line detail-label">Residence (optional)</div>
+        <select class="input" name="blocked_location_id">
+          <option value="">-- Residence (optional) --</option>
+          {% for loc in residences_by_parent.get(t.location_id, []) %}
+          <option value="{{ loc.id }}">{{ loc.name }}</option>
+          {% endfor %}
+        </select>
 
-      {% if t.notes %}
-      <div class="detail-line">Notes: {{ t.notes }}</div>
-      {% endif %}
+        <div class="detail-line detail-label">Blocked until (optional)</div>
+        <input class="input" type="date" name="blocked_until">
 
-      {% if s == "blocked" and t.blocked_reason %}
-      <div class="detail-line">Blocked: {{ t.blocked_reason }}</div>
-      {% endif %}
-
-      <div class="block-form" hidden>
-        <form method="post" action="{{ url_for('worker_task_blocked', task_id=t.id) }}?module={{ active_module }}">
-          <input type="hidden" name="next" value="{{ request.full_path }}">
-
-          <div class="detail-line" style="margin-top:10px; font-weight:800;">Reason</div>
-          <select class="input" name="reason" required>
-            <option value="">-- Reason --</option>
-            <option value="guest">Guest</option>
-            <option value="rain">Rain</option>
-            <option value="access">No access</option>
-            <option value="equipment">Equipment</option>
-            <option value="other">Other</option>
-          </select>
-
-          <div class="detail-line" style="margin-top:10px; font-weight:800;">Residence (optional)</div>
-          <select class="input" name="blocked_location_id">
-            <option value="">-- Residence (optional) --</option>
-            {% for loc in residences_by_parent.get(t.location_id, []) %}
-            <option value="{{ loc.id }}">{{ loc.name }}</option>
-            {% endfor %}
-          </select>
-
-          <div class="detail-line" style="margin-top:10px; font-weight:800;">Blocked until (optional)</div>
-          <input class="input" type="date" name="blocked_until">
-
-          <button class="wbtn block" type="submit" style="margin-top:10px;">Confirm block</button>
-        </form>
-      </div>
-
-    </details>
-
-  </div>
+        <button class="wbtn secondary" type="submit" style="margin-top:10px;">Confirm block</button>
+      </form>
+    </div>
+  </details>
 </article>
