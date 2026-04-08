@@ -2360,6 +2360,179 @@ def worker_dashboard():
     finally:
         db.close()
 
+@app.get("/worker/task/<int:task_id>")
+@cf_required
+def worker_task_detail(task_id: int):
+    user = request.cf_user  # type: ignore[attr-defined]
+    module = (request.args.get("module") or "all").lower()
+    view = (request.args.get("view") or "all").lower()
+
+    if view in {"today", "unfinished", "upcoming"}:
+        back_url = url_for("worker_dashboard", module=module, view=view)
+    else:
+        view = "all"
+        back_url = url_for("worker_dashboard", module=module)
+
+    db = SessionLocal()
+    try:
+        task = db.get(Task, task_id)
+        if not task:
+            flash("Task not found.")
+            return redirect(back_url)
+
+        if not is_task_allowed_for_worker(db, task, user):
+            flash("Not allowed.")
+            return redirect(back_url)
+
+        def display_user_name(row: User | None) -> str:
+            if not row:
+                return "TaskManager"
+            return (row.display_name or row.username.split("@")[0]).strip()
+
+        location = db.get(Location, task.location_id)
+        assigned_rows = (
+            db.query(TaskAssignee)
+            .filter(TaskAssignee.task_id == task.id)
+            .all()
+        )
+        assignee_ids = [row.user_id for row in assigned_rows]
+
+        linked_issue = (
+            db.query(Issue)
+            .filter(Issue.linked_task_id == task.id)
+            .order_by(Issue.created_at.desc())
+            .first()
+        )
+
+        task_photos = (
+            db.query(TaskPhoto)
+            .filter(TaskPhoto.task_id == task.id)
+            .order_by(TaskPhoto.created_at.desc(), TaskPhoto.id.desc())
+            .all()
+        )
+
+        issue_photos = []
+        if linked_issue:
+            issue_photos = (
+                db.query(IssuePhoto)
+                .filter(IssuePhoto.issue_id == linked_issue.id)
+                .order_by(IssuePhoto.created_at.desc(), IssuePhoto.id.desc())
+                .all()
+            )
+
+        creator_ids = set(assignee_ids)
+        if linked_issue and linked_issue.created_by:
+            creator_ids.add(linked_issue.created_by)
+
+        users = {
+            row.id: row
+            for row in db.query(User).filter(User.id.in_(creator_ids)).all()
+        } if creator_ids else {}
+
+        assignee_names = [
+            display_user_name(users.get(user_id))
+            for user_id in assignee_ids
+        ]
+
+        if linked_issue and linked_issue.created_by:
+            created_by_name = display_user_name(users.get(linked_issue.created_by))
+        elif task.carryover_from_task_id:
+            created_by_name = "Carryover task"
+        else:
+            created_by_name = "TaskManager"
+
+        created_at_label = task.created_at.strftime("%Y-%m-%d %H:%M") if task.created_at else "-"
+
+        priority_label = None
+        priority_tone = None
+        if linked_issue and linked_issue.severity in {"medium", "high"}:
+            priority_label = f"{linked_issue.severity.title()} priority"
+            priority_tone = linked_issue.severity
+
+        attachment_items = []
+        seen_paths = set()
+
+        for photo in task_photos:
+            path = (photo.file_path or "").strip()
+            if not path or path in seen_paths:
+                continue
+            seen_paths.add(path)
+            attachment_items.append({
+                "path": path,
+                "label": "Task photo",
+                "created_at": photo.created_at.strftime("%Y-%m-%d %H:%M") if photo.created_at else "",
+            })
+
+        for photo in issue_photos:
+            path = (photo.file_path or "").strip()
+            if not path or path in seen_paths:
+                continue
+            seen_paths.add(path)
+            attachment_items.append({
+                "path": path,
+                "label": f"Issue #{linked_issue.id} reference" if linked_issue else "Reference",
+                "created_at": photo.created_at.strftime("%Y-%m-%d %H:%M") if photo.created_at else "",
+            })
+
+        primary_image = attachment_items[0] if attachment_items else None
+
+        notes_items = []
+        if linked_issue and linked_issue.notes:
+            notes_items.append({
+                "label": f"Issue #{linked_issue.id}",
+                "text": linked_issue.notes,
+            })
+        if task.status == "blocked" and task.blocked_reason:
+            blocked_text = task.blocked_reason.replace("_", " ").title()
+            if task.blocked_until:
+                blocked_text += f" until {task.blocked_until}"
+            notes_items.append({
+                "label": "Blocked",
+                "text": blocked_text,
+            })
+        if task.carryover_from_task_id:
+            notes_items.append({
+                "label": "Carryover",
+                "text": f"Created from task #{task.carryover_from_task_id}.",
+            })
+
+        residences_by_parent = {}
+        units = (
+            db.query(Location)
+            .filter(Location.kind == "unit", Location.is_active == True)
+            .order_by(Location.name.asc())
+            .all()
+        )
+        for unit in units:
+            residences_by_parent.setdefault(unit.parent_id, []).append(unit)
+
+        unread_observation_count = get_worker_unread_observation_count(db, user.id)
+
+        return render_template(
+            "worker_task_detail.html",
+            title=task.title,
+            body_class="worker",
+            active_tab="tasks",
+            active_module=module,
+            task=task,
+            location=location,
+            assignee_names=assignee_names,
+            created_by_name=created_by_name,
+            created_at_label=created_at_label,
+            back_url=back_url,
+            current_view=view,
+            linked_issue=linked_issue,
+            primary_image=primary_image,
+            attachment_items=attachment_items,
+            notes_items=notes_items,
+            priority_label=priority_label,
+            priority_tone=priority_tone,
+            residences_by_parent=residences_by_parent,
+            unread_observation_count=unread_observation_count,
+        )
+    finally:
+        db.close()
+
 # -------- Worker actions --------
 @app.post("/worker/task/<int:task_id>/start")
 @cf_required

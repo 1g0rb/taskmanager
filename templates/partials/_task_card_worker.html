@@ -17,17 +17,9 @@
   </div>
 
   <div class="task-card-main-row">
-    <button
+    <a
       class="task-card-main"
-      type="button"
-      aria-expanded="false"
-      onclick="
-        const card=this.closest('.task-card');
-        const details=card.querySelector('.task-details');
-        const nextState=!details.open;
-        details.open=nextState;
-        this.setAttribute('aria-expanded', nextState ? 'true' : 'false');
-      ">
+      href="{{ url_for('worker_task_detail', task_id=t.id, module=active_module, view=view) }}">
       <div class="task-card-topline">
         <span class="task-location-label">{{ loc_name }}</span>
       </div>
@@ -45,7 +37,7 @@
           Unassigned
         {% endif %}
       </div>
-    </button>
+    </a>
 
     <div class="task-primary-action">
       {% if s != "done" %}
@@ -64,99 +56,4 @@
       {% endif %}
     </div>
   </div>
-
-  <details class="task-details">
-    <summary class="sr-only">Details</summary>
-
-    <div class="task-details-status-row">
-      <span class="badge
-        {% if s == 'done' %}badge-done
-        {% elif s == 'blocked' %}badge-blocked
-        {% elif s == 'in_progress' %}badge-progress
-        {% else %}badge-open{% endif %}">
-        {% if s == 'done' %}Done
-        {% elif s == 'blocked' %}Blocked
-        {% elif s == 'in_progress' %}Started
-        {% else %}Open{% endif %}
-      </span>
-      <span class="task-details-hint">Extra actions stay here so the list stays fast.</span>
-    </div>
-
-    {% if t.started_at %}
-    <div class="detail-line">Start task: {{ t.started_at }}</div>
-    {% endif %}
-
-    {% if t.next_action_date %}
-    <div class="detail-line">Deadline: {{ t.next_action_date }}</div>
-    {% endif %}
-
-    {% if s == "blocked" and t.blocked_reason %}
-    <div class="detail-line">Blocked: {{ t.blocked_reason }}</div>
-    {% endif %}
-
-    <div class="task-detail-actions">
-      {% if s == "open" %}
-      <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn secondary" type="submit">Start</button>
-      </form>
-      {% elif s == "in_progress" %}
-      <button class="wbtn secondary" type="button" disabled>Started</button>
-      {% endif %}
-
-      {% if group == "today" and s != "done" and s != "blocked" %}
-      <form method="post" action="{{ url_for('worker_task_next_day', task_id=t.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn secondary" type="submit">Next day</button>
-      </form>
-      {% elif group == "overdue" and s != "done" %}
-      <form method="post" action="{{ url_for('worker_task_back_today', task_id=t.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn secondary" type="submit">Back to today</button>
-      </form>
-      {% endif %}
-
-      {% if s == "blocked" %}
-      <form method="post" action="{{ url_for('worker_task_unblock', task_id=t.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
-        <button class="wbtn secondary" type="submit">Unblock</button>
-      </form>
-      {% elif s in ["open", "in_progress"] %}
-      <button class="wbtn secondary" type="button" onclick="
-        const card=this.closest('.task-card');
-        const bf=card.querySelector('.block-form');
-        if (bf) bf.hidden=false;
-      ">Block</button>
-      {% endif %}
-    </div>
-
-    <div class="block-form" hidden>
-      <form method="post" action="{{ url_for('worker_task_blocked', task_id=t.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ request.full_path }}">
-
-        <div class="detail-line detail-label">Reason</div>
-        <select class="input" name="reason" required>
-          <option value="">-- Reason --</option>
-          <option value="guest">Guest</option>
-          <option value="rain">Rain</option>
-          <option value="access">No access</option>
-          <option value="equipment">Equipment</option>
-          <option value="other">Other</option>
-        </select>
-
-        <div class="detail-line detail-label">Residence (optional)</div>
-        <select class="input" name="blocked_location_id">
-          <option value="">-- Residence (optional) --</option>
-          {% for loc in residences_by_parent.get(t.location_id, []) %}
-          <option value="{{ loc.id }}">{{ loc.name }}</option>
-          {% endfor %}
-        </select>
-
-        <div class="detail-line detail-label">Blocked until (optional)</div>
-        <input class="input" type="date" name="blocked_until">
-
-        <button class="wbtn secondary" type="submit" style="margin-top:10px;">Confirm block</button>
-      </form>
-    </div>
-  </details>
 </article>

@@ -1,0 +1,224 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="worker-shell">
+  <div class="worker-topbar">
+    <div class="worker-topbar-inner">
+      <div class="worker-brand">
+        <div class="brand-mark">TM</div>
+        <div class="brand-text">
+          <div class="brand-title">TaskManager</div>
+          <div class="brand-sub">Meneghetti</div>
+        </div>
+      </div>
+
+      <div class="worker-topbar-actions">
+        <a href="{{ url_for('worker_observations') }}" class="worker-bell" aria-label="Observations">
+          Obs
+          {% if unread_observation_count and unread_observation_count > 0 %}
+            <span class="worker-bell-badge">{{ unread_observation_count }}</span>
+          {% endif %}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="worker-page worker-task-detail-page">
+    <a class="worker-back-link" href="{{ back_url }}">Back to tasks</a>
+
+    <section class="worker-detail-hero">
+      {% if primary_image %}
+        {% set hero_file = primary_image.path[7:] if primary_image.path.startswith('static/') else primary_image.path %}
+        <div class="worker-detail-media">
+          <img
+            src="{{ url_for('static', filename=hero_file) }}"
+            alt="{{ task.title }}"
+            class="worker-detail-image js-lightbox-image"
+            data-fullsrc="{{ url_for('static', filename=hero_file) }}">
+        </div>
+      {% endif %}
+
+      <div class="worker-detail-summary">
+        <div class="worker-detail-label-row">
+          <span class="task-location-label">{{ location.name if location else "Unknown location" }}</span>
+          {% if priority_label %}
+            <span class="worker-priority-badge {{ priority_tone }}">{{ priority_label }}</span>
+          {% endif %}
+        </div>
+
+        <h1 class="worker-detail-title">{{ task.title }}</h1>
+
+        <div class="worker-detail-status-row">
+          <span class="badge
+            {% if task.status == 'done' %}badge-done
+            {% elif task.status == 'blocked' %}badge-blocked
+            {% elif task.status == 'in_progress' %}badge-progress
+            {% else %}badge-open{% endif %}">
+            {% if task.status == 'done' %}Done
+            {% elif task.status == 'blocked' %}Blocked
+            {% elif task.status == 'in_progress' %}Started
+            {% else %}Open{% endif %}
+          </span>
+
+          {% if task.task_date %}
+            <span class="worker-detail-status-meta">Scheduled {{ task.task_date }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="worker-detail-section">
+      <div class="worker-detail-section-kicker">Description</div>
+      <div class="worker-detail-copy">
+        {{ task.notes if task.notes else "No description provided." }}
+      </div>
+    </section>
+
+    <section class="worker-detail-section">
+      <div class="worker-detail-section-kicker">Task info</div>
+      <div class="worker-detail-meta-grid">
+        <div class="worker-detail-meta-row">
+          <div class="worker-detail-meta-label">Assigned users</div>
+          <div class="worker-detail-meta-value worker-detail-chip-row">
+            {% if assignee_names %}
+              {% for assignee in assignee_names %}
+                <span class="worker-detail-chip">{{ assignee }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="worker-detail-muted">Unassigned</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="worker-detail-meta-row">
+          <div class="worker-detail-meta-label">Created by</div>
+          <div class="worker-detail-meta-value">{{ created_by_name }}</div>
+        </div>
+
+        <div class="worker-detail-meta-row">
+          <div class="worker-detail-meta-label">Created</div>
+          <div class="worker-detail-meta-value">{{ created_at_label }}</div>
+        </div>
+      </div>
+    </section>
+
+    {% if notes_items %}
+    <section class="worker-detail-section">
+      <div class="worker-detail-section-kicker">Notes and observations</div>
+      <div class="worker-detail-notes-list">
+        {% for item in notes_items %}
+        <article class="worker-detail-note-card">
+          <div class="worker-detail-note-label">{{ item.label }}</div>
+          <div class="worker-detail-note-text">{{ item.text }}</div>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if attachment_items %}
+    <section class="worker-detail-section">
+      <div class="worker-detail-section-kicker">Attachments and photos</div>
+      <div class="worker-detail-gallery">
+        {% for item in attachment_items %}
+          {% set item_file = item.path[7:] if item.path.startswith('static/') else item.path %}
+          <button
+            type="button"
+            class="worker-detail-gallery-item js-lightbox-image"
+            data-fullsrc="{{ url_for('static', filename=item_file) }}">
+            <img
+              src="{{ url_for('static', filename=item_file) }}"
+              alt="{{ item.label }}"
+              class="worker-detail-gallery-image">
+            <span class="worker-detail-gallery-meta">
+              <span>{{ item.label }}</span>
+              {% if item.created_at %}
+                <span>{{ item.created_at }}</span>
+              {% endif %}
+            </span>
+          </button>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="worker-detail-section worker-detail-actions-section">
+      <div class="worker-detail-section-kicker">Actions</div>
+
+      <div class="worker-detail-action-grid">
+        {% if task.status == "open" %}
+        <form method="post" action="{{ url_for('worker_task_start', task_id=task.id) }}?module={{ active_module }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="wbtn start worker-detail-action worker-detail-action-strong" type="submit">Start task</button>
+        </form>
+        {% elif task.status == "in_progress" %}
+        <button class="wbtn start active worker-detail-action worker-detail-action-strong" type="button" disabled>Started</button>
+        {% else %}
+        <button class="wbtn start worker-detail-action worker-detail-action-strong" type="button" disabled>Start task</button>
+        {% endif %}
+
+        {% if task.status != "done" %}
+        <form method="post" action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="wbtn done worker-detail-action worker-detail-action-done" type="submit">Done</button>
+        </form>
+        {% else %}
+        <button class="wbtn done worker-detail-action worker-detail-action-done" type="button" disabled>Done</button>
+        {% endif %}
+      </div>
+
+      <div class="worker-detail-secondary-actions">
+        {% if task.status == "blocked" %}
+        <form method="post" action="{{ url_for('worker_task_unblock', task_id=task.id) }}?module={{ active_module }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+          <button class="wbtn secondary worker-detail-action worker-detail-action-secondary" type="submit">Unblock</button>
+        </form>
+        {% elif task.status in ["open", "in_progress"] %}
+        <button
+          class="wbtn secondary worker-detail-action worker-detail-action-secondary"
+          type="button"
+          onclick="
+            const panel=document.getElementById('worker-block-panel');
+            if (panel) panel.hidden = !panel.hidden;
+          ">
+          Block
+        </button>
+        {% endif %}
+      </div>
+
+      {% if task.status in ["open", "in_progress"] %}
+      <div id="worker-block-panel" class="worker-detail-block-panel" hidden>
+        <form method="post" action="{{ url_for('worker_task_blocked', task_id=task.id) }}?module={{ active_module }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}">
+
+          <div class="detail-line detail-label">Reason</div>
+          <select class="input" name="reason" required>
+            <option value="">-- Reason --</option>
+            <option value="guest">Guest</option>
+            <option value="rain">Rain</option>
+            <option value="access">No access</option>
+            <option value="equipment">Equipment</option>
+            <option value="other">Other</option>
+          </select>
+
+          <div class="detail-line detail-label">Residence (optional)</div>
+          <select class="input" name="blocked_location_id">
+            <option value="">-- Residence (optional) --</option>
+            {% for loc in residences_by_parent.get(task.location_id, []) %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="detail-line detail-label">Blocked until (optional)</div>
+          <input class="input" type="date" name="blocked_until">
+
+          <button class="wbtn secondary worker-detail-action worker-detail-action-secondary" type="submit" style="margin-top:10px;">
+            Confirm block
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
