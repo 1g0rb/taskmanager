@@ -3334,6 +3334,28 @@ def admin_tasks_batch_next_day():
     finally:
         db.close()
 
+
+@app.post("/admin/task/<int:task_id>/move_to_today")
+@admin_required
+def admin_task_move_to_today(task_id: int):
+    db = SessionLocal()
+    try:
+        task = db.get(Task, task_id)
+        if not task:
+            flash("Task not found.")
+            return redirect_back()
+
+        today = date.today()
+        task.task_date = today
+        task.next_action_date = today
+
+        db.commit()
+        flash("Task moved to today.")
+        return redirect_back()
+    finally:
+        db.close()
+
+
 @app.post("/admin/tasks/batch/block")
 @admin_required
 def admin_tasks_batch_block():

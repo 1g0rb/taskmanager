@@ -163,10 +163,9 @@
             <button class="btn mini" type="submit">Unblock</button>
           </form>
 
-          <form method="post" action="{{ url_for('admin_tasks_batch_next_day') }}">
+          <form method="post" action="{{ url_for('admin_task_move_to_today', task_id=t.id) }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
-            <input type="hidden" name="task_ids" value="{{ t.id }}">
-            <button class="btn mini" type="submit">Next day</button>
+            <button class="btn mini" type="submit">Today task</button>
           </form>
 
           <form
