@@ -1218,6 +1218,45 @@ def finish_task_work_session(
     return fallback_session, True
 
 
+def get_worker_task_finish_validation_error(
+    db: Session,
+    task_id: int,
+    user_id: int,
+    as_of: datetime | None = None,
+) -> str | None:
+    now = as_of or datetime.utcnow()
+    sessions = (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.task_id == task_id,
+            TaskWorkSession.user_id == user_id,
+        )
+        .all()
+    )
+
+    has_valid_session = False
+    total_recorded_minutes = 0
+
+    for session in sessions:
+        session_minutes = session.duration_minutes or 0
+
+        if session.status == "active" and session.finished_at is None:
+            has_valid_session = True
+            session_minutes = _duration_minutes_between(session.started_at, now)
+        elif session.finished_at and session.finished_at > session.started_at:
+            has_valid_session = True
+
+        total_recorded_minutes += max(session_minutes, 0)
+
+    if not has_valid_session:
+        return "You haven't started this task yet."
+
+    if total_recorded_minutes < 1:
+        return "You can't finish a task with less than 1 minute worked."
+
+    return None
+
+
 def finish_active_sessions_for_tasks(db: Session, task_ids: list[int], finished_at: datetime | None = None) -> int:
     if not task_ids:
         return 0
@@ -2625,6 +2664,16 @@ def worker_task_done(task_id: int):
             flash("Not allowed.")
             return redirect(next_url)
 
+        finish_validation_error = get_worker_task_finish_validation_error(
+            db,
+            t.id,
+            user.id,
+            as_of=now,
+        )
+        if finish_validation_error:
+            flash(finish_validation_error)
+            return redirect(next_url)
+
         if getattr(t, "carryover_from_task_id", None):
             orig_id = t.carryover_from_task_id
             res_id = t.location_id
@@ -2638,7 +2687,7 @@ def worker_task_done(task_id: int):
             if not t.started_at:
                 t.started_at = now
             t.finished_at = now
-            finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=True)
+            finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
 
             db.commit()
 
@@ -2688,7 +2737,7 @@ def worker_task_done(task_id: int):
         t.blocked_until = None
         t.blocked_at = None
         t.blocked_location_id = None
-        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=True)
+        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
 
         db.commit()
 
