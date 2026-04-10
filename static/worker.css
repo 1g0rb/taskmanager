@@ -48,6 +48,49 @@ body.worker .main-content{
   margin: 0 auto;
 }
 
+.worker-flash-stack{
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 12px 14px 0;
+}
+
+.worker-flash{
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #f0cf8f;
+  background: #fff8e8;
+  box-shadow: var(--w-shadow-soft);
+  color: #5c3b00;
+}
+
+.worker-flash + .worker-flash{
+  margin-top: 10px;
+}
+
+.worker-flash-icon{
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4b942;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.worker-flash-message{
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
 .worker-icon{
   display: block;
   width: 100%;
