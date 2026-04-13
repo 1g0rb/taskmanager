@@ -219,7 +219,7 @@
       </button>
       {% endif %}
 
-      {% if task.status != "done" and worker_has_active_session %}
+      {% if task.status == "in_progress" %}
       <form
         method="post"
         action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}"
@@ -233,7 +233,7 @@
           <span data-primary-label>Finish Task</span>
         </button>
       </form>
-      {% elif task.status != "done" and task.status != "blocked" %}
+      {% elif task.status == "open" %}
       <form
         method="post"
         action="{{ url_for('worker_task_start', task_id=task.id) }}?module={{ active_module }}"

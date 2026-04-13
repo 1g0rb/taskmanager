@@ -1260,18 +1260,15 @@ def finish_task_work_session(
 
 
 def get_worker_task_finish_validation_error(
-    db: Session,
-    task_id: int,
-    user_id: int,
+    task: Task,
     as_of: datetime | None = None,
 ) -> str | None:
     now = as_of or datetime.utcnow()
-    active_session = get_active_task_work_session(db, task_id, user_id)
-    if not active_session:
-        return "You haven't started this task yet."
+    if (task.status or "open") != "in_progress" or not task.started_at:
+        return "This task hasn't been started yet."
 
-    active_session_minutes = _duration_minutes_between(active_session.started_at, now)
-    if active_session_minutes < 1:
+    active_task_minutes = _duration_minutes_between(task.started_at, now)
+    if active_task_minutes < 1:
         return "You can't finish a task with less than 1 minute worked."
 
     return None
@@ -2649,7 +2646,8 @@ def worker_task_start(task_id: int):
             t.blocked_at = None
             t.blocked_location_id = None
 
-        t.status = "in_progress"
+        if t.status != "in_progress":
+            t.status = "in_progress"
         if not t.started_at:
             t.started_at = now
 
@@ -2683,37 +2681,12 @@ def worker_task_done(task_id: int):
             flash("Not allowed.")
             return redirect(next_url)
 
-        finish_validation_error = get_worker_task_finish_validation_error(
-            db,
-            t.id,
-            user.id,
-            as_of=now,
-        )
+        finish_validation_error = get_worker_task_finish_validation_error(t, as_of=now)
         if finish_validation_error:
             flash(finish_validation_error)
             return redirect(next_url)
 
-        finished_session, _ = finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
-        if not finished_session:
-            flash("You haven't started this task yet.")
-            return redirect(next_url)
-
-        db.flush()
-        remaining_active_sessions = (
-            db.query(TaskWorkSession)
-            .filter(
-                TaskWorkSession.task_id == t.id,
-                TaskWorkSession.status == "active",
-                TaskWorkSession.finished_at.is_(None),
-            )
-            .count()
-        )
-
-        if remaining_active_sessions > 0:
-            t.status = "in_progress"
-            t.finished_at = None
-            db.commit()
-            return redirect(next_url)
+        finish_active_sessions_for_tasks(db, [t.id], finished_at=now)
 
         if getattr(t, "carryover_from_task_id", None):
             orig_id = t.carryover_from_task_id
@@ -2726,7 +2699,7 @@ def worker_task_done(task_id: int):
 
             t.status = "done"
             if not t.started_at:
-                t.started_at = finished_session.started_at
+                t.started_at = now
             t.finished_at = now
 
             db.commit()
@@ -2770,7 +2743,7 @@ def worker_task_done(task_id: int):
 
         t.status = "done"
         if not t.started_at:
-            t.started_at = finished_session.started_at
+            t.started_at = now
         t.finished_at = now
 
         t.blocked_reason = None
@@ -2845,7 +2818,7 @@ def worker_task_blocked(task_id: int):
         if not t.started_at:
             t.started_at = now
         t.finished_at = None
-        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
+        finish_active_sessions_for_tasks(db, [t.id], finished_at=now)
 
         db.commit()
         return redirect(next_url)
