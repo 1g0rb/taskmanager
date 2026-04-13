@@ -268,6 +268,63 @@ def safe_next_url(default: str):
 def allowed_image_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
+
+def normalize_static_file_path(path: str | None) -> str:
+    normalized = (path or "").strip().replace("\\", "/")
+    while normalized.startswith("/"):
+        normalized = normalized[1:]
+    if normalized.startswith("static/"):
+        normalized = normalized[7:]
+    return normalized
+
+
+def save_task_photo_upload(
+    task_id: int,
+    upload,
+    uploaded_by: int | None = None,
+    *,
+    convert_to_jpeg: bool = False,
+) -> TaskPhoto:
+    original_name = secure_filename(upload.filename or "")
+    if not original_name:
+        raise ValueError("Missing file name.")
+
+    if not allowed_image_file(original_name):
+        raise ValueError("Unsupported image format.")
+
+    upload_dir = os.path.join(app.static_folder, "uploads", "tasks", str(task_id))
+    os.makedirs(upload_dir, exist_ok=True)
+
+    if convert_to_jpeg:
+        unique_name = f"{uuid4().hex}.jpg"
+    else:
+        ext = original_name.rsplit(".", 1)[1].lower()
+        unique_name = f"{uuid4().hex}.{ext}"
+
+    abs_path = os.path.join(upload_dir, unique_name)
+
+    if convert_to_jpeg:
+        img = Image.open(upload)
+        img = ImageOps.exif_transpose(img)
+
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        img.thumbnail((1600, 1600))
+        img.save(abs_path, "JPEG", quality=82, optimize=True)
+    else:
+        upload.save(abs_path)
+
+    rel_path = normalize_static_file_path(f"uploads/tasks/{task_id}/{unique_name}")
+    return TaskPhoto(
+        task_id=task_id,
+        filename=original_name,
+        file_path=rel_path,
+        uploaded_by=uploaded_by,
+    )
+
 def send_telegram_message(text, chat_id=None):
     token = (TELEGRAM_BOT_TOKEN or "").strip()
     chat_id = str(chat_id or TELEGRAM_ADMIN_CHAT_ID).strip()
@@ -1140,10 +1197,12 @@ def finish_work_session(session: TaskWorkSession, finished_at: datetime | None =
     return session
 
 
-def start_task_work_session(db: Session, task_id: int, user_id: int, started_at: datetime | None = None):
-    now = started_at or datetime.utcnow()
-
-    active_same_task = (
+def get_active_task_work_session(
+    db: Session,
+    task_id: int,
+    user_id: int,
+) -> TaskWorkSession | None:
+    return (
         db.query(TaskWorkSession)
         .filter(
             TaskWorkSession.task_id == task_id,
@@ -1151,25 +1210,17 @@ def start_task_work_session(db: Session, task_id: int, user_id: int, started_at:
             TaskWorkSession.status == "active",
             TaskWorkSession.finished_at.is_(None),
         )
-        .order_by(TaskWorkSession.started_at.desc())
+        .order_by(TaskWorkSession.started_at.desc(), TaskWorkSession.id.desc())
         .first()
     )
+
+
+def start_task_work_session(db: Session, task_id: int, user_id: int, started_at: datetime | None = None):
+    now = started_at or datetime.utcnow()
+
+    active_same_task = get_active_task_work_session(db, task_id, user_id)
     if active_same_task:
         return active_same_task, False
-
-    # MVP safeguard: one worker should not keep multiple active sessions open.
-    other_active_sessions = (
-        db.query(TaskWorkSession)
-        .filter(
-            TaskWorkSession.user_id == user_id,
-            TaskWorkSession.task_id != task_id,
-            TaskWorkSession.status == "active",
-            TaskWorkSession.finished_at.is_(None),
-        )
-        .all()
-    )
-    for session in other_active_sessions:
-        finish_work_session(session, now)
 
     session = TaskWorkSession(
         task_id=task_id,
@@ -1189,17 +1240,7 @@ def finish_task_work_session(
     create_fallback: bool = True,
 ):
     now = finished_at or datetime.utcnow()
-    active_session = (
-        db.query(TaskWorkSession)
-        .filter(
-            TaskWorkSession.task_id == task_id,
-            TaskWorkSession.user_id == user_id,
-            TaskWorkSession.status == "active",
-            TaskWorkSession.finished_at.is_(None),
-        )
-        .order_by(TaskWorkSession.started_at.desc())
-        .first()
-    )
+    active_session = get_active_task_work_session(db, task_id, user_id)
     if active_session:
         return finish_work_session(active_session, now), False
 
@@ -1225,33 +1266,12 @@ def get_worker_task_finish_validation_error(
     as_of: datetime | None = None,
 ) -> str | None:
     now = as_of or datetime.utcnow()
-    sessions = (
-        db.query(TaskWorkSession)
-        .filter(
-            TaskWorkSession.task_id == task_id,
-            TaskWorkSession.user_id == user_id,
-        )
-        .all()
-    )
-
-    has_valid_session = False
-    total_recorded_minutes = 0
-
-    for session in sessions:
-        session_minutes = session.duration_minutes or 0
-
-        if session.status == "active" and session.finished_at is None:
-            has_valid_session = True
-            session_minutes = _duration_minutes_between(session.started_at, now)
-        elif session.finished_at and session.finished_at > session.started_at:
-            has_valid_session = True
-
-        total_recorded_minutes += max(session_minutes, 0)
-
-    if not has_valid_session:
+    active_session = get_active_task_work_session(db, task_id, user_id)
+    if not active_session:
         return "You haven't started this task yet."
 
-    if total_recorded_minutes < 1:
+    active_session_minutes = _duration_minutes_between(active_session.started_at, now)
+    if active_session_minutes < 1:
         return "You can't finish a task with less than 1 minute worked."
 
     return None
@@ -1666,7 +1686,7 @@ def admin_tasks():
         linked_issue_photo_by_task_id = {}
         for task_id, iss in issue_by_task_id.items():
             if iss.photos:
-                linked_issue_photo_by_task_id[task_id] = iss.photos[0].file_path
+                linked_issue_photo_by_task_id[task_id] = normalize_static_file_path(iss.photos[0].file_path)
         
         def matches_admin_filters(task: Task) -> bool:
             if selected_module and (task.module or "").lower() != selected_module:
@@ -1778,7 +1798,7 @@ def admin_tasks():
         linked_issue_photo_by_task_id = {}
         for task_id, iss in issue_by_task_id.items():
             if iss.photos:
-                linked_issue_photo_by_task_id[task_id] = iss.photos[0].file_path
+                linked_issue_photo_by_task_id[task_id] = normalize_static_file_path(iss.photos[0].file_path)
         photo_rows = (
             db.query(TaskPhoto)
             .filter(TaskPhoto.task_id.in_(task_ids))
@@ -1787,9 +1807,14 @@ def admin_tasks():
         ) if task_ids else []
 
         latest_task_photo_by_task_id = {}
+        task_photo_paths_by_task_id = {}
         for p in photo_rows:
+            normalized_path = normalize_static_file_path(p.file_path)
+            if not normalized_path:
+                continue
+            task_photo_paths_by_task_id.setdefault(p.task_id, []).append(normalized_path)
             if p.task_id not in latest_task_photo_by_task_id:
-                latest_task_photo_by_task_id[p.task_id] = p.file_path
+                latest_task_photo_by_task_id[p.task_id] = normalized_path
 
         task_work_sessions_by_task_id, task_work_summary_by_task_id, active_work_sessions_by_task_id, _ = (
             build_task_work_session_data(db, task_ids)
@@ -1845,6 +1870,7 @@ def admin_tasks():
             issue_by_task_id=issue_by_task_id,
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
             latest_task_photo_by_task_id=latest_task_photo_by_task_id,
+            task_photo_paths_by_task_id=task_photo_paths_by_task_id,
             task_work_sessions_by_task_id=task_work_sessions_by_task_id,
             task_work_summary_by_task_id=task_work_summary_by_task_id,
             active_work_sessions_by_task_id=active_work_sessions_by_task_id,
@@ -2167,40 +2193,28 @@ def admin_task_new():
             db.add(t)
             db.commit()
 
-            # OPTIONAL REFERENCE PHOTO
-            photo = request.files.get("photo")
-            if photo and photo.filename:
-                if not allowed_image_file(photo.filename):
-                    flash("Unsupported image format.")
-                    return redirect(url_for("admin_task_new"))
+            # OPTIONAL REFERENCE PHOTOS
+            photo_uploads = [
+                photo for photo in request.files.getlist("photo")
+                if photo and photo.filename
+            ]
+            invalid_photo = next(
+                (photo.filename for photo in photo_uploads if not allowed_image_file(photo.filename)),
+                None,
+            )
+            if invalid_photo:
+                flash("Unsupported image format.")
+                return redirect(url_for("admin_task_new"))
 
-                original_name = secure_filename(photo.filename)
-                unique_name = f"{uuid4().hex}.jpg"
-
-                upload_dir = os.path.join(app.static_folder, "uploads", "tasks", str(t.id))
-                os.makedirs(upload_dir, exist_ok=True)
-
-                abs_path = os.path.join(upload_dir, unique_name)
-
-                img = Image.open(photo)
-                img = ImageOps.exif_transpose(img)
-
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                elif img.mode != "RGB":
-                    img = img.convert("RGB")
-
-                img.thumbnail((1600, 1600))
-                img.save(abs_path, "JPEG", quality=82, optimize=True)
-
-                rel_path = f"uploads/tasks/{t.id}/{unique_name}"
-
-                db.add(TaskPhoto(
-                    task_id=t.id,
-                    filename=original_name,
-                    file_path=rel_path,
+            for photo in photo_uploads:
+                db.add(save_task_photo_upload(
+                    t.id,
+                    photo,
                     uploaded_by=getattr(request.cf_user, "id", None),
+                    convert_to_jpeg=True,
                 ))
+
+            if photo_uploads:
                 db.commit()
 
             # ASSIGN WORKERS
@@ -2366,8 +2380,11 @@ def worker_dashboard():
 
         latest_task_photo_by_task_id = {}
         for p in photo_rows:
+            normalized_path = normalize_static_file_path(p.file_path)
+            if not normalized_path:
+                continue
             if p.task_id not in latest_task_photo_by_task_id:
-                latest_task_photo_by_task_id[p.task_id] = p.file_path
+                latest_task_photo_by_task_id[p.task_id] = normalized_path
 
         _, _, _, active_work_session_by_task_user = build_task_work_session_data(db, all_ids)
         worker_active_session_by_task_id = {
@@ -2475,6 +2492,7 @@ def worker_task_detail(task_id: int):
             .order_by(TaskPhoto.created_at.desc(), TaskPhoto.id.desc())
             .all()
         )
+        worker_active_session = get_active_task_work_session(db, task.id, user.id)
 
         issue_photos = []
         if linked_issue:
@@ -2518,7 +2536,7 @@ def worker_task_detail(task_id: int):
         seen_paths = set()
 
         for photo in task_photos:
-            path = (photo.file_path or "").strip()
+            path = normalize_static_file_path(photo.file_path)
             if not path or path in seen_paths:
                 continue
             seen_paths.add(path)
@@ -2529,7 +2547,7 @@ def worker_task_detail(task_id: int):
             })
 
         for photo in issue_photos:
-            path = (photo.file_path or "").strip()
+            path = normalize_static_file_path(photo.file_path)
             if not path or path in seen_paths:
                 continue
             seen_paths.add(path)
@@ -2587,6 +2605,7 @@ def worker_task_detail(task_id: int):
             back_url=back_url,
             current_view=view,
             linked_issue=linked_issue,
+            worker_has_active_session=worker_active_session is not None,
             primary_image=primary_image,
             attachment_items=attachment_items,
             notes_items=notes_items,
@@ -2674,6 +2693,28 @@ def worker_task_done(task_id: int):
             flash(finish_validation_error)
             return redirect(next_url)
 
+        finished_session, _ = finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
+        if not finished_session:
+            flash("You haven't started this task yet.")
+            return redirect(next_url)
+
+        db.flush()
+        remaining_active_sessions = (
+            db.query(TaskWorkSession)
+            .filter(
+                TaskWorkSession.task_id == t.id,
+                TaskWorkSession.status == "active",
+                TaskWorkSession.finished_at.is_(None),
+            )
+            .count()
+        )
+
+        if remaining_active_sessions > 0:
+            t.status = "in_progress"
+            t.finished_at = None
+            db.commit()
+            return redirect(next_url)
+
         if getattr(t, "carryover_from_task_id", None):
             orig_id = t.carryover_from_task_id
             res_id = t.location_id
@@ -2685,9 +2726,8 @@ def worker_task_done(task_id: int):
 
             t.status = "done"
             if not t.started_at:
-                t.started_at = now
+                t.started_at = finished_session.started_at
             t.finished_at = now
-            finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
 
             db.commit()
 
@@ -2730,14 +2770,13 @@ def worker_task_done(task_id: int):
 
         t.status = "done"
         if not t.started_at:
-            t.started_at = now
+            t.started_at = finished_session.started_at
         t.finished_at = now
 
         t.blocked_reason = None
         t.blocked_until = None
         t.blocked_at = None
         t.blocked_location_id = None
-        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
 
         db.commit()
 
@@ -3234,23 +3273,11 @@ def worker_task_add_photo(task_id: int):
             flash("Unsupported image format.")
             return redirect(default_url)
 
-        original_name = secure_filename(f.filename)
-        ext = original_name.rsplit(".", 1)[1].lower()
-        unique_name = f"{uuid4().hex}.{ext}"
-
-        upload_dir = os.path.join(app.static_folder, "uploads", "tasks", str(task_id))
-        os.makedirs(upload_dir, exist_ok=True)
-
-        abs_path = os.path.join(upload_dir, unique_name)
-        f.save(abs_path)
-
-        rel_path = f"uploads/tasks/{task_id}/{unique_name}"
-
-        db.add(TaskPhoto(
-            task_id=task_id,
-            filename=original_name,
-            file_path=rel_path,
-            uploaded_by=getattr(user, "id", None)
+        db.add(save_task_photo_upload(
+            task_id,
+            f,
+            uploaded_by=getattr(user, "id", None),
+            convert_to_jpeg=False,
         ))
         db.commit()
 

@@ -219,31 +219,33 @@
       </button>
       {% endif %}
 
-      {% if task.status == "open" %}
+      {% if task.status != "done" and worker_has_active_session %}
+      <form
+        method="post"
+        action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}"
+        class="worker-detail-primary-form"
+        data-start-form
+        data-action-mode="finish"
+        data-finish-action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}">
+        <input type="hidden" name="next" value="{{ back_url }}" data-primary-next>
+        <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary is-active" type="submit" data-primary-button>
+          <span class="worker-detail-dock-icon" aria-hidden="true">&#9654;</span>
+          <span data-primary-label>Finish Task</span>
+        </button>
+      </form>
+      {% elif task.status != "done" and task.status != "blocked" %}
       <form
         method="post"
         action="{{ url_for('worker_task_start', task_id=task.id) }}?module={{ active_module }}"
         class="worker-detail-primary-form"
         data-start-form
+        data-action-mode="start"
         data-finish-action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}"
         data-finish-next="{{ back_url }}">
         <input type="hidden" name="next" value="{{ request.full_path }}" data-primary-next>
         <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary" type="submit" data-primary-button>
           <span class="worker-detail-dock-icon" aria-hidden="true">&#9654;</span>
           <span data-primary-label>Start Task</span>
-        </button>
-      </form>
-      {% elif task.status == "in_progress" %}
-      <form
-        method="post"
-        action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}"
-        class="worker-detail-primary-form"
-        data-start-form
-        data-finish-action="{{ url_for('worker_task_done', task_id=task.id) }}?module={{ active_module }}">
-        <input type="hidden" name="next" value="{{ back_url }}" data-primary-next>
-        <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary is-active" type="submit" data-primary-button>
-          <span class="worker-detail-dock-icon" aria-hidden="true">&#9654;</span>
-          <span data-primary-label>Finish Task</span>
         </button>
       </form>
       {% else %}
@@ -299,10 +301,10 @@
     const nextInput = document.querySelector("[data-primary-next]");
     if (!form || !dock || !button || !label || !nextInput) return;
 
-    if (dock.dataset.taskStatus !== "open") return;
+    if (form.dataset.actionMode !== "start") return;
 
     form.addEventListener("submit", async function (event) {
-      if (dock.dataset.taskStatus !== "open") {
+      if (form.dataset.actionMode !== "start") {
         return;
       }
 
@@ -325,6 +327,7 @@
         }
 
         dock.dataset.taskStatus = "in_progress";
+        form.dataset.actionMode = "finish";
         form.action = form.dataset.finishAction || form.action;
         nextInput.value = form.dataset.finishNext || nextInput.value;
         button.classList.add("is-active");
