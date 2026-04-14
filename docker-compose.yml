@@ -12,4 +12,5 @@ services:
       - TELEGRAM_ADMIN_CHAT_ID=${TELEGRAM_ADMIN_CHAT_ID:-8603880940}
     volumes:
       - ./data:/app/data
+      - ./static/uploads:/app/static/uploads
     restart: unless-stopped

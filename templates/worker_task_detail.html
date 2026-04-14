@@ -27,14 +27,13 @@
 
     <article class="worker-detail-screen">
       {% if primary_image %}
-        {% set hero_file = primary_image.path[7:] if primary_image.path.startswith('static/') else primary_image.path %}
         <section class="worker-detail-hero">
           <div class="worker-detail-media">
             <img
-              src="{{ url_for('static', filename=hero_file) }}"
+              src="{{ url_for('static', filename=primary_image.path) }}"
               alt="{{ task.title }}"
               class="worker-detail-image js-lightbox-image"
-              data-fullsrc="{{ url_for('static', filename=hero_file) }}">
+              data-fullsrc="{{ url_for('static', filename=primary_image.path) }}">
           </div>
 
           <div class="worker-detail-hero-badges">
@@ -174,14 +173,13 @@
           </div>
           <div class="worker-detail-gallery">
             {% for item in attachment_items %}
-              {% set item_file = item.path[7:] if item.path.startswith('static/') else item.path %}
               <button
                 type="button"
                 class="worker-detail-gallery-item js-lightbox-image"
-                data-fullsrc="{{ url_for('static', filename=item_file) }}"
+                data-fullsrc="{{ url_for('static', filename=item.path) }}"
                 aria-label="Open attachment {{ item.label }}">
                 <img
-                  src="{{ url_for('static', filename=item_file) }}"
+                  src="{{ url_for('static', filename=item.path) }}"
                   alt="{{ item.label }}"
                   class="worker-detail-gallery-image">
               </button>
