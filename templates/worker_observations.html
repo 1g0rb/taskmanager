@@ -54,14 +54,24 @@
               </div>
             </div>
 
-            {% if o.photo_path %}
-              <div class="worker-observation-photo-wrap">
-                <img
-                  src="{{ o.photo_path }}"
-                  alt="Observation photo"
-                  class="worker-observation-photo js-lightbox-image"
-                  data-fullsrc="{{ o.photo_path }}"
-                >
+            {% if o.photos or o.photo_path %}
+              <div class="worker-observation-photo-wrap" style="display:flex; flex-wrap:wrap; gap:10px;">
+                {% for photo in o.photos %}
+                  <img
+                    src="{{ url_for('static', filename=photo.file_path) }}"
+                    alt="Observation photo {{ loop.index }}"
+                    class="worker-observation-photo js-lightbox-image"
+                    data-fullsrc="{{ url_for('static', filename=photo.file_path) }}"
+                  >
+                {% endfor %}
+                {% if (not o.photos) and o.photo_path %}
+                  <img
+                    src="{{ o.photo_path }}"
+                    alt="Observation photo"
+                    class="worker-observation-photo js-lightbox-image"
+                    data-fullsrc="{{ o.photo_path }}"
+                  >
+                {% endif %}
               </div>
             {% endif %}
 

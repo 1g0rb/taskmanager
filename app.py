@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Boolean, Date, DateTime,
-    ForeignKey, Text, text, select, case, or_, func
+    ForeignKey, Text, text, select, case, or_, func, Table
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -211,6 +211,26 @@ class IssuePhoto(Base):
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+
+observation_workers = Table(
+    "observation_workers",
+    Base.metadata,
+    Column("observation_id", Integer, ForeignKey("observations.id"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+)
+
+
+class ObservationPhoto(Base):
+    __tablename__ = "observation_photos"
+
+    id = Column(Integer, primary_key=True)
+    observation_id = Column(Integer, ForeignKey("observations.id"), nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Observation(Base):
     __tablename__ = "observations"
 
@@ -231,7 +251,9 @@ class Observation(Base):
 
     location = relationship("Location")
     assigned_user = relationship("User", foreign_keys=[assigned_user_id])
+    assigned_users = relationship("User", secondary=observation_workers, lazy="select")
     created_by_user = relationship("User", foreign_keys=[created_by_user_id])
+    photos = relationship("ObservationPhoto", backref="observation", lazy="select")
 
 
 class UserActivity(Base):
@@ -320,6 +342,36 @@ def save_task_photo_upload(
     rel_path = normalize_static_file_path(f"uploads/tasks/{task_id}/{unique_name}")
     return TaskPhoto(
         task_id=task_id,
+        filename=original_name,
+        file_path=rel_path,
+        uploaded_by=uploaded_by,
+    )
+
+
+def save_observation_photo_upload(
+    observation_id: int,
+    upload,
+    uploaded_by: int | None = None,
+) -> ObservationPhoto:
+    original_name = secure_filename(upload.filename or "")
+    if not original_name:
+        raise ValueError("Missing file name.")
+
+    if not allowed_image_file(original_name):
+        raise ValueError("Unsupported image format.")
+
+    ext = original_name.rsplit(".", 1)[1].lower()
+    unique_name = f"{uuid4().hex}_{original_name}"
+
+    upload_dir = os.path.join(app.static_folder, "uploads", "observations")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    abs_path = os.path.join(upload_dir, unique_name)
+    upload.save(abs_path)
+
+    rel_path = normalize_static_file_path(f"uploads/observations/{unique_name}")
+    return ObservationPhoto(
+        observation_id=observation_id,
         filename=original_name,
         file_path=rel_path,
         uploaded_by=uploaded_by,
@@ -426,6 +478,62 @@ def ensure_observation_column_is_read():
             print("Added column: observations.is_read")
 
 
+def ensure_observation_schema():
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS observation_workers (
+                observation_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                PRIMARY KEY (observation_id, user_id),
+                FOREIGN KEY(observation_id) REFERENCES observations(id),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS observation_photos (
+                id INTEGER NOT NULL PRIMARY KEY,
+                observation_id INTEGER NOT NULL,
+                filename VARCHAR NOT NULL,
+                file_path VARCHAR NOT NULL,
+                uploaded_by INTEGER,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(observation_id) REFERENCES observations(id),
+                FOREIGN KEY(uploaded_by) REFERENCES users(id)
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_observation_photos_observation_id ON observation_photos (observation_id)"
+        ))
+
+        conn.execute(text("""
+            INSERT OR IGNORE INTO observation_workers (observation_id, user_id)
+            SELECT id, assigned_user_id
+            FROM observations
+            WHERE assigned_user_id IS NOT NULL
+        """))
+        conn.execute(text("""
+            INSERT OR IGNORE INTO observation_photos (observation_id, filename, file_path, uploaded_by, created_at)
+            SELECT
+                id,
+                substr(replace(photo_path, '\\', '/'), instr(replace(photo_path, '\\', '/'), '/observations/') + 14),
+                CASE
+                    WHEN photo_path LIKE '/static/%' THEN substr(photo_path, 9)
+                    WHEN photo_path LIKE 'static/%' THEN substr(photo_path, 8)
+                    ELSE replace(photo_path, '\\', '/')
+                END,
+                created_by_user_id,
+                created_at
+            FROM observations
+            WHERE photo_path IS NOT NULL
+              AND trim(photo_path) != ''
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM observation_photos op
+                  WHERE op.observation_id = observations.id
+              )
+        """))
+
+
 def ensure_user_activity_schema():
     with engine.begin() as conn:
         tables = conn.execute(
@@ -485,6 +593,7 @@ ensure_task_column_carryover()
 ensure_user_column_display_name()
 ensure_user_column_telegram_chat_id()
 ensure_observation_column_is_read()
+ensure_observation_schema()
 ensure_user_activity_schema()
 ensure_task_work_session_schema()
 
@@ -1113,7 +1222,10 @@ def get_worker_unread_observation_count(db: Session, user_id: int) -> int:
     return (
         db.query(Observation)
         .filter(
-            Observation.assigned_user_id == user_id,
+            or_(
+                Observation.assigned_user_id == user_id,
+                Observation.assigned_users.any(User.id == user_id),
+            ),
             Observation.is_read == False,
         )
         .count()
@@ -3460,18 +3572,25 @@ def admin_observation_new():
             note = (request.form.get("note") or "").strip()
             module = (request.form.get("module") or "").strip() or None
             loc_raw = (request.form.get("location_id") or "").strip()
-            assigned_raw = (request.form.get("assigned_user_id") or "").strip()
+            assigned_raw_values = request.form.getlist("assigned_user_ids")
+            assigned_user_ids = []
+            for value in assigned_raw_values:
+                value = (value or "").strip()
+                if value.isdigit():
+                    user_id = int(value)
+                    if user_id not in assigned_user_ids:
+                        assigned_user_ids.append(user_id)
 
             print("DEBUG note:", repr(note))
             print("DEBUG module:", repr(module))
             print("DEBUG loc_raw:", repr(loc_raw))
-            print("DEBUG assigned_raw:", repr(assigned_raw))
+            print("DEBUG assigned_raw_values:", repr(assigned_raw_values))
 
             location_id = int(loc_raw) if loc_raw.isdigit() else None
-            assigned_user_id = int(assigned_raw) if assigned_raw.isdigit() else None
+            assigned_user_id = assigned_user_ids[0] if assigned_user_ids else None
 
             print("DEBUG location_id:", location_id)
-            print("DEBUG assigned_user_id:", assigned_user_id)
+            print("DEBUG assigned_user_ids:", assigned_user_ids)
 
             # VALIDACIJE
             if not note:
@@ -3485,9 +3604,9 @@ def admin_observation_new():
                     locations=locations,
                 )
 
-            if not assigned_user_id:
+            if not assigned_user_ids:
                 print("❌ FAIL: assigned_user_id missing or invalid")
-                flash("Please select a worker.")
+                flash("Please select at least one worker.")
                 return render_template(
                     "admin_observation_new.html",
                     title="New observation",
@@ -3498,10 +3617,30 @@ def admin_observation_new():
 
             # PHOTO UPLOAD
             photo_path = None
-            f = request.files.get("photo")
+            photo_uploads = [
+                photo for photo in request.files.getlist("photos")
+                if photo and photo.filename
+            ]
+            f = photo_uploads[0] if photo_uploads else None
 
             if f:
                 print("DEBUG photo filename:", f.filename)
+
+            invalid_photo = next(
+                (photo.filename for photo in photo_uploads if not allowed_image_file(photo.filename)),
+                None,
+            )
+            if invalid_photo:
+                print("Observation upload failed:", invalid_photo)
+                flash("Unsupported image format.")
+                return render_template(
+                    "admin_observation_new.html",
+                    title="New observation",
+                    users=users,
+                    user_picker_mode=user_picker_mode,
+                    locations=locations,
+                )
+            f = None
 
             if f and f.filename:
                 ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
@@ -3549,22 +3688,43 @@ def admin_observation_new():
                 status="new",
             )
 
-            print("DEBUG about to save observation for user:", assigned_user_id)
+            print("DEBUG about to save observation for users:", assigned_user_ids)
 
             db.add(obs)
-            db.commit()
+            db.flush()
 
-            assigned_user = db.get(User, assigned_user_id) if assigned_user_id else None
+            assigned_users = (
+                db.query(User)
+                .filter(User.id.in_(assigned_user_ids))
+                .all()
+            ) if assigned_user_ids else []
+            obs.assigned_users = assigned_users
+
+            if photo_uploads:
+                photo_rows = []
+                for photo in photo_uploads:
+                    photo_row = save_observation_photo_upload(
+                        obs.id,
+                        photo,
+                        uploaded_by=current_user.id if current_user else None,
+                    )
+                    photo_rows.append(photo_row)
+                    db.add(photo_row)
+                if photo_rows:
+                    obs.photo_path = f"/static/{photo_rows[0].file_path}"
+
+            db.commit()
             location = db.get(Location, location_id) if location_id else None
             location_text = f"\nLocation: {location.name}" if location else ""
-            send_user_telegram_message(
-                assigned_user,
-                (
-                    f"📝 New observation\n"
-                    f"{note}{location_text}\n"
-                    f"{TASKMANAGER_URL}worker/observations"
-                ),
-            )
+            for assigned_user in assigned_users:
+                send_user_telegram_message(
+                    assigned_user,
+                    (
+                        f"New observation\n"
+                        f"{note}{location_text}\n"
+                        f"{TASKMANAGER_URL}worker/observations"
+                    ),
+                )
 
             print("✅ SUCCESS: observation saved with id:", obs.id)
             print("=== END DEBUG ===\n")
@@ -3596,18 +3756,33 @@ def worker_observations():
     try:
         current_user = request.cf_user  # type: ignore[attr-defined]
 
-        db.query(Observation).filter(
-            Observation.assigned_user_id == current_user.id,
-            Observation.is_read == False,
-        ).update({Observation.is_read: True}, synchronize_session=False)
-        db.commit()
+        observation_ids = [
+            row.id
+            for row in (
+                db.query(Observation.id)
+                .filter(
+                    or_(
+                        Observation.assigned_user_id == current_user.id,
+                        Observation.assigned_users.any(User.id == current_user.id),
+                    )
+                )
+                .all()
+            )
+        ]
+
+        if observation_ids:
+            db.query(Observation).filter(
+                Observation.id.in_(observation_ids),
+                Observation.is_read == False,
+            ).update({Observation.is_read: True}, synchronize_session=False)
+            db.commit()
 
         observations = (
             db.query(Observation)
-            .filter(Observation.assigned_user_id == current_user.id)
+            .filter(Observation.id.in_(observation_ids))
             .order_by(Observation.created_at.desc())
             .all()
-        )
+        ) if observation_ids else []
 
         unread_count = get_worker_unread_observation_count(db, current_user.id)
 
@@ -3688,3 +3863,4 @@ def handle_large_file(e):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
