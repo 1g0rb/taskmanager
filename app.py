@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from werkzeug.exceptions import RequestEntityTooLarge
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 import requests
 # ---------------- DB ----------------
 DB_URL = os.environ.get("DATABASE_URL")
@@ -361,26 +361,40 @@ def save_observation_photo_upload(
         raise ValueError("Unsupported image format.")
 
     ext = original_name.rsplit(".", 1)[1].lower()
-    unique_name = f"{uuid4().hex}_{original_name}"
+    unique_name = f"{uuid4().hex}.jpg"
 
     upload_dir = os.path.join(app.static_folder, "uploads", "observations")
     app.logger.info(
-        "Observation photo save start observation_id=%s original_name=%s content_type=%s upload_dir=%s",
+        "Observation photo save start observation_id=%s original_name=%s extension=%s content_type=%s content_length=%s upload_dir=%s",
         observation_id,
         original_name,
+        ext,
         getattr(upload, "content_type", None),
+        request.content_length,
         upload_dir,
     )
     os.makedirs(upload_dir, exist_ok=True)
 
     abs_path = os.path.join(upload_dir, unique_name)
-    upload.save(abs_path)
+    try:
+        save_optimized_image(upload, abs_path, max_size=(1600, 1600), quality=82)
+    except (UnidentifiedImageError, OSError) as exc:
+        app.logger.warning(
+            "Observation photo unsupported observation_id=%s filename=%s extension=%s content_type=%s error=%s",
+            observation_id,
+            original_name,
+            ext,
+            getattr(upload, "content_type", None),
+            exc,
+        )
+        raise ValueError("Image format not supported. Please use JPG or PNG.") from exc
     app.logger.info(
-        "Observation photo saved observation_id=%s filename=%s ext=%s abs_path=%s",
+        "Observation photo saved observation_id=%s filename=%s ext=%s abs_path=%s path_exists=%s",
         observation_id,
         original_name,
         ext,
         abs_path,
+        os.path.exists(abs_path),
     )
 
     rel_path = normalize_static_file_path(f"uploads/observations/{unique_name}")
@@ -614,7 +628,7 @@ ensure_task_work_session_schema()
 # ---------------- App ----------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 # ---------------- Cloudflare Access auth ----------------
 CF_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
@@ -3582,10 +3596,11 @@ def admin_observation_new():
 
         if request.method == "POST":
             app.logger.info(
-                "Observation create POST received method=%s form_keys=%s file_keys=%s",
+                "Observation create POST received method=%s form_keys=%s file_keys=%s content_length=%s",
                 request.method,
                 sorted(request.form.keys()),
                 sorted(request.files.keys()),
+                request.content_length,
             )
             try:
                 note = (request.form.get("note") or "").strip()
@@ -3648,7 +3663,7 @@ def admin_observation_new():
                         "Observation create validation failed: unsupported photo=%s",
                         invalid_photo,
                     )
-                    flash("Unsupported image format.")
+                    flash("Image format not supported. Please use JPG or PNG.")
                     return render_template(
                         "admin_observation_new.html",
                         title="New observation",
@@ -3734,7 +3749,9 @@ def admin_observation_new():
                     sorted(request.files.keys()),
                 )
                 error_message = "Observation could not be saved. Please try again."
-                if is_dev_auth_bypass_enabled():
+                if isinstance(exc, ValueError):
+                    error_message = str(exc)
+                elif is_dev_auth_bypass_enabled():
                     error_message = f"{error_message} ({type(exc).__name__}: {exc})"
                 flash(error_message)
                 return render_template(
@@ -3865,7 +3882,9 @@ def admin_task_delete(task_id: int):
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_file(e):
-    flash("Image too large. Maximum size is 6MB.")
+    flash("Image is too large. Please choose a smaller photo.")
+    if request.path == url_for("admin_observation_new"):
+        return redirect(url_for("admin_observation_new"))
     return redirect(request.referrer or url_for("worker_dashboard"))
 
 if __name__ == "__main__":
