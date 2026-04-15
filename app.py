@@ -364,10 +364,24 @@ def save_observation_photo_upload(
     unique_name = f"{uuid4().hex}_{original_name}"
 
     upload_dir = os.path.join(app.static_folder, "uploads", "observations")
+    app.logger.info(
+        "Observation photo save start observation_id=%s original_name=%s content_type=%s upload_dir=%s",
+        observation_id,
+        original_name,
+        getattr(upload, "content_type", None),
+        upload_dir,
+    )
     os.makedirs(upload_dir, exist_ok=True)
 
     abs_path = os.path.join(upload_dir, unique_name)
     upload.save(abs_path)
+    app.logger.info(
+        "Observation photo saved observation_id=%s filename=%s ext=%s abs_path=%s",
+        observation_id,
+        original_name,
+        ext,
+        abs_path,
+    )
 
     rel_path = normalize_static_file_path(f"uploads/observations/{unique_name}")
     return ObservationPhoto(
@@ -3594,9 +3608,12 @@ def admin_observation_new():
                 ]
 
                 app.logger.info(
-                    "Observation create parsed worker_count=%s photo_count=%s location_id=%s",
+                    "Observation create parsed worker_ids=%s worker_count=%s photo_count=%s photo_names=%s photo_content_types=%s location_id=%s",
+                    assigned_user_ids,
                     len(assigned_user_ids),
                     len(photo_uploads),
+                    [photo.filename for photo in photo_uploads],
+                    [getattr(photo, "content_type", None) for photo in photo_uploads],
                     location_id,
                 )
 
@@ -3652,8 +3669,15 @@ def admin_observation_new():
                     status="new",
                 )
 
+                app.logger.info(
+                    "Observation create before db.add assigned_user_id=%s created_by=%s",
+                    assigned_user_id,
+                    current_user.id if current_user else None,
+                )
                 db.add(obs)
+                app.logger.info("Observation create before db.flush")
                 db.flush()
+                app.logger.info("Observation create after db.flush observation_id=%s", obs.id)
 
                 assigned_users = (
                     db.query(User)
@@ -3661,10 +3685,19 @@ def admin_observation_new():
                     .all()
                 ) if assigned_user_ids else []
                 obs.assigned_users = assigned_users
+                app.logger.info(
+                    "Observation create resolved assigned_users=%s",
+                    [user.id for user in assigned_users],
+                )
 
                 if photo_uploads:
                     photo_rows = []
                     for photo in photo_uploads:
+                        app.logger.info(
+                            "Observation create saving photo filename=%s content_type=%s",
+                            photo.filename,
+                            getattr(photo, "content_type", None),
+                        )
                         photo_row = save_observation_photo_upload(
                             obs.id,
                             photo,
@@ -3675,6 +3708,7 @@ def admin_observation_new():
                     if photo_rows:
                         obs.photo_path = f"/static/{photo_rows[0].file_path}"
 
+                app.logger.info("Observation create before db.commit observation_id=%s", obs.id)
                 db.commit()
                 app.logger.info("Observation create committed observation_id=%s", obs.id)
 
@@ -3692,14 +3726,17 @@ def admin_observation_new():
 
                 flash("Observation created.")
                 return redirect(url_for("admin_tasks"))
-            except Exception:
+            except Exception as exc:
                 db.rollback()
                 app.logger.exception(
                     "Observation create failed form_keys=%s file_keys=%s",
                     sorted(request.form.keys()),
                     sorted(request.files.keys()),
                 )
-                flash("Observation could not be saved. Please try again.")
+                error_message = "Observation could not be saved. Please try again."
+                if is_dev_auth_bypass_enabled():
+                    error_message = f"{error_message} ({type(exc).__name__}: {exc})"
+                flash(error_message)
                 return render_template(
                     "admin_observation_new.html",
                     title="New observation",
