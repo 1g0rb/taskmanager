@@ -31,7 +31,7 @@
             rows="5"
             required
             placeholder="Example: Rakes were not returned to storage after pruning near the greenhouse."
-          ></textarea>
+          >{{ request.form.get("note", "") }}</textarea>
           <div class="small">Keep it short and actionable so the worker understands the next step immediately.</div>
         </div>
 
@@ -39,8 +39,8 @@
           <label class="observation-label" for="module">Module</label>
           <select id="module" class="input" name="module">
             <option value="">Select module</option>
-            <option value="horticulture">Horticulture</option>
-            <option value="garden">Garden</option>
+            <option value="horticulture" {% if request.form.get("module") == "horticulture" %}selected{% endif %}>Horticulture</option>
+            <option value="garden" {% if request.form.get("module") == "garden" %}selected{% endif %}>Garden</option>
           </select>
         </div>
 
@@ -49,7 +49,7 @@
           <select id="location_id" class="input" name="location_id">
             <option value="">Optional location</option>
             {% for loc in locations %}
-              <option value="{{ loc.id }}">{{ loc.module|capitalize }} / {{ loc.name }}</option>
+              <option value="{{ loc.id }}" {% if request.form.get("location_id") == (loc.id|string) %}selected{% endif %}>{{ loc.module|capitalize }} / {{ loc.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -61,7 +61,7 @@
           <div class="input" style="max-height:220px; overflow:auto; padding:10px 12px;">
             {% for u in users %}
               <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-                <input type="checkbox" name="assigned_user_ids" value="{{ u.id }}">
+                <input type="checkbox" name="assigned_user_ids" value="{{ u.id }}" {% if (u.id|string) in request.form.getlist("assigned_user_ids") %}checked{% endif %}>
                 <span>{{ u.display_name or u.username }}{% if user_picker_mode == "all_active" %} ({{ u.role }}){% endif %}</span>
               </label>
             {% endfor %}

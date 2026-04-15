@@ -102,6 +102,42 @@ button, input, select{ font-family: inherit; }
   font-weight: 700;
 }
 
+.admin-flash-stack{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin: 0 0 16px;
+}
+
+.admin-flash{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(214,69,69,.18);
+  background: linear-gradient(135deg, rgba(214,69,69,.12), rgba(245,158,11,.10));
+  color: #7f1d1d;
+  box-shadow: 0 10px 22px rgba(214,69,69,.08);
+}
+
+.admin-flash-icon{
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 999px;
+  display:grid;
+  place-items:center;
+  font-weight: 900;
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(214,69,69,.14);
+}
+
+.admin-flash-message{
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 /* ---------- Sidebar (Admin) ---------- */
 .sidebar{
   width: 260px;

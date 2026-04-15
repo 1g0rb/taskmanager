@@ -3567,88 +3567,70 @@ def admin_observation_new():
         )
 
         if request.method == "POST":
-            print("\n=== DEBUG POST /admin/observations/new ===")
-
-            note = (request.form.get("note") or "").strip()
-            module = (request.form.get("module") or "").strip() or None
-            loc_raw = (request.form.get("location_id") or "").strip()
-            assigned_raw_values = request.form.getlist("assigned_user_ids")
-            assigned_user_ids = []
-            for value in assigned_raw_values:
-                value = (value or "").strip()
-                if value.isdigit():
-                    user_id = int(value)
-                    if user_id not in assigned_user_ids:
-                        assigned_user_ids.append(user_id)
-
-            print("DEBUG note:", repr(note))
-            print("DEBUG module:", repr(module))
-            print("DEBUG loc_raw:", repr(loc_raw))
-            print("DEBUG assigned_raw_values:", repr(assigned_raw_values))
-
-            location_id = int(loc_raw) if loc_raw.isdigit() else None
-            assigned_user_id = assigned_user_ids[0] if assigned_user_ids else None
-
-            print("DEBUG location_id:", location_id)
-            print("DEBUG assigned_user_ids:", assigned_user_ids)
-
-            # VALIDACIJE
-            if not note:
-                print("❌ FAIL: note missing")
-                flash("Observation note is required.")
-                return render_template(
-                    "admin_observation_new.html",
-                    title="New observation",
-                    users=users,
-                    user_picker_mode=user_picker_mode,
-                    locations=locations,
-                )
-
-            if not assigned_user_ids:
-                print("❌ FAIL: assigned_user_id missing or invalid")
-                flash("Please select at least one worker.")
-                return render_template(
-                    "admin_observation_new.html",
-                    title="New observation",
-                    users=users,
-                    user_picker_mode=user_picker_mode,
-                    locations=locations,
-                )
-
-            # PHOTO UPLOAD
-            photo_path = None
-            photo_uploads = [
-                photo for photo in request.files.getlist("photos")
-                if photo and photo.filename
-            ]
-            f = photo_uploads[0] if photo_uploads else None
-
-            if f:
-                print("DEBUG photo filename:", f.filename)
-
-            invalid_photo = next(
-                (photo.filename for photo in photo_uploads if not allowed_image_file(photo.filename)),
-                None,
+            app.logger.info(
+                "Observation create POST received method=%s form_keys=%s file_keys=%s",
+                request.method,
+                sorted(request.form.keys()),
+                sorted(request.files.keys()),
             )
-            if invalid_photo:
-                print("Observation upload failed:", invalid_photo)
-                flash("Unsupported image format.")
-                return render_template(
-                    "admin_observation_new.html",
-                    title="New observation",
-                    users=users,
-                    user_picker_mode=user_picker_mode,
-                    locations=locations,
+            try:
+                note = (request.form.get("note") or "").strip()
+                module = (request.form.get("module") or "").strip() or None
+                loc_raw = (request.form.get("location_id") or "").strip()
+                assigned_raw_values = request.form.getlist("assigned_user_ids")
+                assigned_user_ids = []
+                for value in assigned_raw_values:
+                    value = (value or "").strip()
+                    if value.isdigit():
+                        user_id = int(value)
+                        if user_id not in assigned_user_ids:
+                            assigned_user_ids.append(user_id)
+
+                location_id = int(loc_raw) if loc_raw.isdigit() else None
+                assigned_user_id = assigned_user_ids[0] if assigned_user_ids else None
+                photo_uploads = [
+                    photo for photo in request.files.getlist("photos")
+                    if photo and photo.filename
+                ]
+
+                app.logger.info(
+                    "Observation create parsed worker_count=%s photo_count=%s location_id=%s",
+                    len(assigned_user_ids),
+                    len(photo_uploads),
+                    location_id,
                 )
-            f = None
 
-            if f and f.filename:
-                ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+                if not note:
+                    app.logger.warning("Observation create validation failed: missing note")
+                    flash("Observation note is required.")
+                    return render_template(
+                        "admin_observation_new.html",
+                        title="New observation",
+                        users=users,
+                        user_picker_mode=user_picker_mode,
+                        locations=locations,
+                    )
 
-                print("DEBUG photo extension:", ext)
+                if not assigned_user_ids:
+                    app.logger.warning("Observation create validation failed: no workers selected")
+                    flash("Please select at least one worker.")
+                    return render_template(
+                        "admin_observation_new.html",
+                        title="New observation",
+                        users=users,
+                        user_picker_mode=user_picker_mode,
+                        locations=locations,
+                    )
 
-                if ext not in ALLOWED_IMAGE_EXTENSIONS:
-                    print("❌ FAIL: unsupported image format:", ext)
+                invalid_photo = next(
+                    (photo.filename for photo in photo_uploads if not allowed_image_file(photo.filename)),
+                    None,
+                )
+                if invalid_photo:
+                    app.logger.warning(
+                        "Observation create validation failed: unsupported photo=%s",
+                        invalid_photo,
+                    )
                     flash("Unsupported image format.")
                     return render_template(
                         "admin_observation_new.html",
@@ -3658,85 +3640,73 @@ def admin_observation_new():
                         locations=locations,
                     )
 
-                filename = secure_filename(f.filename)
-                unique_name = f"{uuid4().hex}_{filename}"
-
-                upload_dir = os.path.join(app.static_folder, "uploads", "observations")
-                os.makedirs(upload_dir, exist_ok=True)
-
-                abs_path = os.path.join(upload_dir, unique_name)
-                f.save(abs_path)
-
-                photo_path = f"/static/uploads/observations/{unique_name}"
-
-                print("DEBUG photo saved to:", photo_path)
-
-            # CURRENT USER
-            current_user = request.cf_user  # type: ignore[attr-defined]
-
-            print("DEBUG current_user:", current_user.id if current_user else None)
-
-            # CREATE OBSERVATION
-            obs = Observation(
-                note=note,
-                module=module,
-                location_id=location_id,
-                assigned_user_id=assigned_user_id,
-                created_by_user_id=current_user.id if current_user else None,
-                photo_path=photo_path,
-                is_read=False,
-                status="new",
-            )
-
-            print("DEBUG about to save observation for users:", assigned_user_ids)
-
-            db.add(obs)
-            db.flush()
-
-            assigned_users = (
-                db.query(User)
-                .filter(User.id.in_(assigned_user_ids))
-                .all()
-            ) if assigned_user_ids else []
-            obs.assigned_users = assigned_users
-
-            if photo_uploads:
-                photo_rows = []
-                for photo in photo_uploads:
-                    photo_row = save_observation_photo_upload(
-                        obs.id,
-                        photo,
-                        uploaded_by=current_user.id if current_user else None,
-                    )
-                    photo_rows.append(photo_row)
-                    db.add(photo_row)
-                if photo_rows:
-                    obs.photo_path = f"/static/{photo_rows[0].file_path}"
-
-            db.commit()
-            location = db.get(Location, location_id) if location_id else None
-            location_text = f"\nLocation: {location.name}" if location else ""
-            for assigned_user in assigned_users:
-                send_user_telegram_message(
-                    assigned_user,
-                    (
-                        f"New observation\n"
-                        f"{note}{location_text}\n"
-                        f"{TASKMANAGER_URL}worker/observations"
-                    ),
+                current_user = request.cf_user  # type: ignore[attr-defined]
+                obs = Observation(
+                    note=note,
+                    module=module,
+                    location_id=location_id,
+                    assigned_user_id=assigned_user_id,
+                    created_by_user_id=current_user.id if current_user else None,
+                    photo_path=None,
+                    is_read=False,
+                    status="new",
                 )
 
-            print("✅ SUCCESS: observation saved with id:", obs.id)
-            print("=== END DEBUG ===\n")
+                db.add(obs)
+                db.flush()
 
-            flash("Observation created.")
-            return redirect(url_for("admin_tasks"))
-        
-        print("\n=== DEBUG USERS (GET) ===")
-        print("DEBUG users count:", len(users))
-        for u in users:
-            print("DEBUG user:", u.id, u.username, u.role, u.is_active)
-        print("=== END DEBUG USERS ===\n")
+                assigned_users = (
+                    db.query(User)
+                    .filter(User.id.in_(assigned_user_ids))
+                    .all()
+                ) if assigned_user_ids else []
+                obs.assigned_users = assigned_users
+
+                if photo_uploads:
+                    photo_rows = []
+                    for photo in photo_uploads:
+                        photo_row = save_observation_photo_upload(
+                            obs.id,
+                            photo,
+                            uploaded_by=current_user.id if current_user else None,
+                        )
+                        photo_rows.append(photo_row)
+                        db.add(photo_row)
+                    if photo_rows:
+                        obs.photo_path = f"/static/{photo_rows[0].file_path}"
+
+                db.commit()
+                app.logger.info("Observation create committed observation_id=%s", obs.id)
+
+                location = db.get(Location, location_id) if location_id else None
+                location_text = f"\nLocation: {location.name}" if location else ""
+                for assigned_user in assigned_users:
+                    send_user_telegram_message(
+                        assigned_user,
+                        (
+                            f"New observation\n"
+                            f"{note}{location_text}\n"
+                            f"{TASKMANAGER_URL}worker/observations"
+                        ),
+                    )
+
+                flash("Observation created.")
+                return redirect(url_for("admin_tasks"))
+            except Exception:
+                db.rollback()
+                app.logger.exception(
+                    "Observation create failed form_keys=%s file_keys=%s",
+                    sorted(request.form.keys()),
+                    sorted(request.files.keys()),
+                )
+                flash("Observation could not be saved. Please try again.")
+                return render_template(
+                    "admin_observation_new.html",
+                    title="New observation",
+                    users=users,
+                    user_picker_mode=user_picker_mode,
+                    locations=locations,
+                )
 
         return render_template(
             "admin_observation_new.html",

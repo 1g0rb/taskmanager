@@ -45,20 +45,29 @@
         <span>Mobile/local network access is enabled for testing.</span>
       </div>
       {% endif %}
-      {% if request.path.startswith('/worker') %}
       {% with messages = get_flashed_messages() %}
         {% if messages %}
-        <section class="worker-flash-stack" aria-live="polite" aria-label="Status messages">
-          {% for message in messages %}
-          <div class="worker-flash worker-flash-warning" role="alert">
-            <div class="worker-flash-icon" aria-hidden="true">!</div>
-            <div class="worker-flash-message">{{ message }}</div>
-          </div>
-          {% endfor %}
-        </section>
+          {% if request.path.startswith('/worker') %}
+          <section class="worker-flash-stack" aria-live="polite" aria-label="Status messages">
+            {% for message in messages %}
+            <div class="worker-flash worker-flash-warning" role="alert">
+              <div class="worker-flash-icon" aria-hidden="true">!</div>
+              <div class="worker-flash-message">{{ message }}</div>
+            </div>
+            {% endfor %}
+          </section>
+          {% else %}
+          <section class="admin-flash-stack" aria-live="polite" aria-label="Status messages">
+            {% for message in messages %}
+            <div class="admin-flash" role="alert">
+              <div class="admin-flash-icon" aria-hidden="true">!</div>
+              <div class="admin-flash-message">{{ message }}</div>
+            </div>
+            {% endfor %}
+          </section>
+          {% endif %}
         {% endif %}
       {% endwith %}
-      {% endif %}
       {% block content %}{% endblock %}
     </main>
 
