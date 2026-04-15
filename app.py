@@ -1404,8 +1404,11 @@ def get_worker_task_finish_validation_error(
     as_of: datetime | None = None,
 ) -> str | None:
     now = as_of or datetime.utcnow()
-    if (task.status or "open") != "in_progress" or not task.started_at:
-        return "This task hasn't been started yet."
+    task_status = (task.status or "open")
+    if task_status == "blocked":
+        return "Task needs to be restarted after being blocked."
+    if task_status != "in_progress" or not task.started_at:
+        return "Task must be started before finishing."
 
     active_task_minutes = _duration_minutes_between(task.started_at, now)
     if active_task_minutes < 1:
