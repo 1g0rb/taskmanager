@@ -9,8 +9,16 @@
         <label>Title</label>
         <input class="input" name="title" placeholder="e.g. Hedge trimming" required>
 
+        <label style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+          <input type="checkbox" name="is_todo" value="1" id="is_todo">
+          <span>Create as To Do backlog item</span>
+        </label>
+        <div class="small" id="todo-help" style="margin-top:6px;">
+          Leave this checked for unscheduled backlog work. Schedule it later when it is ready for execution.
+        </div>
+
         <label>Date</label>
-        <input class="input" name="task_date" type="date">
+        <input class="input" name="task_date" id="task_date" type="date">
 
         <label>Module</label>
         <select class="input" name="module" id="module">
@@ -44,8 +52,11 @@
             const moduleSel = document.getElementById("module");
             const areaSel = document.getElementById("area_id");
             const unitSel = document.getElementById("residence_id");
+            const todoChk = document.getElementById("is_todo");
+            const dateInput = document.getElementById("task_date");
+            const todoHelp = document.getElementById("todo-help");
 
-            if (!moduleSel || !areaSel || !unitSel) return;
+            if (!moduleSel || !areaSel || !unitSel || !todoChk || !dateInput || !todoHelp) return;
 
             function firstVisibleOption(selectEl) {
               for (const opt of selectEl.options) {
@@ -93,11 +104,24 @@
               filterUnitsByAreaAndModule();
             }
 
+            function syncTodoState() {
+              const isTodo = todoChk.checked;
+              dateInput.disabled = isTodo;
+              if (isTodo) {
+                dateInput.value = "";
+              }
+              todoHelp.textContent = isTodo
+                ? "This item will stay in the admin To Do backlog until you schedule it."
+                : "Pick a date now, or leave it empty to create a regular task for today.";
+            }
+
             moduleSel.addEventListener("change", refreshAll);
             areaSel.addEventListener("change", filterUnitsByAreaAndModule);
+            todoChk.addEventListener("change", syncTodoState);
 
             // initial
             refreshAll();
+            syncTodoState();
           })();
         </script>
 

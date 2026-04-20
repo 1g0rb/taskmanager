@@ -1,6 +1,7 @@
 {% set s = (t.status or "open") %}
 {% set ids = task_to_user_ids.get(t.id, []) %}
 {% set d = (t.task_date|string) if t.task_date else "" %}
+{% set is_todo = t.is_todo %}
 {% set is_unfinished = (t.status != "done" and d and d < today) %}
 {% set is_today = (t.status != "done" and d and d == today) %}
 {% set is_upcoming = (t.status != "done" and d and d > today) %}
@@ -11,6 +12,7 @@
 
     <div class="taskv2-accent
   {% if t.status == 'done' %}done
+  {% elif is_todo %}open
   {% elif t.status == 'blocked' %}blocked
   {% elif is_unfinished %}overdue
   {% elif is_today %}today
@@ -26,7 +28,9 @@
         <div class="taskv2-title">{{ t.title }}</div>
 
         <div class="taskv2-right">
-          {% if is_unfinished %}
+          {% if is_todo %}
+          <span class="pill warn">To Do</span>
+          {% elif is_unfinished %}
           <span class="pill danger">Unfinished</span>
           {% elif is_today %}
           <span class="pill ok">Today</span>
@@ -44,17 +48,17 @@
       <div class="taskv2-meta">
 
         <div class="meta-line">
-          <span class="meta-ico">📅</span>
-          <span class="meta-txt">{{ t.task_date if t.task_date else "—" }}</span>
+          <span class="meta-ico">Date</span>
+          <span class="meta-txt">{{ t.task_date if t.task_date else "Backlog" }}</span>
         </div>
 
         <div class="meta-line">
-          <span class="meta-ico">📍</span>
+          <span class="meta-ico">Loc</span>
           <span class="meta-txt">{{ locations[t.location_id].name if t.location_id in locations else "?" }}</span>
         </div>
 
         <div class="meta-line">
-          <span class="meta-ico">🌷</span>
+          <span class="meta-ico">Mod</span>
           <span class="meta-txt">
             {% if (t.module or '')|lower == 'garden' %}
             <span class="pill module garden">Garden</span>
@@ -65,7 +69,7 @@
         </div>
 
         <div class="meta-line">
-          <span class="meta-ico">👥</span>
+          <span class="meta-ico">Team</span>
           <span class="meta-txt">
             {% if ids %}
             {% for uid in ids %}
@@ -78,18 +82,18 @@
         </div>
 
         <div class="meta-line">
-          <span class="meta-ico">⏱</span>
+          <span class="meta-ico">Time</span>
           <span class="meta-txt">{{ format_duration_minutes(work_summary.get('total_duration_minutes', 0)) }}</span>
         </div>
 
         <div class="meta-line">
-          <span class="meta-ico">🧑</span>
+          <span class="meta-ico">Work</span>
           <span class="meta-txt">{{ work_summary.get('worker_count', 0) }} worker{{ '' if work_summary.get('worker_count', 0) == 1 else 's' }}</span>
         </div>
 
         {% if t.notes %}
         <div class="meta-line wide">
-          <span class="meta-ico">📝</span>
+          <span class="meta-ico">Note</span>
           <span class="meta-txt">{{ t.notes }}</span>
         </div>
         {% endif %}
@@ -112,7 +116,7 @@
 {% if linked_issue_photo_by_task_id.get(t.id) %}
   <div class="task-source-issue" style="margin-top:12px;">
     <div class="small" style="margin-bottom:6px;">
-      Source issue #{{ issue_by_task_id[t.id].id }} — {{ issue_by_task_id[t.id].title }}
+      Source issue #{{ issue_by_task_id[t.id].id }} - {{ issue_by_task_id[t.id].title }}
     </div>
 
     <img
@@ -148,6 +152,18 @@
 
           {% else %}
 
+          {% if is_todo %}
+          <form method="post" action="{{ url_for('admin_task_schedule', task_id=t.id) }}" style="display:flex; gap:8px; align-items:center;">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <input class="assign-select" type="date" name="schedule_date" required>
+            <button class="btn mini" type="submit">Schedule</button>
+          </form>
+
+          <form method="post" action="{{ url_for('admin_task_move_to_today', task_id=t.id) }}">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="btn mini ok" type="submit">Send to Today</button>
+          </form>
+          {% else %}
           <form method="post" action="{{ url_for('admin_tasks_batch_done') }}">
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="task_ids" value="{{ t.id }}">
@@ -170,6 +186,7 @@
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <button class="btn mini" type="submit">Today task</button>
           </form>
+          {% endif %}
 
           <form
             method="post"

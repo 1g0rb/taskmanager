@@ -5,6 +5,12 @@
 
   <div class="dash-stats">
 
+    <a class="dash-stat {{ 'active' if flt=='todo' else '' }}" href="{{ url_for('admin_tasks', filter='todo', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
+      <div class="dash-stat-label">To Do</div>
+      <div class="dash-stat-value">{{ counts['todo'] }}</div>
+      <div class="dash-stat-ico">Backlog</div>
+    </a>
+
     <a class="dash-stat {{ 'active' if flt=='today' else '' }}" href="{{ url_for('admin_tasks', filter='today', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
       <div class="dash-stat-label">Today</div>
       <div class="dash-stat-value">{{ counts['today'] }}</div>
@@ -138,6 +144,7 @@
 </div>
 
 {% for key, title in [
+  ("todo", "To Do"),
   ("unfinished", "🔥 Unfinished"),
   ("today", "📅 Today"),
   ("upcoming", "🟢 Upcoming")
@@ -196,7 +203,7 @@
   </div>
 {% endif %}
 
-{% if not groups['unfinished'] and not groups['today'] and not groups['upcoming'] and not done_history_groups %}
+{% if not groups['todo'] and not groups['unfinished'] and not groups['today'] and not groups['upcoming'] and not done_history_groups %}
   <div class="card admin-empty-state">
     <div class="done-row-title" style="margin-bottom:6px;">No tasks match these filters</div>
     <div class="muted">Try clearing one or more filters, or switch to another task view.</div>

@@ -91,6 +91,7 @@ class Task(Base):
 
     task_date = Column(Date, default=date.today)
     next_action_date = Column(Date, nullable=True)
+    is_todo = Column(Boolean, default=False, nullable=False)
 
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
 
@@ -474,6 +475,14 @@ def ensure_task_column_carryover():
             conn.execute(text("ALTER TABLE tasks ADD COLUMN carryover_from_task_id INTEGER"))
             print("✅ Added column: tasks.carryover_from_task_id")
 
+def ensure_task_column_is_todo():
+    with engine.begin() as conn:
+        cols = conn.execute(text("PRAGMA table_info(tasks)")).fetchall()
+        names = {c[1] for c in cols}
+        if "is_todo" not in names:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN is_todo BOOLEAN NOT NULL DEFAULT 0"))
+            print("Added column: tasks.is_todo")
+
 def ensure_user_column_display_name():
     with engine.begin() as conn:
         cols = conn.execute(text("PRAGMA table_info(users)")).fetchall()
@@ -618,6 +627,7 @@ def ensure_task_work_session_schema():
 
 Base.metadata.create_all(engine)
 ensure_task_column_carryover()
+ensure_task_column_is_todo()
 ensure_user_column_display_name()
 ensure_user_column_telegram_chat_id()
 ensure_observation_column_is_read()
@@ -1060,6 +1070,8 @@ def parse_module_arg() -> tuple[str, str | None]:
 
 
 def get_task_schedule_date(task: Task) -> date | None:
+    if getattr(task, "is_todo", False):
+        return None
     return task.task_date or task.next_action_date
 
 
@@ -1104,7 +1116,7 @@ def notify_task_assignees(db: Session, task: Task, label: str) -> None:
 
 
 def load_worker_task_groups(db: Session, user: User, module_filter: str | None, today: date, until: date):
-    query = db.query(Task).filter(Task.status != "done")
+    query = db.query(Task).filter(Task.status != "done", Task.is_todo == False)
     if module_filter:
         query = query.filter(Task.module == module_filter)
     query = filter_my_and_unassigned(db, query, user)
@@ -1174,6 +1186,8 @@ def pick_worker_priority_task(today_tasks, overdue_tasks, upcoming_tasks, assign
 
 
 def is_task_allowed_for_worker(db, task: Task, user: User) -> bool:
+    if getattr(task, "is_todo", False):
+        return False
     if user.role == "admin" or user.username.lower() in ADMIN_EMAILS:
         return True
 
@@ -1785,6 +1799,10 @@ def admin_tasks():
 
         # SMART SORT (command center order)
         def task_sort_key(t):
+            if t.is_todo:
+                created_key = t.created_at or datetime.min
+                created_stamp = created_key.timestamp() if created_key != datetime.min else 0
+                return (-1, -created_stamp, -(t.id or 0))
             d = str(t.task_date) if t.task_date else "9999-99-99"
 
             if t.status == "done":
@@ -1846,40 +1864,45 @@ def admin_tasks():
         # URGENT STRIP
         urgent_tasks = [
             t for t in tasks
-            if t.status != "done" and t.task_date and str(t.task_date) <= today
+            if not t.is_todo and t.status != "done" and t.task_date and str(t.task_date) <= today
         ][:4]
 
         # COUNTS
         counts = {
-            "today": sum(1 for t in tasks if (t.task_date and str(t.task_date) == today and t.status != "done")),
-            "unfinished": sum(1 for t in tasks if (t.task_date and str(t.task_date) < today and t.status != "done")),
-            "upcoming": sum(1 for t in tasks if (t.task_date and str(t.task_date) > today and t.status != "done")),
-            "done": sum(1 for t in tasks if t.status == "done"),
+            "todo": sum(1 for t in tasks if t.is_todo),
+            "today": sum(1 for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) == today and t.status != "done")),
+            "unfinished": sum(1 for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) < today and t.status != "done")),
+            "upcoming": sum(1 for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) > today and t.status != "done")),
+            "done": sum(1 for t in tasks if not t.is_todo and t.status == "done"),
         }
 
         # FILTER LIST
         filtered_tasks = tasks
-        if flt == "today":
-            filtered_tasks = [t for t in tasks if (t.task_date and str(t.task_date) == today)]
+        if flt == "todo":
+            filtered_tasks = [t for t in tasks if t.is_todo]
+        elif flt == "today":
+            filtered_tasks = [t for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) == today)]
         elif flt == "unfinished":
-            filtered_tasks = [t for t in tasks if (t.task_date and str(t.task_date) < today and t.status != "done")]
+            filtered_tasks = [t for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) < today and t.status != "done")]
         elif flt == "open":
-            filtered_tasks = [t for t in tasks if t.status == "open"]
+            filtered_tasks = [t for t in tasks if t.status == "open" and not t.is_todo]
         elif flt == "done":
-            filtered_tasks = [t for t in tasks if t.status == "done"]
+            filtered_tasks = [t for t in tasks if t.status == "done" and not t.is_todo]
         elif flt == "upcoming":
-            filtered_tasks = [t for t in tasks if (t.task_date and str(t.task_date) > today and t.status != "done")]
+            filtered_tasks = [t for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) > today and t.status != "done")]
 
         # GROUPING
-        groups = {"unfinished": [], "today": [], "upcoming": [], "done": []}
+        groups = {"todo": [], "unfinished": [], "today": [], "upcoming": [], "done": []}
 
         for t in filtered_tasks:
+            if t.is_todo:
+                groups["todo"].append(t)
+                continue
             if t.status == "done":
                 groups["done"].append(t)
                 continue
 
             if not t.task_date:
-                groups["upcoming"].append(t)
                 continue
 
             d = str(t.task_date)
@@ -2287,9 +2310,12 @@ def admin_task_new():
             assigned_ids = [int(x) for x in assigned_ids if x and x.strip().isdigit()]
 
             task_date_raw = (request.form.get("task_date") or "").strip()
-            if task_date_raw:
+            is_todo = (request.form.get("is_todo") or "").strip() == "1"
+            if task_date_raw and not is_todo:
                 y, m, d = task_date_raw.split("-")
                 task_date_val = date(int(y), int(m), int(d))
+            elif is_todo:
+                task_date_val = None
             else:
                 task_date_val = date.today()
 
@@ -2328,6 +2354,7 @@ def admin_task_new():
                 notes=notes or None,
                 task_date=task_date_val,
                 next_action_date=task_date_val,
+                is_todo=is_todo,
                 status="open",
             )
             db.add(t)
@@ -2368,13 +2395,14 @@ def admin_task_new():
                        
             print("ADMIN_TASK_NEW: TASK SAVED, BEFORE TELEGRAM")
 
-            telegram_ok = send_telegram_message(
+            if not t.is_todo:
+                telegram_ok = send_telegram_message(
                 f"🆕 New task created\n"
                 f"{title}\n"
                 f"{TASKMANAGER_URL}admin/tasks#{t.id}"
             )
-            print("ADMIN_TASK_NEW: TELEGRAM RESULT =", telegram_ok)
-            flash("Task created.")
+            print("ADMIN_TASK_NEW: TELEGRAM RESULT =", telegram_ok if not t.is_todo else "skipped")
+            flash("Task created." if not t.is_todo else "To Do item created.")
             return redirect_back()
 
         return render_template(
@@ -3538,11 +3566,43 @@ def admin_task_move_to_today(task_id: int):
             return redirect_back()
 
         today = date.today()
+        task.is_todo = False
         task.task_date = today
         task.next_action_date = today
 
         db.commit()
+        notify_task_assignees(db, task, label="moved to today")
         flash("Task moved to today.")
+        return redirect_back()
+    finally:
+        db.close()
+
+
+@app.post("/admin/task/<int:task_id>/schedule")
+@admin_required
+def admin_task_schedule(task_id: int):
+    db = SessionLocal()
+    try:
+        task = db.get(Task, task_id)
+        if not task:
+            flash("Task not found.")
+            return redirect_back()
+
+        schedule_date_raw = (request.form.get("schedule_date") or "").strip()
+        if not schedule_date_raw:
+            flash("Schedule date is required.")
+            return redirect_back()
+
+        y, m, d = schedule_date_raw.split("-")
+        scheduled_for = date(int(y), int(m), int(d))
+
+        task.is_todo = False
+        task.task_date = scheduled_for
+        task.next_action_date = scheduled_for
+
+        db.commit()
+        notify_task_assignees(db, task, label="scheduled")
+        flash("Task scheduled.")
         return redirect_back()
     finally:
         db.close()
