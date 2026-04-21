@@ -1,25 +1,26 @@
 :root {
-  --manager-bg: #f4efe6;
-  --manager-bg-alt: #ece4d6;
-  --manager-surface: rgba(255, 251, 245, 0.86);
-  --manager-surface-strong: rgba(255, 253, 249, 0.96);
-  --manager-border: rgba(84, 72, 54, 0.11);
-  --manager-shadow: 0 24px 54px rgba(69, 57, 39, 0.08);
-  --manager-text: #2f281f;
-  --manager-muted: #776856;
-  --manager-green: #566d5b;
-  --manager-green-soft: rgba(86, 109, 91, 0.12);
-  --manager-yellow: #9b7d4d;
-  --manager-yellow-soft: rgba(155, 125, 77, 0.13);
-  --manager-red: #8a5847;
-  --manager-red-soft: rgba(138, 88, 71, 0.12);
-  --manager-neutral-soft: rgba(88, 76, 59, 0.07);
+  --manager-bg: #f3ede3;
+  --manager-bg-deep: #eadfce;
+  --manager-sidebar: #f7f2ea;
+  --manager-surface: rgba(255, 251, 245, 0.88);
+  --manager-surface-strong: rgba(255, 252, 248, 0.96);
+  --manager-border: rgba(96, 82, 61, 0.09);
+  --manager-shadow: 0 18px 40px rgba(76, 60, 36, 0.07);
+  --manager-shadow-soft: 0 8px 20px rgba(76, 60, 36, 0.04);
+  --manager-text: #2e271f;
+  --manager-muted: #7a6e5d;
+  --manager-accent: #526455;
+  --manager-accent-soft: rgba(82, 100, 85, 0.12);
+  --manager-warm: #9c7d59;
+  --manager-warm-soft: rgba(156, 125, 89, 0.13);
+  --manager-overdue: #9a6b58;
+  --manager-overdue-soft: rgba(154, 107, 88, 0.12);
 }
 
 body.is-manager {
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), transparent 34%),
-    linear-gradient(180deg, var(--manager-bg-alt), var(--manager-bg));
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 30%),
+    linear-gradient(180deg, var(--manager-bg-deep), var(--manager-bg));
   color: var(--manager-text);
 }
 
@@ -28,321 +29,454 @@ body.is-manager .app-shell {
 }
 
 body.is-manager .main-content {
-  padding: 38px 28px 52px;
+  padding: 28px;
+}
+
+.manager-frame {
+  max-width: 1460px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
+}
+
+.manager-sidebar {
+  background: linear-gradient(180deg, rgba(248, 244, 237, 0.96), rgba(245, 239, 231, 0.92));
+  border: 1px solid var(--manager-border);
+  border-radius: 30px;
+  padding: 28px 22px;
+  box-shadow: var(--manager-shadow-soft);
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.manager-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 4px 12px;
+}
+
+.manager-brand-mark {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  border: 1px solid rgba(96, 82, 61, 0.1);
+  background: rgba(255, 252, 248, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 28px;
+  color: var(--manager-warm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.manager-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.manager-brand-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.manager-brand-sub {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--manager-muted);
+}
+
+.manager-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.manager-nav-item {
+  display: block;
+  padding: 13px 14px;
+  border-radius: 16px;
+  color: var(--manager-text);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.manager-nav-item:hover {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateX(1px);
+}
+
+.manager-nav-item.is-active {
+  background: rgba(235, 226, 212, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(96, 82, 61, 0.06);
 }
 
 .manager-shell {
-  max-width: 1400px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
 }
 
 .manager-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 24px;
+  gap: 20px;
+  padding: 6px 4px 2px;
+}
+
+.manager-header-copy {
+  max-width: 620px;
 }
 
 .manager-eyebrow {
   margin: 0 0 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
   font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   color: var(--manager-muted);
 }
 
 .manager-title,
-.executive-hero h2,
 .manager-panel-head h2,
+.manager-task-primary h3,
 .manager-kpi-value {
   font-family: Georgia, "Times New Roman", serif;
 }
 
 .manager-title {
   margin: 0;
-  font-size: clamp(2.2rem, 3.1vw, 3.8rem);
+  font-size: clamp(2.3rem, 3.3vw, 3.8rem);
   line-height: 1;
   font-weight: 500;
 }
 
-.manager-timestamp {
-  min-width: 220px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  border: 1px solid var(--manager-border);
-  background: rgba(255, 251, 245, 0.58);
-  box-shadow: 0 10px 24px rgba(69, 57, 39, 0.05);
-  text-align: right;
-}
-
-.manager-timestamp-label {
-  display: block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+.manager-subtitle {
+  margin: 10px 0 0;
   color: var(--manager-muted);
-}
-
-.manager-timestamp-value {
-  display: block;
-  margin-top: 8px;
   font-size: 16px;
+  line-height: 1.5;
 }
 
-.executive-hero,
-.manager-kpi,
-.manager-panel {
-  border: 1px solid var(--manager-border);
-  background: var(--manager-surface);
-  backdrop-filter: blur(16px);
-  box-shadow: var(--manager-shadow);
-}
-
-.executive-hero {
-  border-radius: 30px;
-  padding: 32px 34px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-}
-
-.executive-hero-label {
-  display: block;
-  margin-bottom: 14px;
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.manager-timestamp {
   color: var(--manager-muted);
+  font-size: 14px;
+  padding-top: 10px;
+  white-space: nowrap;
 }
 
-.executive-hero h2 {
-  margin: 0;
-  font-size: clamp(2.3rem, 3.4vw, 4.2rem);
-  font-weight: 500;
-  line-height: 0.98;
-}
-
-.executive-hero-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 999px;
-  padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.executive-status-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.42);
-}
-
-.executive-status-text {
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.executive-hero-green {
-  color: var(--manager-green);
-  background: linear-gradient(180deg, rgba(246, 250, 246, 0.95), rgba(239, 245, 239, 0.84));
-}
-
-.executive-hero-yellow {
-  color: var(--manager-yellow);
-  background: linear-gradient(180deg, rgba(251, 248, 241, 0.95), rgba(246, 238, 222, 0.84));
-}
-
-.executive-hero-red {
-  color: var(--manager-red);
-  background: linear-gradient(180deg, rgba(251, 245, 242, 0.95), rgba(245, 233, 228, 0.86));
-}
-
-.executive-kpis {
+.manager-kpis {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 16px;
 }
 
-.manager-kpi {
-  border-radius: 24px;
-  padding: 24px 22px 22px;
-  min-height: 168px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+.manager-kpi,
+.manager-panel {
+  background: var(--manager-surface);
+  border: 1px solid var(--manager-border);
+  box-shadow: var(--manager-shadow);
+  backdrop-filter: blur(14px);
 }
 
-.manager-kpi-label {
-  color: var(--manager-muted);
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+.manager-kpi {
+  min-height: 126px;
+  border-radius: 24px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
 }
 
 .manager-kpi-value {
-  font-size: clamp(2.7rem, 3.4vw, 4rem);
-  line-height: 0.95;
+  font-size: clamp(2.3rem, 3vw, 3.5rem);
+  line-height: 1;
   font-weight: 500;
 }
 
-.executive-kpi.is-alert .manager-kpi-value {
-  color: var(--manager-red);
+.manager-kpi-label {
+  font-size: 14px;
+  color: var(--manager-muted);
 }
 
-.executive-kpi.is-warning .manager-kpi-value {
-  color: var(--manager-yellow);
+.manager-kpi-overdue .manager-kpi-value {
+  color: var(--manager-overdue);
 }
 
-.executive-grid {
+.manager-kpi-blocked .manager-kpi-value {
+  color: var(--manager-warm);
+}
+
+.manager-kpi-urgent .manager-kpi-value {
+  color: var(--manager-accent);
+}
+
+.manager-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.05fr);
+  gap: 18px;
 }
 
 .manager-panel {
   border-radius: 28px;
-  padding: 26px;
+  padding: 24px;
+}
+
+.manager-panel-wide {
+  min-height: 290px;
 }
 
 .manager-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 18px;
 }
 
 .manager-panel-head h2 {
   margin: 0;
-  font-size: 30px;
+  font-size: 31px;
+  line-height: 1.05;
   font-weight: 500;
 }
 
-.executive-alert-list,
-.executive-team-list {
+.manager-panel-head span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--manager-muted);
+}
+
+.manager-task-list,
+.manager-summary-list,
+.manager-location-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-.executive-alert,
-.executive-team-row {
+.manager-task-row,
+.manager-location-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(84, 72, 54, 0.08);
+  border: 1px solid rgba(96, 82, 61, 0.07);
   background: var(--manager-surface-strong);
-  padding: 16px 18px;
 }
 
-.executive-alert {
-  font-size: 16px;
+.manager-task-row.is-overdue {
+  background: linear-gradient(180deg, rgba(255, 252, 249, 0.98), rgba(248, 240, 235, 0.96));
+}
+
+.manager-task-primary {
+  min-width: 0;
+}
+
+.manager-task-primary h3 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.15;
   font-weight: 500;
 }
 
-.executive-alert-danger {
-  background: linear-gradient(180deg, rgba(252, 246, 243, 0.98), rgba(247, 237, 232, 0.98));
-  color: var(--manager-red);
+.manager-task-subline {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  color: var(--manager-muted);
+  font-size: 13px;
 }
 
-.executive-alert-warning {
-  background: linear-gradient(180deg, rgba(252, 249, 242, 0.98), rgba(247, 240, 228, 0.98));
-  color: var(--manager-yellow);
+.manager-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  text-align: right;
 }
 
-.executive-alert-neutral {
-  background: rgba(255, 253, 249, 0.96);
+.manager-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  background: rgba(46, 39, 31, 0.05);
   color: var(--manager-text);
 }
 
-.executive-alert-ok {
-  background: linear-gradient(180deg, rgba(246, 250, 246, 0.98), rgba(239, 245, 239, 0.98));
-  color: var(--manager-green);
+.manager-badge.status-open {
+  background: rgba(122, 110, 93, 0.08);
 }
 
-.executive-team-row {
+.manager-badge.status-in_progress,
+.manager-badge.priority-high {
+  background: var(--manager-accent-soft);
+  color: var(--manager-accent);
+}
+
+.manager-badge.status-blocked {
+  background: var(--manager-warm-soft);
+  color: var(--manager-warm);
+}
+
+.manager-badge.priority-urgent {
+  background: var(--manager-overdue-soft);
+  color: var(--manager-overdue);
+}
+
+.manager-badge.priority-normal {
+  background: rgba(122, 110, 93, 0.1);
+  color: #6f6251;
+}
+
+.manager-badge.priority-low,
+.manager-badge.status-done {
+  background: rgba(95, 114, 97, 0.1);
+  color: #5a715d;
+}
+
+.manager-task-date {
+  font-size: 13px;
+  color: var(--manager-muted);
+  min-width: 50px;
+}
+
+.manager-task-date-overdue {
+  color: var(--manager-overdue);
+  font-weight: 600;
+}
+
+.manager-summary-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 9px;
 }
 
-.executive-team-name {
+.manager-summary-copy {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--manager-muted);
+}
+
+.manager-summary-copy strong,
+.manager-location-metrics strong {
+  color: var(--manager-text);
+  font-weight: 600;
+}
+
+.manager-summary-bar {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(96, 82, 61, 0.08);
+  overflow: hidden;
+}
+
+.manager-summary-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(156, 125, 89, 0.88), rgba(82, 100, 85, 0.72));
+}
+
+.manager-location-name {
   font-size: 16px;
 }
 
-.executive-team-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 92px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.executive-team-badge.active {
-  background: var(--manager-green-soft);
-  color: var(--manager-green);
-}
-
-.executive-team-badge.idle {
-  background: var(--manager-neutral-soft);
+.manager-location-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 14px;
+  font-size: 13px;
   color: var(--manager-muted);
 }
 
 .manager-empty {
   margin: 0;
+  padding: 6px 2px 2px;
   color: var(--manager-muted);
   font-size: 14px;
 }
 
-@media (max-width: 1180px) {
-  .executive-kpis {
+@media (max-width: 1260px) {
+  .manager-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-sidebar {
+    min-height: auto;
+  }
+
+  .manager-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .manager-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .executive-grid {
+  .manager-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
   body.is-manager .main-content {
-    padding: 22px 14px 30px;
+    padding: 16px;
   }
 
   .manager-header,
-  .executive-hero,
-  .executive-team-row {
+  .manager-task-row,
+  .manager-location-row {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .manager-timestamp {
-    min-width: 0;
-    text-align: left;
-  }
-
-  .executive-kpis {
+  .manager-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .manager-kpi,
+  .manager-sidebar,
   .manager-panel,
-  .executive-hero {
+  .manager-kpi {
     border-radius: 22px;
-    padding: 20px 18px;
   }
 
-  .executive-hero h2 {
-    font-size: 2.4rem;
+  .manager-title {
+    font-size: 2.5rem;
   }
 
   .manager-panel-head h2 {
-    font-size: 24px;
+    font-size: 26px;
+  }
+
+  .manager-task-meta,
+  .manager-location-metrics {
+    justify-content: flex-start;
+    text-align: left;
   }
 }
