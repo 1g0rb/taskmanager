@@ -1,13 +1,18 @@
-{% extends "layout.html" %}
+{% extends "manager/layout.html" %}
 
 {% block content %}
 {% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
 {% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
 
-<section class="manager-frame">
+<section class="manager-frame manager-dashboard-shell">
   <aside class="manager-sidebar">
     <div class="manager-brand">
-      <div class="manager-brand-mark">M</div>
+      <div class="manager-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" class="manager-brand-icon">
+          <circle cx="20" cy="20" r="6"></circle>
+          <path d="M20 3v7M20 30v7M3 20h7M30 20h7M8.2 8.2l4.9 4.9M26.9 26.9l4.9 4.9M31.8 8.2l-4.9 4.9M13.1 26.9l-4.9 4.9"></path>
+        </svg>
+      </div>
       <div class="manager-brand-copy">
         <span class="manager-brand-name">Meneghetti</span>
         <span class="manager-brand-sub">Estate Operations</span>
@@ -15,12 +20,46 @@
     </div>
 
     <nav class="manager-nav" aria-label="Manager navigation">
-      <a class="manager-nav-item is-active" href="{{ url_for('manager_dashboard') }}">Manager Dashboard</a>
-      <a class="manager-nav-item" href="#today-tasks">Tasks Overview</a>
-      <a class="manager-nav-item" href="#upcoming-tasks">Calendar</a>
-      <a class="manager-nav-item" href="#location-summary">Locations</a>
-      <a class="manager-nav-item" href="#status-summary">Reports</a>
+      <a class="manager-nav-item is-active" href="{{ url_for('manager_dashboard') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"></path><path d="M7.5 10.5V19h9v-8.5"></path></svg>
+        </span>
+        <span>Manager Dashboard</span>
+      </a>
+      <a class="manager-nav-item" href="#today-tasks">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="15" rx="2"></rect><path d="M8 9.5h8M8 13h6"></path></svg>
+        </span>
+        <span>Tasks Overview</span>
+      </a>
+      <a class="manager-nav-item" href="#upcoming-tasks">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><rect x="4.5" y="6" width="15" height="13" rx="2"></rect><path d="M8 4.5V8M16 4.5V8M4.5 10.5h15"></path></svg>
+        </span>
+        <span>Calendar</span>
+      </a>
+      <a class="manager-nav-item" href="#location-summary">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 21s-5-5.2-5-10a5 5 0 1 1 10 0c0 4.8-5 10-5 10Z"></path><circle cx="12" cy="11" r="1.8"></circle></svg>
+        </span>
+        <span>Locations</span>
+      </a>
+      <a class="manager-nav-item" href="#status-summary">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M6 17.5h12"></path><path d="M8 17.5v-6"></path><path d="M12 17.5v-9"></path><path d="M16 17.5v-4"></path></svg>
+        </span>
+        <span>Reports</span>
+      </a>
     </nav>
+
+    <div class="manager-sidebar-footer">
+      <a class="manager-signout" href="{{ url_for('logout') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+        </span>
+        <span>Sign out</span>
+      </a>
+    </div>
   </aside>
 
   <div class="manager-shell">
@@ -28,7 +67,7 @@
       <div class="manager-header-copy">
         <p class="manager-eyebrow">Meneghetti Collection</p>
         <h1 class="manager-title">Manager Dashboard</h1>
-        <p class="manager-subtitle">Overview of tasks and operational flow across the estate.</p>
+        <p class="manager-subtitle">Overview of tasks and operations</p>
       </div>
       <div class="manager-timestamp">
         <span class="manager-timestamp-value">{{ last_updated_label }}</span>
@@ -51,7 +90,7 @@
           <span>{{ today_tasks|length }}</span>
         </div>
         <div class="manager-task-list">
-          {% for task in today_tasks %}
+          {% for task in today_tasks[:5] %}
           <article class="manager-task-row">
             <div class="manager-task-primary">
               <h3>{{ task.title }}</h3>
@@ -78,7 +117,7 @@
           <span>{{ overdue_tasks|length }}</span>
         </div>
         <div class="manager-task-list">
-          {% for task in overdue_tasks %}
+          {% for task in overdue_tasks[:5] %}
           <article class="manager-task-row is-overdue">
             <div class="manager-task-primary">
               <h3>{{ task.title }}</h3>
@@ -143,7 +182,7 @@
           <span>Next 7 Days</span>
         </div>
         <div class="manager-task-list">
-          {% for task in upcoming_tasks %}
+          {% for task in upcoming_tasks[:5] %}
           <article class="manager-task-row">
             <div class="manager-task-primary">
               <h3>{{ task.title }}</h3>
@@ -165,16 +204,27 @@
 
       <article id="location-summary" class="manager-panel">
         <div class="manager-panel-head">
-          <h2>Location Summary</h2>
+          <h2>Tasks by Location</h2>
         </div>
         <div class="manager-location-list">
+          <div class="manager-location-head">
+            <span></span>
+            <span>Open</span>
+            <span>Overdue</span>
+            <span>Blocked</span>
+          </div>
           {% for item in location_summary %}
           <div class="manager-location-row">
-            <div class="manager-location-name">{{ item.location_name }}</div>
+            <div class="manager-location-name">
+              <span class="manager-location-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 4 20 8.5v7L12 20l-8-4.5v-7L12 4Z"></path><path d="M12 4v16"></path><path d="M4 8.5 12 13l8-4.5"></path></svg>
+              </span>
+              <span>{{ item.location_name }}</span>
+            </div>
             <div class="manager-location-metrics">
-              <span><strong>{{ item.open_count }}</strong> Open</span>
-              <span><strong>{{ item.overdue_count }}</strong> Overdue</span>
-              <span><strong>{{ item.blocked_count }}</strong> Blocked</span>
+              <span><strong>{{ item.open_count }}</strong></span>
+              <span><strong>{{ item.overdue_count }}</strong></span>
+              <span><strong>{{ item.blocked_count }}</strong></span>
             </div>
           </div>
           {% else %}

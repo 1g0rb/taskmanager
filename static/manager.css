@@ -15,29 +15,54 @@
   --manager-warm-soft: rgba(156, 125, 89, 0.13);
   --manager-overdue: #9a6b58;
   --manager-overdue-soft: rgba(154, 107, 88, 0.12);
+  --manager-page-width: 1460px;
 }
 
-body.is-manager {
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body.manager-page {
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 30%),
     linear-gradient(180deg, var(--manager-bg-deep), var(--manager-bg));
   color: var(--manager-text);
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
-body.is-manager .app-shell {
-  display: block;
-}
-
-body.is-manager .main-content {
+.manager-page-shell {
+  min-height: 100vh;
   padding: 28px;
 }
 
+.manager-flash-stack {
+  max-width: var(--manager-page-width);
+  margin: 0 auto 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manager-flash {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--manager-border);
+  background: rgba(255, 251, 245, 0.92);
+  box-shadow: var(--manager-shadow-soft);
+}
+
 .manager-frame {
-  max-width: 1460px;
+  max-width: var(--manager-page-width);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: 255px minmax(0, 1fr);
+  gap: 26px;
+  min-height: calc(100vh - 56px);
 }
 
 .manager-sidebar {
@@ -46,7 +71,7 @@ body.is-manager .main-content {
   border-radius: 30px;
   padding: 28px 22px;
   box-shadow: var(--manager-shadow-soft);
-  min-height: calc(100vh - 56px);
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -60,18 +85,26 @@ body.is-manager .main-content {
 }
 
 .manager-brand-mark {
-  width: 54px;
-  height: 54px;
-  border-radius: 18px;
-  border: 1px solid rgba(96, 82, 61, 0.1);
-  background: rgba(255, 252, 248, 0.95);
+  width: 58px;
+  height: 58px;
+  border-radius: 20px;
+  border: 1px solid rgba(96, 82, 61, 0.08);
+  background: rgba(255, 252, 248, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 28px;
   color: var(--manager-warm);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.manager-brand-icon {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .manager-brand-copy {
@@ -100,13 +133,32 @@ body.is-manager .main-content {
 }
 
 .manager-nav-item {
-  display: block;
-  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 15px;
   border-radius: 16px;
   color: var(--manager-text);
   text-decoration: none;
   font-size: 14px;
   transition: background-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.manager-nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: #7b6542;
+}
+
+.manager-nav-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .manager-nav-item:hover {
@@ -119,10 +171,26 @@ body.is-manager .main-content {
   box-shadow: inset 0 0 0 1px rgba(96, 82, 61, 0.06);
 }
 
+.manager-sidebar-footer {
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.manager-signout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--manager-text);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 10px 12px;
+}
+
 .manager-shell {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  padding: 6px 2px;
 }
 
 .manager-header {
@@ -222,7 +290,7 @@ body.is-manager .main-content {
 
 .manager-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.05fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.95fr) minmax(0, 0.82fr);
   gap: 18px;
 }
 
@@ -235,6 +303,10 @@ body.is-manager .main-content {
   min-height: 290px;
 }
 
+.manager-grid > .manager-panel:nth-child(5) {
+  grid-column: 1 / span 2;
+}
+
 .manager-panel-head {
   display: flex;
   align-items: center;
@@ -245,7 +317,7 @@ body.is-manager .main-content {
 
 .manager-panel-head h2 {
   margin: 0;
-  font-size: 31px;
+  font-size: 29px;
   line-height: 1.05;
   font-weight: 500;
 }
@@ -287,7 +359,7 @@ body.is-manager .main-content {
 
 .manager-task-primary h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.15;
   font-weight: 500;
 }
@@ -388,7 +460,7 @@ body.is-manager .main-content {
 
 .manager-summary-bar {
   width: 100%;
-  height: 7px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(96, 82, 61, 0.08);
   overflow: hidden;
@@ -401,15 +473,47 @@ body.is-manager .main-content {
   background: linear-gradient(90deg, rgba(156, 125, 89, 0.88), rgba(82, 100, 85, 0.72));
 }
 
+.manager-location-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px 64px 60px;
+  gap: 12px;
+  padding: 0 8px 4px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--manager-muted);
+}
+
 .manager-location-name {
-  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.manager-location-icon {
+  width: 18px;
+  height: 18px;
+  color: #8d7450;
+}
+
+.manager-location-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .manager-location-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px 14px;
+  display: grid;
+  grid-template-columns: 54px 64px 60px;
+  align-items: center;
+  justify-content: end;
+  text-align: right;
+  gap: 0;
   font-size: 13px;
   color: var(--manager-muted);
 }
@@ -442,10 +546,14 @@ body.is-manager .main-content {
   .manager-grid {
     grid-template-columns: 1fr;
   }
+
+  .manager-grid > .manager-panel:nth-child(5) {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 760px) {
-  body.is-manager .main-content {
+  .manager-page-shell {
     padding: 16px;
   }
 
@@ -478,5 +586,11 @@ body.is-manager .main-content {
   .manager-location-metrics {
     justify-content: flex-start;
     text-align: left;
+  }
+
+  .manager-location-head,
+  .manager-location-metrics {
+    grid-template-columns: repeat(3, minmax(0, auto));
+    gap: 12px;
   }
 }

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title or "Manager Dashboard" }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='manager.css') }}?v=1002">
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="manager-page {{ body_class or '' }}">
+  <div class="manager-page-shell">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+      <section class="manager-flash-stack" aria-live="polite" aria-label="Status messages">
+        {% for message in messages %}
+        <div class="manager-flash" role="alert">{{ message }}</div>
+        {% endfor %}
+      </section>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
