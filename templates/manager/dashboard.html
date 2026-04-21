@@ -1,15 +1,55 @@
 {% extends "layout.html" %}
 
 {% block content %}
-{% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
-{% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
+{% set ns = namespace(today=0, overdue=0, in_progress=0, blocked=0, done_today=0, urgent=0, team_members=[], active_members=[]) %}
+{% for kpi in kpis %}
+  {% if kpi.key == 'today' %}{% set ns.today = kpi.value %}{% endif %}
+  {% if kpi.key == 'overdue' %}{% set ns.overdue = kpi.value %}{% endif %}
+  {% if kpi.key == 'in_progress' %}{% set ns.in_progress = kpi.value %}{% endif %}
+  {% if kpi.key == 'blocked' %}{% set ns.blocked = kpi.value %}{% endif %}
+  {% if kpi.key == 'done_today' %}{% set ns.done_today = kpi.value %}{% endif %}
+  {% if kpi.key == 'urgent' %}{% set ns.urgent = kpi.value %}{% endif %}
+{% endfor %}
 
-<section class="manager-shell">
-  <header class="manager-header">
+{% for collection in [today_tasks, overdue_tasks, upcoming_tasks, recent_completions_today] %}
+  {% for task in collection %}
+    {% for name in task.assigned_user_display_names %}
+      {% if name and name not in ns.team_members %}
+        {% set ns.team_members = ns.team_members + [name] %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+{% endfor %}
+
+{% for collection in [today_tasks, overdue_tasks, recent_completions_today] %}
+  {% for task in collection %}
+    {% if task.status == 'in_progress' or task.completed_at %}
+      {% for name in task.assigned_user_display_names %}
+        {% if name and name not in ns.active_members %}
+          {% set ns.active_members = ns.active_members + [name] %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% set total_pressure = ns.overdue + ns.blocked %}
+{% if ns.overdue >= 5 or ns.blocked >= 3 or ns.urgent >= 4 %}
+  {% set operational_state = 'red' %}
+  {% set operational_label = 'Attention Required' %}
+{% elif total_pressure > 0 %}
+  {% set operational_state = 'yellow' %}
+  {% set operational_label = 'Watch Closely' %}
+{% else %}
+  {% set operational_state = 'green' %}
+  {% set operational_label = 'Running Normally' %}
+{% endif %}
+
+<section class="manager-shell executive-dashboard">
+  <header class="manager-header executive-header">
     <div>
       <p class="manager-eyebrow">Ordo Apps</p>
-      <h1 class="manager-title">Manager Dashboard</h1>
-      <p class="manager-subtitle">Read-only overview of tasks, flow, and operational pressure points.</p>
+      <h1 class="manager-title">Executive Dashboard</h1>
     </div>
     <div class="manager-timestamp">
       <span class="manager-timestamp-label">Last updated</span>
@@ -17,214 +57,90 @@
     </div>
   </header>
 
-  <section class="manager-kpis" aria-label="Key performance indicators">
-    {% for kpi in kpis %}
-    <article class="manager-kpi manager-kpi-{{ kpi.key }}">
-      <div class="manager-kpi-value">{{ kpi.value }}</div>
-      <div class="manager-kpi-label">{{ kpi.label }}</div>
-    </article>
-    {% endfor %}
-  </section>
-
-  <section class="manager-grid">
-    <div class="manager-main-column">
-      <article class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Today Tasks</h2>
-          <span>{{ today_tasks|length }}</span>
-        </div>
-        <div class="manager-task-list">
-          {% for task in today_tasks %}
-          <article class="manager-task-row">
-            <div class="manager-task-copy">
-              <div class="manager-task-title-row">
-                <h3>{{ task.title }}</h3>
-                <div class="manager-task-badges">
-                  <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
-                  <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-                </div>
-              </div>
-              <div class="manager-task-meta">
-                <span>{{ task.location_name }}</span>
-                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
-                <span>
-                  {% if task.scheduled_date %}
-                    Due {{ task.scheduled_date.strftime('%d %b') }}
-                  {% else %}
-                    Unscheduled
-                  {% endif %}
-                </span>
-              </div>
-              {% if task.short_description %}
-              <p class="manager-task-note">{{ task.short_description }}</p>
-              {% endif %}
-            </div>
-          </article>
-          {% else %}
-          <p class="manager-empty">No open tasks scheduled for today.</p>
-          {% endfor %}
-        </div>
-      </article>
-
-      <article class="manager-panel manager-panel-overdue">
-        <div class="manager-panel-head">
-          <h2>Overdue Tasks</h2>
-          <span>{{ overdue_tasks|length }}</span>
-        </div>
-        <div class="manager-task-list">
-          {% for task in overdue_tasks %}
-          <article class="manager-task-row manager-task-row-overdue">
-            <div class="manager-task-copy">
-              <div class="manager-task-title-row">
-                <h3>{{ task.title }}</h3>
-                <div class="manager-task-badges">
-                  <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
-                  <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-                  <span class="manager-badge overdue-accent">{{ task.days_overdue }}d overdue</span>
-                </div>
-              </div>
-              <div class="manager-task-meta">
-                <span>{{ task.location_name }}</span>
-                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
-                <span>
-                  {% if task.scheduled_date %}
-                    Due {{ task.scheduled_date.strftime('%d %b') }}
-                  {% else %}
-                    Unscheduled
-                  {% endif %}
-                </span>
-              </div>
-              {% if task.short_description %}
-              <p class="manager-task-note">{{ task.short_description }}</p>
-              {% endif %}
-            </div>
-          </article>
-          {% else %}
-          <p class="manager-empty">Nothing overdue right now.</p>
-          {% endfor %}
-        </div>
-      </article>
+  <section class="executive-hero executive-hero-{{ operational_state }}">
+    <div class="executive-hero-copy">
+      <span class="executive-hero-label">Operational Status</span>
+      <h2>{{ operational_label }}</h2>
     </div>
-
-    <aside class="manager-side-column">
-      <article class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Status Summary</h2>
-        </div>
-        <div class="manager-summary-list">
-          {% for item in status_summary %}
-          <div class="manager-summary-row">
-            <div class="manager-summary-copy">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
-            </div>
-            <div class="manager-summary-bar">
-              <span style="width: {{ (item.count / (max_status_count or 1) * 100)|round(0, 'ceil') }}%"></span>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </article>
-
-      <article class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Priority Summary</h2>
-        </div>
-        <div class="manager-summary-list">
-          {% for item in priority_summary %}
-          <div class="manager-summary-row">
-            <div class="manager-summary-copy">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
-            </div>
-            <div class="manager-summary-bar">
-              <span style="width: {{ (item.count / (max_priority_count or 1) * 100)|round(0, 'ceil') }}%"></span>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </article>
-
-      <article class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Top Problem Locations</h2>
-        </div>
-        <div class="manager-location-list">
-          {% for item in location_summary %}
-          <div class="manager-location-row">
-            <div>
-              <h3>{{ item.location_name }}</h3>
-              <p>{{ item.open_count }} open tasks</p>
-            </div>
-            <div class="manager-location-stats">
-              <span><strong>{{ item.overdue_count }}</strong> overdue</span>
-              <span><strong>{{ item.blocked_count }}</strong> blocked</span>
-            </div>
-          </div>
-          {% else %}
-          <p class="manager-empty">No location pressure points to show.</p>
-          {% endfor %}
-        </div>
-      </article>
-    </aside>
+    <div class="executive-hero-indicator">
+      <span class="executive-status-dot"></span>
+      <span class="executive-status-text">{{ operational_state|upper }}</span>
+    </div>
   </section>
 
-  <section class="manager-bottom-grid">
-    <article class="manager-panel">
-      <div class="manager-panel-head">
-        <h2>Upcoming Next 7 Days</h2>
-        <span>{{ upcoming_tasks|length }}</span>
+  <section class="manager-kpis executive-kpis" aria-label="Executive metrics">
+    <article class="manager-kpi executive-kpi">
+      <span class="manager-kpi-label">Today Tasks</span>
+      <div class="manager-kpi-value">{{ ns.today }}</div>
+    </article>
+    <article class="manager-kpi executive-kpi {{ 'is-alert' if ns.overdue > 0 else '' }}">
+      <span class="manager-kpi-label">Overdue</span>
+      <div class="manager-kpi-value">{{ ns.overdue }}</div>
+    </article>
+    <article class="manager-kpi executive-kpi">
+      <span class="manager-kpi-label">In Progress</span>
+      <div class="manager-kpi-value">{{ ns.in_progress }}</div>
+    </article>
+    <article class="manager-kpi executive-kpi {{ 'is-warning' if ns.blocked > 0 else '' }}">
+      <span class="manager-kpi-label">Blocked</span>
+      <div class="manager-kpi-value">{{ ns.blocked }}</div>
+    </article>
+    <article class="manager-kpi executive-kpi">
+      <span class="manager-kpi-label">Done Today</span>
+      <div class="manager-kpi-value">{{ ns.done_today }}</div>
+    </article>
+    <article class="manager-kpi executive-kpi">
+      <span class="manager-kpi-label">Urgent</span>
+      <div class="manager-kpi-value">{{ ns.urgent }}</div>
+    </article>
+  </section>
+
+  <section class="executive-grid">
+    <article class="manager-panel executive-panel">
+      <div class="manager-panel-head executive-panel-head">
+        <h2>Critical Alerts</h2>
       </div>
-      <div class="manager-task-list">
-        {% for task in upcoming_tasks %}
-        <article class="manager-task-row">
-          <div class="manager-task-copy">
-            <div class="manager-task-title-row">
-              <h3>{{ task.title }}</h3>
-              <div class="manager-task-badges">
-                <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-              </div>
-            </div>
-            <div class="manager-task-meta">
-              <span>{{ task.location_name }}</span>
-              <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
-              <span>{{ task.scheduled_date.strftime('%d %b') if task.scheduled_date else 'Unscheduled' }}</span>
-            </div>
-          </div>
-        </article>
-        {% else %}
-        <p class="manager-empty">No upcoming tasks in the next seven days.</p>
-        {% endfor %}
+      <div class="executive-alert-list">
+        {% if ns.overdue > 0 %}
+        <div class="executive-alert executive-alert-danger">
+          <span>{{ ns.overdue }} tasks overdue</span>
+        </div>
+        {% endif %}
+        {% if ns.blocked > 0 %}
+        <div class="executive-alert executive-alert-warning">
+          <span>{{ ns.blocked }} tasks blocked</span>
+        </div>
+        {% endif %}
+        {% if ns.done_today == 0 %}
+        <div class="executive-alert executive-alert-neutral">
+          <span>No tasks completed today</span>
+        </div>
+        {% endif %}
+        {% if ns.overdue == 0 and ns.blocked == 0 and ns.done_today > 0 %}
+        <div class="executive-alert executive-alert-ok">
+          <span>No critical operational alerts</span>
+        </div>
+        {% endif %}
       </div>
     </article>
 
-    {% if recent_completions_today %}
-    <article class="manager-panel">
-      <div class="manager-panel-head">
-        <h2>Completed Today</h2>
-        <span>{{ recent_completions_today|length }}</span>
+    <article class="manager-panel executive-panel">
+      <div class="manager-panel-head executive-panel-head">
+        <h2>Team Status</h2>
       </div>
-      <div class="manager-task-list">
-        {% for task in recent_completions_today %}
-        <article class="manager-task-row manager-task-row-complete">
-          <div class="manager-task-copy">
-            <div class="manager-task-title-row">
-              <h3>{{ task.title }}</h3>
-              <div class="manager-task-badges">
-                <span class="manager-badge status-done">Done</span>
-              </div>
-            </div>
-            <div class="manager-task-meta">
-              <span>{{ task.location_name }}</span>
-              <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
-              <span>{{ task.completed_at.strftime('%H:%M') if task.completed_at else '' }}</span>
-            </div>
-          </div>
-        </article>
+      <div class="executive-team-list">
+        {% for member in ns.team_members %}
+        <div class="executive-team-row">
+          <span class="executive-team-name">{{ member }}</span>
+          <span class="executive-team-badge {{ 'active' if member in ns.active_members else 'idle' }}">
+            {{ 'Active' if member in ns.active_members else 'Idle' }}
+          </span>
+        </div>
+        {% else %}
+        <p class="manager-empty">No team activity visible in the current dashboard scope.</p>
         {% endfor %}
       </div>
     </article>
-    {% endif %}
   </section>
 </section>
 {% endblock %}
