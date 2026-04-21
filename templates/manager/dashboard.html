@@ -3,6 +3,24 @@
 {% block content %}
 {% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
 {% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
+{% set kpi_map = namespace(today=0, overdue=0, in_progress=0, blocked=0, done_today=0, urgent=0) %}
+{% if kpis %}
+  {% for kpi in kpis %}
+    {% if kpi.key == 'today' %}
+      {% set kpi_map.today = kpi.value %}
+    {% elif kpi.key == 'overdue' %}
+      {% set kpi_map.overdue = kpi.value %}
+    {% elif kpi.key == 'in_progress' %}
+      {% set kpi_map.in_progress = kpi.value %}
+    {% elif kpi.key == 'blocked' %}
+      {% set kpi_map.blocked = kpi.value %}
+    {% elif kpi.key == 'done_today' %}
+      {% set kpi_map.done_today = kpi.value %}
+    {% elif kpi.key == 'urgent' %}
+      {% set kpi_map.urgent = kpi.value %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
 
 <section class="manager-frame manager-layout manager-dashboard">
   <aside class="manager-sidebar">
@@ -53,7 +71,7 @@
     </nav>
 
     <div class="manager-sidebar-footer">
-      <a class="manager-signout" href="{{ url_for('logout') }}">
+      <a class="manager-signout" href="{{ logout_url if logout_url else url_for('logout') }}">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
         </span>
@@ -70,17 +88,45 @@
         <p class="manager-subtitle">Overview of tasks and operations</p>
       </div>
       <div class="manager-timestamp">
-        <span class="manager-timestamp-value">{{ last_updated_label }}</span>
+        <span class="manager-timestamp-value">
+          {% if last_updated_label %}
+            {{ last_updated_label }}
+          {% elif generated_at %}
+            {{ generated_at.strftime('%d %b %Y · %H:%M') if generated_at.strftime else generated_at }}
+          {% elif last_updated %}
+            {{ last_updated }}
+          {% else %}
+            Last updated just now
+          {% endif %}
+        </span>
       </div>
     </header>
 
     <section class="manager-kpis manager-kpi-grid" aria-label="Key performance indicators">
-      {% for kpi in kpis %}
-      <article class="manager-kpi manager-kpi-card kpi-card manager-kpi-{{ kpi.key }}{% if kpi.key == 'overdue' %} is-overdue{% endif %}{% if kpi.key == 'urgent' %} is-urgent{% endif %}">
-        <div class="manager-kpi-value kpi-value">{{ kpi.value }}</div>
-        <div class="manager-kpi-label kpi-label">{{ kpi.label }}</div>
+      <article class="manager-kpi manager-kpi-card kpi-card">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.today }}</div>
+        <div class="manager-kpi-label kpi-label">Today Tasks</div>
       </article>
-      {% endfor %}
+      <article class="manager-kpi manager-kpi-card kpi-card is-overdue">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.overdue }}</div>
+        <div class="manager-kpi-label kpi-label">Overdue</div>
+      </article>
+      <article class="manager-kpi manager-kpi-card kpi-card">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.in_progress }}</div>
+        <div class="manager-kpi-label kpi-label">In Progress</div>
+      </article>
+      <article class="manager-kpi manager-kpi-card kpi-card">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.blocked }}</div>
+        <div class="manager-kpi-label kpi-label">Blocked</div>
+      </article>
+      <article class="manager-kpi manager-kpi-card kpi-card">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.done_today }}</div>
+        <div class="manager-kpi-label kpi-label">Done Today</div>
+      </article>
+      <article class="manager-kpi manager-kpi-card kpi-card is-urgent">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.urgent }}</div>
+        <div class="manager-kpi-label kpi-label">Urgent</div>
+      </article>
     </section>
 
     <section class="manager-grid">
@@ -95,8 +141,8 @@
             <div class="manager-task-main">
               <div class="manager-task-title">{{ task.title }}</div>
               <div class="manager-task-subline manager-task-meta">
-                <span>{{ task.location_name }}</span>
-                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
+                <span>{{ task.location_name or task.location or 'No location' }}</span>
+                <span>{{ (task.assigned_user_display_names or task.assigned_names or [])|join(', ') if (task.assigned_user_display_names or task.assigned_names) else 'Unassigned' }}</span>
               </div>
             </div>
             <div class="manager-task-aside">
@@ -104,7 +150,10 @@
                 <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
                 <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
               </div>
-              <span class="manager-task-date">{{ task.scheduled_date.strftime('%d %b') if task.scheduled_date else 'No date' }}</span>
+              <span class="manager-task-date">
+                {% set task_due = task.scheduled_date or task.due_date %}
+                {{ task_due.strftime('%d %b') if task_due and task_due.strftime else (task_due if task_due else 'No date') }}
+              </span>
             </div>
           </article>
           {% else %}
@@ -124,8 +173,8 @@
             <div class="manager-task-main">
               <div class="manager-task-title">{{ task.title }}</div>
               <div class="manager-task-subline manager-task-meta">
-                <span>{{ task.location_name }}</span>
-                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
+                <span>{{ task.location_name or task.location or 'No location' }}</span>
+                <span>{{ (task.assigned_user_display_names or task.assigned_names or [])|join(', ') if (task.assigned_user_display_names or task.assigned_names) else 'Unassigned' }}</span>
               </div>
             </div>
             <div class="manager-task-aside">
@@ -149,9 +198,10 @@
         <div class="manager-summary-list">
           {% for item in status_summary %}
           <div class="manager-summary-row">
-            <div class="manager-summary-label">{{ item.label }}</div>
+            <div class="manager-summary-label">{{ item.label or item.status or 'Status' }}</div>
             <div class="manager-summary-track">
-              <div class="manager-summary-fill{% if item.label|lower in ['blocked', 'overdue'] %} is-warm{% elif item.label|lower in ['completed', 'done'] %} is-muted{% endif %}" style="width: {{ (item.count / (max_status_count or 1) * 100)|round(0, 'ceil') }}%"></div>
+              {% set status_label = (item.label or item.status or '')|lower %}
+              <div class="manager-summary-fill{% if status_label in ['blocked', 'overdue'] %} is-warm{% elif status_label in ['completed', 'done', 'done today'] %} is-muted{% endif %}" style="width: {{ (item.count / (max_status_count or 1) * 100)|round(0, 'ceil') }}%"></div>
             </div>
             <div class="manager-summary-value">{{ item.count }}</div>
           </div>
@@ -166,9 +216,10 @@
         <div class="manager-summary-list">
           {% for item in priority_summary %}
           <div class="manager-summary-row">
-            <div class="manager-summary-label">{{ item.label }}</div>
+            <div class="manager-summary-label">{{ item.label or item.priority or 'Priority' }}</div>
             <div class="manager-summary-track">
-              <div class="manager-summary-fill{% if item.label|lower in ['urgent', 'high'] %} is-warm{% elif item.label|lower == 'low' %} is-muted{% endif %}" style="width: {{ (item.count / (max_priority_count or 1) * 100)|round(0, 'ceil') }}%"></div>
+              {% set priority_label = (item.label or item.priority or '')|lower %}
+              <div class="manager-summary-fill{% if priority_label in ['urgent', 'high'] %} is-warm{% elif priority_label == 'low' %} is-muted{% endif %}" style="width: {{ (item.count / (max_priority_count or 1) * 100)|round(0, 'ceil') }}%"></div>
             </div>
             <div class="manager-summary-value">{{ item.count }}</div>
           </div>
@@ -187,11 +238,12 @@
             <div>
               <div class="manager-upcoming-title">{{ task.title }}</div>
               <div class="manager-task-subline manager-task-meta">
-                <span>{{ task.location_name }}</span>
-                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
+                <span>{{ task.location_name or task.location or 'No location' }}</span>
+                <span>{{ (task.assigned_user_display_names or task.assigned_names or [])|join(', ') if (task.assigned_user_display_names or task.assigned_names) else 'Unassigned' }}</span>
               </div>
             </div>
-            <span class="manager-upcoming-date">{{ task.scheduled_date.strftime('%d %b') if task.scheduled_date else 'No date' }}</span>
+            {% set upcoming_due = task.scheduled_date or task.due_date %}
+            <span class="manager-upcoming-date">{{ upcoming_due.strftime('%d %b') if upcoming_due and upcoming_due.strftime else (upcoming_due if upcoming_due else 'No date') }}</span>
             <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
           </article>
           {% else %}
@@ -217,11 +269,11 @@
               <span class="manager-location-icon">
                 <svg viewBox="0 0 24 24"><path d="M12 4 20 8.5v7L12 20l-8-4.5v-7L12 4Z"></path><path d="M12 4v16"></path><path d="M4 8.5 12 13l8-4.5"></path></svg>
               </span>
-              <span>{{ item.location_name }}</span>
+              <span>{{ item.location_name or item.name or item.location or 'Unknown' }}</span>
             </div>
-            <span class="manager-location-num">{{ item.open_count }}</span>
-            <span class="manager-location-num is-overdue">{{ item.overdue_count }}</span>
-            <span class="manager-location-num is-blocked">{{ item.blocked_count }}</span>
+            <span class="manager-location-num">{{ item.open_count if item.open_count is defined else (item.open if item.open is defined else 0) }}</span>
+            <span class="manager-location-num is-overdue">{{ item.overdue_count if item.overdue_count is defined else (item.overdue if item.overdue is defined else 0) }}</span>
+            <span class="manager-location-num is-blocked">{{ item.blocked_count if item.blocked_count is defined else (item.blocked if item.blocked is defined else 0) }}</span>
           </div>
           {% else %}
           <p class="manager-empty">No location pressure points to show.</p>
