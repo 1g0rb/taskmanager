@@ -1391,6 +1391,12 @@ a.stat:hover{
   color: var(--primary);
 }
 
+.users-badge.manager{
+  background: rgba(124, 108, 79, .12);
+  border-color: rgba(124, 108, 79, .2);
+  color: #65533a;
+}
+
 /* --- Users table: stable columns (no floating) --- */
 .users-table{
   width:100%;
@@ -1586,6 +1592,11 @@ a.stat:hover{
 
 body.is-worker .mobile-topbar,
 body.is-worker .mobile-overlay{
+  display:none !important;
+}
+
+body.is-manager .mobile-topbar,
+body.is-manager .mobile-overlay{
   display:none !important;
 }
 

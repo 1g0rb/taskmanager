@@ -78,13 +78,14 @@
 
           <td>
             <div class="users-role-row">
-              <span class="users-badge {{ 'admin' if u.role=='admin' else 'worker' }}">
+              <span class="users-badge {{ u.role if u.role in ['admin', 'manager', 'worker'] else 'worker' }}">
                 {{ u.role|upper }}
               </span>
 
               <form method="post" action="{{ url_for('admin_user_set_role', user_id=u.id) }}">
                 <select name="role" class="input users-select-compact" onchange="this.form.submit()">
                   <option value="worker" {{ 'selected' if u.role=='worker' else '' }}>worker</option>
+                  <option value="manager" {{ 'selected' if u.role=='manager' else '' }}>manager</option>
                   <option value="admin" {{ 'selected' if u.role=='admin' else '' }}>admin</option>
                 </select>
               </form>

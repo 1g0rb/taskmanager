@@ -11,15 +11,20 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='worker.css') }}?v=2004">
   {% endif %}
 
+  {% if request.endpoint and request.endpoint.startswith('manager_') %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='manager.css') }}?v=1001">
+  {% endif %}
+
   {% block head_extra %}{% endblock %}
 </head>
 
-<body class="{{ body_class or '' }} {{ 'is-worker' if request.path.startswith('/worker') else 'is-admin' }}"
+<body class="{{ body_class or '' }} {{ 'is-manager' if request.endpoint and request.endpoint.startswith('manager_') else ('is-worker' if request.path.startswith('/worker') else 'is-admin') }}"
       data-autorefresh="{{ '1' if autorefresh else '0' }}">
 
   {% if current_user.is_authenticated
         and current_user.role == 'admin'
-        and not request.path.startswith('/worker') %}
+        and not request.path.startswith('/worker')
+        and not (request.endpoint and request.endpoint.startswith('manager_')) %}
 
     <div class="mobile-topbar">
       <button class="mobile-burger" id="navToggle" type="button">&#9776;</button>
@@ -34,7 +39,8 @@
 
     {% if current_user.is_authenticated
           and current_user.role == 'admin'
-          and not request.path.startswith('/worker') %}
+          and not request.path.startswith('/worker')
+          and not (request.endpoint and request.endpoint.startswith('manager_')) %}
       {% include "partials/_sidebar.html" %}
     {% endif %}
 

@@ -22,6 +22,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from werkzeug.exceptions import RequestEntityTooLarge
 from PIL import Image, ImageOps, UnidentifiedImageError
 import requests
+from services.manager_dashboard import build_manager_dashboard_data
 # ---------------- DB ----------------
 DB_URL = os.environ.get("DATABASE_URL")
 if not DB_URL:
@@ -639,6 +640,7 @@ ensure_task_work_session_schema()
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+app.config["MANAGER_HOST"] = (os.environ.get("MANAGER_HOST") or "manager.ordoapps.app").strip().lower()
 
 # ---------------- Cloudflare Access auth ----------------
 CF_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
@@ -656,6 +658,34 @@ IGNORED_ACTIVITY_PATHS = {"/favicon.ico", "/health"}
 
 def redirect_back(default="admin_tasks"):
     return redirect(safe_next_url(url_for(default)))
+
+
+def request_host_name() -> str:
+    return (request.host.split(":", 1)[0] if request.host else "").strip().lower()
+
+
+def is_admin_user(user: User | None) -> bool:
+    if not user:
+        return False
+    return (getattr(user, "role", "") == "admin") or ((getattr(user, "username", "") or "").lower() in ADMIN_EMAILS)
+
+
+def is_manager_user(user: User | None) -> bool:
+    return bool(user and getattr(user, "role", "") == "manager")
+
+
+def can_access_manager_dashboard(user: User | None) -> bool:
+    return is_admin_user(user) or is_manager_user(user)
+
+
+def can_access_worker_area(user: User | None) -> bool:
+    return is_admin_user(user) or bool(user and getattr(user, "role", "") == "worker")
+
+
+def is_manager_request() -> bool:
+    manager_host = (app.config.get("MANAGER_HOST") or "").strip().lower()
+    return bool(manager_host) and request_host_name() == manager_host
+
 
 def get_task_ids_from_request() -> list[int]:
     raw_values = request.form.getlist("task_ids")
@@ -849,6 +879,21 @@ def track_user_activity():
 
     log_user_activity()
 
+
+@app.before_request
+def restrict_manager_host_surface():
+    if not is_manager_request():
+        return None
+
+    if request.path.startswith("/static/"):
+        return None
+
+    allowed_endpoints = {"index", "manager_dashboard", "health", "logout", "static"}
+    if (request.endpoint or "") in allowed_endpoints:
+        return None
+
+    abort(404)
+
 def get_local_dev_user(db: Session) -> User:
     # probaj uzeti prvog aktivnog admina
     u = db.query(User).filter(User.role == "admin", User.is_active == True).first()
@@ -919,6 +964,8 @@ def cf_required(fn):
             user = get_current_user_or_dev(db)
             if not user:
                 return redirect("/cdn-cgi/access/login")
+            if request.path.startswith("/worker") and not can_access_worker_area(user):
+                abort(403)
 
             request.cf_user = user  # type: ignore[attr-defined]
             return fn(*args, **kwargs)
@@ -936,11 +983,26 @@ def admin_required(fn):
             user = user = get_current_user_or_dev(db)
             if not user:
                 abort(401)
-            # role iz baze ili allowlist
-            is_admin = (user.role == "admin") or (user.username.lower() in ADMIN_EMAILS)
-            if not is_admin:
+            if not is_admin_user(user):
                 flash("Admin access required.")
                 return redirect(url_for("index"))
+            request.cf_user = user  # type: ignore[attr-defined]
+            return fn(*args, **kwargs)
+        finally:
+            db.close()
+    return wrapper
+
+
+def manager_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        db = SessionLocal()
+        try:
+            user = get_current_user_or_dev(db)
+            if not user:
+                return redirect("/cdn-cgi/access/login")
+            if not can_access_manager_dashboard(user):
+                abort(403)
             request.cf_user = user  # type: ignore[attr-defined]
             return fn(*args, **kwargs)
         finally:
@@ -1188,7 +1250,9 @@ def pick_worker_priority_task(today_tasks, overdue_tasks, upcoming_tasks, assign
 def is_task_allowed_for_worker(db, task: Task, user: User) -> bool:
     if getattr(task, "is_todo", False):
         return False
-    if user.role == "admin" or user.username.lower() in ADMIN_EMAILS:
+    if not can_access_worker_area(user):
+        return False
+    if is_admin_user(user):
         return True
 
     rows = db.query(TaskAssignee).filter(TaskAssignee.task_id == task.id).all()
@@ -1627,10 +1691,43 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
     return stats
 
 
+def render_manager_dashboard_page(user: User):
+    db = SessionLocal()
+    try:
+        dashboard_data = build_manager_dashboard_data(
+            db,
+            Task=Task,
+            TaskAssignee=TaskAssignee,
+            User=User,
+            Location=Location,
+            Issue=Issue,
+            get_task_schedule_date=get_task_schedule_date,
+        )
+        request.cf_user = user  # type: ignore[attr-defined]
+        return render_template(
+            "manager/dashboard.html",
+            title="Manager Dashboard",
+            body_class="manager",
+            autorefresh=False,
+            active_tab="manager",
+            last_updated_label=dashboard_data["generated_at"].strftime("%d %b %Y · %H:%M"),
+            **dashboard_data,
+        )
+    finally:
+        db.close()
+
+
 # ---------------- Health ----------------
 @app.get("/health")
 def health():
     return "ok", 200
+
+
+@app.get("/manager/dashboard")
+@manager_required
+def manager_dashboard():
+    user = request.cf_user  # type: ignore[attr-defined]
+    return render_manager_dashboard_page(user)
 
 
 @app.get("/")
@@ -1642,9 +1739,19 @@ def index():
             # ovo pusti Cloudflareu da odradi login
             return redirect("/cdn-cgi/access/login")
 
-        is_admin = (user.role == "admin") or (user.username.lower() in ADMIN_EMAILS)
-        if is_admin:
+        if is_manager_request():
+            if not can_access_manager_dashboard(user):
+                abort(403)
+            return render_manager_dashboard_page(user)
+
+        if is_admin_user(user):
             return redirect(url_for("admin_tasks"))
+
+        if is_manager_user(user):
+            manager_host = (app.config.get("MANAGER_HOST") or "").strip().lower()
+            if manager_host:
+                return redirect(f"https://{manager_host}/")
+            return redirect(url_for("manager_dashboard"))
 
         return redirect(url_for("worker_dashboard"))
     finally:
@@ -2079,6 +2186,7 @@ def admin_users():
         users = query.order_by(
             User.is_active.desc(),
             case((User.role == "admin", 1), else_=0).desc(),
+            case((User.role == "manager", 1), else_=0).desc(),
             User.username.asc()
         ).all()
 
@@ -2187,7 +2295,7 @@ def admin_user_toggle_active(user_id: int):
 @admin_required
 def admin_user_set_role(user_id: int):
     role = (request.form.get("role") or "worker").strip().lower()
-    if role not in ("admin", "worker"):
+    if role not in ("admin", "manager", "worker"):
         flash("Invalid role.")
         return redirect(url_for("admin_users"))
 
