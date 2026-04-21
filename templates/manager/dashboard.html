@@ -4,7 +4,7 @@
 {% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
 {% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
 
-<section class="manager-frame manager-dashboard-shell">
+<section class="manager-frame manager-layout manager-dashboard">
   <aside class="manager-sidebar">
     <div class="manager-brand">
       <div class="manager-brand-mark" aria-hidden="true">
@@ -14,37 +14,37 @@
         </svg>
       </div>
       <div class="manager-brand-copy">
-        <span class="manager-brand-name">Meneghetti</span>
-        <span class="manager-brand-sub">Estate Operations</span>
+        <span class="manager-brand-name brand-title">Meneghetti</span>
+        <span class="manager-brand-sub brand-subtitle">Estate Operations</span>
       </div>
     </div>
 
     <nav class="manager-nav" aria-label="Manager navigation">
-      <a class="manager-nav-item is-active" href="{{ url_for('manager_dashboard') }}">
+      <a class="manager-nav-item manager-nav-link is-active" href="{{ url_for('manager_dashboard') }}">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"></path><path d="M7.5 10.5V19h9v-8.5"></path></svg>
         </span>
         <span>Manager Dashboard</span>
       </a>
-      <a class="manager-nav-item" href="#today-tasks">
+      <a class="manager-nav-item manager-nav-link" href="#today-tasks">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="15" rx="2"></rect><path d="M8 9.5h8M8 13h6"></path></svg>
         </span>
         <span>Tasks Overview</span>
       </a>
-      <a class="manager-nav-item" href="#upcoming-tasks">
+      <a class="manager-nav-item manager-nav-link" href="#upcoming-tasks">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><rect x="4.5" y="6" width="15" height="13" rx="2"></rect><path d="M8 4.5V8M16 4.5V8M4.5 10.5h15"></path></svg>
         </span>
         <span>Calendar</span>
       </a>
-      <a class="manager-nav-item" href="#location-summary">
+      <a class="manager-nav-item manager-nav-link" href="#location-summary">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><path d="M12 21s-5-5.2-5-10a5 5 0 1 1 10 0c0 4.8-5 10-5 10Z"></path><circle cx="12" cy="11" r="1.8"></circle></svg>
         </span>
         <span>Locations</span>
       </a>
-      <a class="manager-nav-item" href="#status-summary">
+      <a class="manager-nav-item manager-nav-link" href="#status-summary">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><path d="M6 17.5h12"></path><path d="M8 17.5v-6"></path><path d="M12 17.5v-9"></path><path d="M16 17.5v-4"></path></svg>
         </span>
@@ -62,10 +62,10 @@
     </div>
   </aside>
 
-  <div class="manager-shell">
+  <div class="manager-main manager-shell">
     <header class="manager-header">
       <div class="manager-header-copy">
-        <p class="manager-eyebrow">Meneghetti Collection</p>
+        <p class="manager-eyebrow eyebrow">Meneghetti Collection</p>
         <h1 class="manager-title">Manager Dashboard</h1>
         <p class="manager-subtitle">Overview of tasks and operations</p>
       </div>
@@ -74,34 +74,36 @@
       </div>
     </header>
 
-    <section class="manager-kpis" aria-label="Key performance indicators">
+    <section class="manager-kpis manager-kpi-grid" aria-label="Key performance indicators">
       {% for kpi in kpis %}
-      <article class="manager-kpi manager-kpi-{{ kpi.key }}">
-        <div class="manager-kpi-value">{{ kpi.value }}</div>
-        <div class="manager-kpi-label">{{ kpi.label }}</div>
+      <article class="manager-kpi manager-kpi-card kpi-card manager-kpi-{{ kpi.key }}{% if kpi.key == 'overdue' %} is-overdue{% endif %}{% if kpi.key == 'urgent' %} is-urgent{% endif %}">
+        <div class="manager-kpi-value kpi-value">{{ kpi.value }}</div>
+        <div class="manager-kpi-label kpi-label">{{ kpi.label }}</div>
       </article>
       {% endfor %}
     </section>
 
     <section class="manager-grid">
-      <article id="today-tasks" class="manager-panel manager-panel-wide">
-        <div class="manager-panel-head">
-          <h2>Today Tasks</h2>
-          <span>{{ today_tasks|length }}</span>
+      <article id="today-tasks" class="manager-panel manager-card dashboard-card compact-if-few">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Today Tasks</h2>
+          <span class="manager-card-count card-count">{{ today_tasks|length }}</span>
         </div>
         <div class="manager-task-list">
           {% for task in today_tasks[:5] %}
-          <article class="manager-task-row">
-            <div class="manager-task-primary">
-              <h3>{{ task.title }}</h3>
-              <div class="manager-task-subline">
+          <article class="manager-task-row manager-task-item">
+            <div class="manager-task-main">
+              <div class="manager-task-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
                 <span>{{ task.location_name }}</span>
                 <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
               </div>
             </div>
-            <div class="manager-task-meta">
-              <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
-              <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+            <div class="manager-task-aside">
+              <div class="manager-badges">
+                <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+                <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+              </div>
               <span class="manager-task-date">{{ task.scheduled_date.strftime('%d %b') if task.scheduled_date else 'No date' }}</span>
             </div>
           </article>
@@ -111,25 +113,27 @@
         </div>
       </article>
 
-      <article class="manager-panel manager-panel-wide manager-panel-overdue">
-        <div class="manager-panel-head">
-          <h2>Overdue Tasks</h2>
-          <span>{{ overdue_tasks|length }}</span>
+      <article class="manager-panel manager-card dashboard-card compact-if-few">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Overdue Tasks</h2>
+          <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
         </div>
         <div class="manager-task-list">
           {% for task in overdue_tasks[:5] %}
-          <article class="manager-task-row is-overdue">
-            <div class="manager-task-primary">
-              <h3>{{ task.title }}</h3>
-              <div class="manager-task-subline">
+          <article class="manager-task-row manager-task-item {% if task.days_overdue and task.days_overdue >= 7 %}is-overdue-strong{% else %}is-overdue-mild{% endif %}">
+            <div class="manager-task-main">
+              <div class="manager-task-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
                 <span>{{ task.location_name }}</span>
                 <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
               </div>
             </div>
-            <div class="manager-task-meta">
-              <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
-              <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-              <span class="manager-task-date manager-task-date-overdue">{{ task.days_overdue }}d</span>
+            <div class="manager-task-aside">
+              <div class="manager-badges">
+                <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+                <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+              </div>
+              <span class="manager-task-date manager-task-overdue{% if task.days_overdue and task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d</span>
             </div>
           </article>
           {% else %}
@@ -138,63 +142,57 @@
         </div>
       </article>
 
-      <article id="status-summary" class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Status Summary</h2>
+      <article id="status-summary" class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Tasks by Status</h2>
         </div>
         <div class="manager-summary-list">
           {% for item in status_summary %}
           <div class="manager-summary-row">
-            <div class="manager-summary-copy">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
+            <div class="manager-summary-label">{{ item.label }}</div>
+            <div class="manager-summary-track">
+              <div class="manager-summary-fill{% if item.label|lower in ['blocked', 'overdue'] %} is-warm{% elif item.label|lower in ['completed', 'done'] %} is-muted{% endif %}" style="width: {{ (item.count / (max_status_count or 1) * 100)|round(0, 'ceil') }}%"></div>
             </div>
-            <div class="manager-summary-bar">
-              <span style="width: {{ (item.count / (max_status_count or 1) * 100)|round(0, 'ceil') }}%"></span>
-            </div>
+            <div class="manager-summary-value">{{ item.count }}</div>
           </div>
           {% endfor %}
         </div>
       </article>
 
-      <article class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Priority Summary</h2>
+      <article class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Tasks by Priority</h2>
         </div>
         <div class="manager-summary-list">
           {% for item in priority_summary %}
           <div class="manager-summary-row">
-            <div class="manager-summary-copy">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
+            <div class="manager-summary-label">{{ item.label }}</div>
+            <div class="manager-summary-track">
+              <div class="manager-summary-fill{% if item.label|lower in ['urgent', 'high'] %} is-warm{% elif item.label|lower == 'low' %} is-muted{% endif %}" style="width: {{ (item.count / (max_priority_count or 1) * 100)|round(0, 'ceil') }}%"></div>
             </div>
-            <div class="manager-summary-bar">
-              <span style="width: {{ (item.count / (max_priority_count or 1) * 100)|round(0, 'ceil') }}%"></span>
-            </div>
+            <div class="manager-summary-value">{{ item.count }}</div>
           </div>
           {% endfor %}
         </div>
       </article>
 
-      <article id="upcoming-tasks" class="manager-panel manager-panel-wide">
-        <div class="manager-panel-head">
-          <h2>Upcoming Tasks</h2>
-          <span>Next 7 Days</span>
+      <article id="upcoming-tasks" class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Upcoming Tasks</h2>
+          <span class="manager-card-count card-count">Next 7 Days</span>
         </div>
-        <div class="manager-task-list">
+        <div class="manager-upcoming-list">
           {% for task in upcoming_tasks[:5] %}
-          <article class="manager-task-row">
-            <div class="manager-task-primary">
-              <h3>{{ task.title }}</h3>
-              <div class="manager-task-subline">
+          <article class="manager-upcoming-row">
+            <div>
+              <div class="manager-upcoming-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
                 <span>{{ task.location_name }}</span>
                 <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
               </div>
             </div>
-            <div class="manager-task-meta">
-              <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-              <span class="manager-task-date">{{ task.scheduled_date.strftime('%d %b') if task.scheduled_date else 'No date' }}</span>
-            </div>
+            <span class="manager-upcoming-date">{{ task.scheduled_date.strftime('%d %b') if task.scheduled_date else 'No date' }}</span>
+            <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
           </article>
           {% else %}
           <p class="manager-empty">No upcoming tasks in the next seven days.</p>
@@ -202,9 +200,9 @@
         </div>
       </article>
 
-      <article id="location-summary" class="manager-panel">
-        <div class="manager-panel-head">
-          <h2>Tasks by Location</h2>
+      <article id="location-summary" class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Tasks by Location</h2>
         </div>
         <div class="manager-location-list">
           <div class="manager-location-head">
@@ -221,11 +219,9 @@
               </span>
               <span>{{ item.location_name }}</span>
             </div>
-            <div class="manager-location-metrics">
-              <span><strong>{{ item.open_count }}</strong></span>
-              <span><strong>{{ item.overdue_count }}</strong></span>
-              <span><strong>{{ item.blocked_count }}</strong></span>
-            </div>
+            <span class="manager-location-num">{{ item.open_count }}</span>
+            <span class="manager-location-num is-overdue">{{ item.overdue_count }}</span>
+            <span class="manager-location-num is-blocked">{{ item.blocked_count }}</span>
           </div>
           {% else %}
           <p class="manager-empty">No location pressure points to show.</p>
