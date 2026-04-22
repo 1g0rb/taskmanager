@@ -87,18 +87,15 @@
                 </div>
               </div>
               <div class="manager-task-aside">
-                <div class="manager-badges">
-                  <span class="manager-badge status-done">Done</span>
-                  {% if task.priority %}
-                  <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-                  {% endif %}
-                </div>
-                <span class="manager-task-date">{{ task.completed_time_label or 'Completed' }}</span>
-                {% if task.duration_minutes %}
-                <span class="manager-task-meta manager-duration-label">{{ task.duration_minutes }} min</span>
+              <div class="manager-badges">
+                <span class="manager-badge status-done">Done</span>
+                {% if task.priority %}
+                <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
                 {% endif %}
               </div>
-            </article>
+              <span class="manager-task-date">{{ task.completed_time_label or 'Completed' }}</span>
+            </div>
+          </article>
             {% endfor %}
           </div>
         </section>

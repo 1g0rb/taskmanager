@@ -99,28 +99,27 @@
       <article class="manager-panel manager-card dashboard-card">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">By Location</h2>
-          <span class="manager-card-count card-count">Open · Unfinished · Blocked · Done Recently</span>
         </div>
-        <div class="manager-location-list">
-          <div class="manager-location-head manager-location-head-wide">
-            <span></span>
+        <div class="manager-location-report">
+          <div class="manager-location-report-head">
+            <span class="manager-location-report-name-head">Location</span>
             <span>Open</span>
             <span>Unfinished</span>
             <span>Blocked</span>
-            <span>Done</span>
+            <span>Done Recently</span>
           </div>
           {% for item in location_performance %}
-          <div class="manager-location-row manager-location-row-wide">
-            <div class="manager-location-name">
-              <span class="manager-location-icon">
+          <div class="manager-location-report-row">
+            <div class="manager-location-report-name">
+              <span class="manager-location-icon manager-location-report-icon">
                 <svg viewBox="0 0 24 24"><path d="M12 4 20 8.5v7L12 20l-8-4.5v-7L12 4Z"></path><path d="M12 4v16"></path><path d="M4 8.5 12 13l8-4.5"></path></svg>
               </span>
-              <span>{{ item.location_name }}</span>
+              <span class="manager-location-report-title">{{ item.location_name }}</span>
             </div>
-            <span class="manager-location-num">{{ item.open_count }}</span>
-            <span class="manager-location-num is-overdue">{{ item.unfinished_count }}</span>
-            <span class="manager-location-num is-blocked">{{ item.blocked_count }}</span>
-            <span class="manager-location-num">{{ item.done_recent_count }}</span>
+            <span class="manager-location-report-metric">{{ item.open_count }}</span>
+            <span class="manager-location-report-metric is-unfinished">{{ item.unfinished_count }}</span>
+            <span class="manager-location-report-metric is-blocked">{{ item.blocked_count }}</span>
+            <span class="manager-location-report-metric">{{ item.done_recent_count }}</span>
           </div>
           {% else %}
           <p class="manager-empty">No location summary available.</p>

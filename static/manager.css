@@ -718,6 +718,79 @@ body.manager-page {
   grid-template-columns: 1fr 36px 72px 36px 42px;
 }
 
+.manager-location-report {
+  display: grid;
+  gap: 6px;
+}
+
+.manager-location-report-head,
+.manager-location-report-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 60px 90px 70px 110px;
+  align-items: center;
+}
+
+.manager-location-report-head {
+  gap: 12px;
+  padding: 0 4px 8px;
+  font-size: 0.68rem;
+  color: var(--md-text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.manager-location-report-head span:not(.manager-location-report-name-head) {
+  text-align: center;
+}
+
+.manager-location-report-name-head {
+  text-align: left;
+}
+
+.manager-location-report-row {
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(230, 221, 208, 0.72);
+}
+
+.manager-location-report-row:last-of-type {
+  border-bottom: 0;
+}
+
+.manager-location-report-name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manager-location-report-icon {
+  flex: 0 0 18px;
+}
+
+.manager-location-report-title {
+  color: #4e453b;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.manager-location-report-metric {
+  text-align: center;
+  color: #5b5248;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.manager-location-report-metric.is-unfinished {
+  color: #a36a59;
+}
+
+.manager-location-report-metric.is-blocked {
+  color: #8a846f;
+}
+
 .manager-recently-completed-card {
   grid-column: 1 / -1;
 }
@@ -833,7 +906,8 @@ body.manager-page {
   .manager-upcoming-row,
   .manager-location-row,
   .manager-location-row-wide,
-  .manager-trend-row {
+  .manager-trend-row,
+  .manager-location-report-row {
     grid-template-columns: 1fr;
   }
 
@@ -850,6 +924,10 @@ body.manager-page {
   }
 
   .manager-location-head-wide {
+    display: none;
+  }
+
+  .manager-location-report-head {
     display: none;
   }
 }
