@@ -3,6 +3,7 @@
 {% block content %}
 {% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
 {% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
+{% set done_tasks_url = "https://task.ordoapps.app/admin/tasks?flt=done" %}
 {% set kpi_map = namespace(today=0, overdue=0, in_progress=0, blocked=0, done_today=0, urgent=0) %}
 {% if kpis %}
   {% for kpi in kpis %}
@@ -38,29 +39,17 @@
     </div>
 
     <nav class="manager-nav" aria-label="Manager navigation">
-      <a class="manager-nav-item manager-nav-link is-active" href="{{ url_for('manager_dashboard') }}">
+      <a class="manager-nav-item manager-nav-link is-active" href="/">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"></path><path d="M7.5 10.5V19h9v-8.5"></path></svg>
         </span>
         <span>Manager Dashboard</span>
       </a>
-      <a class="manager-nav-item manager-nav-link" href="#today-tasks">
+      <a class="manager-nav-item manager-nav-link" href="{{ done_tasks_url }}" target="_blank" rel="noopener noreferrer">
         <span class="manager-nav-icon">
           <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="15" rx="2"></rect><path d="M8 9.5h8M8 13h6"></path></svg>
         </span>
-        <span>Tasks Overview</span>
-      </a>
-      <a class="manager-nav-item manager-nav-link" href="#upcoming-tasks">
-        <span class="manager-nav-icon">
-          <svg viewBox="0 0 24 24"><rect x="4.5" y="6" width="15" height="13" rx="2"></rect><path d="M8 4.5V8M16 4.5V8M4.5 10.5h15"></path></svg>
-        </span>
-        <span>Calendar</span>
-      </a>
-      <a class="manager-nav-item manager-nav-link" href="#location-summary">
-        <span class="manager-nav-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 21s-5-5.2-5-10a5 5 0 1 1 10 0c0 4.8-5 10-5 10Z"></path><circle cx="12" cy="11" r="1.8"></circle></svg>
-        </span>
-        <span>Locations</span>
+        <span>Done Tasks</span>
       </a>
       <a class="manager-nav-item manager-nav-link" href="#status-summary">
         <span class="manager-nav-icon">
@@ -71,12 +60,7 @@
     </nav>
 
     <div class="manager-sidebar-footer">
-      <a class="manager-signout" href="{{ logout_url if logout_url else url_for('logout') }}">
-        <span class="manager-nav-icon">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
-        </span>
-        <span>Sign out</span>
-      </a>
+      <a class="manager-signout" href="{{ logout_url if logout_url else url_for('logout') }}">Sign out</a>
     </div>
   </aside>
 
@@ -109,7 +93,7 @@
       </article>
       <article class="manager-kpi manager-kpi-card kpi-card is-overdue">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.overdue }}</div>
-        <div class="manager-kpi-label kpi-label">Overdue</div>
+        <div class="manager-kpi-label kpi-label">Unfinished</div>
       </article>
       <article class="manager-kpi manager-kpi-card kpi-card">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.in_progress }}</div>
@@ -164,7 +148,7 @@
 
       <article class="manager-panel manager-card dashboard-card compact-if-few">
         <div class="manager-panel-head manager-card-header card-header">
-          <h2 class="manager-card-title card-title">Overdue Tasks</h2>
+          <h2 class="manager-card-title card-title">Unfinished Tasks</h2>
           <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
         </div>
         <div class="manager-task-list">
@@ -186,7 +170,7 @@
             </div>
           </article>
           {% else %}
-          <p class="manager-empty">Nothing overdue right now.</p>
+          <p class="manager-empty">Nothing unfinished right now.</p>
           {% endfor %}
         </div>
       </article>
@@ -260,7 +244,7 @@
           <div class="manager-location-head">
             <span></span>
             <span>Open</span>
-            <span>Overdue</span>
+            <span>Unfinished</span>
             <span>Blocked</span>
           </div>
           {% for item in location_summary %}
