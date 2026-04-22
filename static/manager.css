@@ -722,6 +722,33 @@ body.manager-page {
   grid-column: 1 / -1;
 }
 
+.manager-done-groups {
+  display: grid;
+  gap: 24px;
+}
+
+.manager-done-group {
+  display: grid;
+  gap: 14px;
+}
+
+.manager-done-group + .manager-done-group {
+  padding-top: 6px;
+  border-top: 1px solid #ece4d7;
+}
+
+.manager-done-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.manager-duration-label {
+  font-size: 0.82rem;
+  color: var(--md-text-muted);
+}
+
 .manager-empty {
   margin: 0;
   color: var(--md-text-soft);

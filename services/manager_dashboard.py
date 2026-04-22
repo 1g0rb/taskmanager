@@ -150,6 +150,7 @@ def _collect_manager_task_data(
     unfinished_tasks = []
     upcoming_tasks = []
     completed_today = []
+    completed_task_items = []
     recent_completed_tasks = []
     open_task_items = []
 
@@ -194,6 +195,8 @@ def _collect_manager_task_data(
             unfinished_tasks.append(item)
         if upcoming:
             upcoming_tasks.append(item)
+        if is_done(task):
+            completed_task_items.append(item)
         if done_today:
             completed_today.append(item)
         if completed_recently:
@@ -288,6 +291,7 @@ def _collect_manager_task_data(
         "priority_summary": priority_summary,
         "location_summary": location_items[:8],
         "recent_completions_today": sorted(completed_today, key=completion_sort_key, reverse=True)[:8],
+        "completed_tasks": sorted(completed_task_items, key=completion_sort_key, reverse=True),
         "recent_completed_tasks": sorted(recent_completed_tasks, key=completion_sort_key, reverse=True)[:10],
         "completion_trend": completion_trend,
         "completion_trend_max": trend_max,
@@ -374,4 +378,73 @@ def build_manager_reports_data(
         "status_summary": base["status_summary"],
         "priority_summary": base["priority_summary"],
         "recent_completed_tasks": base["recent_completed_tasks"],
+    }
+
+
+def build_manager_done_tasks_data(
+    db,
+    *,
+    Task,
+    TaskAssignee,
+    User,
+    Location,
+    Issue,
+    get_task_schedule_date,
+    today: date | None = None,
+):
+    base = _collect_manager_task_data(
+        db,
+        Task=Task,
+        TaskAssignee=TaskAssignee,
+        User=User,
+        Location=Location,
+        Issue=Issue,
+        get_task_schedule_date=get_task_schedule_date,
+        today=today,
+    )
+
+    grouped = defaultdict(list)
+    for task in base["completed_tasks"]:
+        completed_at = task.get("completed_at")
+        completed_date = completed_at.date() if completed_at and hasattr(completed_at, "date") else None
+        if not completed_date:
+            continue
+
+        duration_minutes = None
+        started_at = task.get("started_at")
+        if started_at and completed_at:
+            delta = completed_at - started_at
+            duration_minutes = max(0, int(delta.total_seconds() // 60))
+
+        grouped[completed_date].append(
+            {
+                **task,
+                "completed_date": completed_date,
+                "completed_date_label": completed_date.strftime("%A, %d %b %Y"),
+                "completed_time_label": completed_at.strftime("%H:%M") if hasattr(completed_at, "strftime") else None,
+                "duration_minutes": duration_minutes,
+            }
+        )
+
+    grouped_items = []
+    for completed_date in sorted(grouped.keys(), reverse=True):
+        items = sorted(
+            grouped[completed_date],
+            key=lambda item: item.get("completed_at") or datetime.min,
+            reverse=True,
+        )
+        grouped_items.append(
+            {
+                "date": completed_date,
+                "date_label": completed_date.strftime("%A, %d %b %Y"),
+                "count": len(items),
+                "tasks": items,
+            }
+        )
+
+    return {
+        "generated_at": base["generated_at"],
+        "today": base["today"],
+        "done_task_groups": grouped_items,
+        "done_task_count": sum(group["count"] for group in grouped_items),
     }
