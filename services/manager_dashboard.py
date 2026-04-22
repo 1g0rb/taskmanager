@@ -4,7 +4,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
 
-def build_manager_dashboard_data(
+def _collect_manager_task_data(
     db,
     *,
     Task,
@@ -17,6 +17,7 @@ def build_manager_dashboard_data(
 ):
     today_value = today or date.today()
     upcoming_until = today_value + timedelta(days=7)
+    recent_window_start = today_value - timedelta(days=6)
 
     tasks = (
         db.query(Task)
@@ -26,10 +27,7 @@ def build_manager_dashboard_data(
     )
 
     task_ids = [task.id for task in tasks if getattr(task, "id", None)]
-    locations = {
-        row.id: row
-        for row in db.query(Location).all()
-    }
+    locations = {row.id: row for row in db.query(Location).all()}
 
     assignee_rows = (
         db.query(TaskAssignee)
@@ -49,10 +47,14 @@ def build_manager_dashboard_data(
         if legacy_user_id:
             user_ids.add(legacy_user_id)
 
-    users = {
-        row.id: row
-        for row in db.query(User).filter(User.id.in_(user_ids)).all()
-    } if user_ids else {}
+    users = (
+        {
+            row.id: row
+            for row in db.query(User).filter(User.id.in_(user_ids)).all()
+        }
+        if user_ids
+        else {}
+    )
 
     linked_issues = (
         db.query(Issue)
@@ -112,6 +114,10 @@ def build_manager_dashboard_data(
         status_weight = {"blocked": 0, "in_progress": 1, "open": 2, "done": 3}.get(item["status"], 9)
         return (schedule_key, status_weight, item["title"].lower(), item["id"])
 
+    def completion_sort_key(item: dict) -> tuple:
+        completion = item.get("completed_at") or datetime.min
+        return (completion, item["title"].lower(), item["id"])
+
     def prepare_task(task) -> dict:
         schedule_date = get_task_schedule_date(task)
         location = locations.get(getattr(task, "location_id", None))
@@ -141,68 +147,83 @@ def build_manager_dashboard_data(
     prepared_tasks = [prepare_task(task) for task in tasks]
 
     today_tasks = []
-    overdue_tasks = []
+    unfinished_tasks = []
     upcoming_tasks = []
     completed_today = []
-    open_tasks = []
+    recent_completed_tasks = []
+    open_task_items = []
 
     status_counter = Counter()
     priority_counter = Counter()
-    location_summary = defaultdict(lambda: {"location_name": "Unknown location", "open": 0, "overdue": 0, "blocked": 0})
+    completion_counter = Counter()
+    location_summary = defaultdict(
+        lambda: {
+            "location_name": "Unknown location",
+            "open": 0,
+            "unfinished": 0,
+            "blocked": 0,
+            "done_recent": 0,
+        }
+    )
 
     for task, item in zip(tasks, prepared_tasks):
         schedule_date = item["_schedule_date"]
-        done_today = completed_on(task) == today_value
-        overdue = bool(schedule_date and schedule_date < today_value and not is_done(task))
+        completion_date = completed_on(task)
+        done_today = completion_date == today_value
+        unfinished = bool(schedule_date and schedule_date < today_value and not is_done(task))
         due_today = bool(schedule_date == today_value and not is_done(task))
-        upcoming = bool(
-            schedule_date
-            and today_value < schedule_date <= upcoming_until
-            and not is_done(task)
-        )
+        upcoming = bool(schedule_date and today_value < schedule_date <= upcoming_until and not is_done(task))
+        completed_recently = bool(completion_date and recent_window_start <= completion_date <= today_value)
+
+        location_row = location_summary[getattr(task, "location_id", None)]
+        location_row["location_name"] = item["location_name"]
 
         if not is_done(task):
-            open_tasks.append(task)
+            open_task_items.append(item)
             status_counter[item["status"]] += 1
             priority_counter[item["priority"]] += 1
-
-            location_row = location_summary[getattr(task, "location_id", None)]
-            location_row["location_name"] = item["location_name"]
             location_row["open"] += 1
-            if overdue:
-                location_row["overdue"] += 1
+            if unfinished:
+                location_row["unfinished"] += 1
             if is_blocked(task):
                 location_row["blocked"] += 1
 
         if due_today:
             today_tasks.append(item)
-        if overdue:
-            overdue_tasks.append(item)
+        if unfinished:
+            unfinished_tasks.append(item)
         if upcoming:
             upcoming_tasks.append(item)
         if done_today:
             completed_today.append(item)
+        if completed_recently:
+            recent_completed_tasks.append(item)
+            completion_counter[completion_date] += 1
+            location_row["done_recent"] += 1
 
     location_items = []
     for location_id, summary in location_summary.items():
-        score = (summary["overdue"] * 3) + (summary["blocked"] * 2) + summary["open"]
-        location_items.append(
-            {
-                "location_id": location_id,
-                "location_name": summary["location_name"],
-                "open_count": summary["open"],
-                "overdue_count": summary["overdue"],
-                "blocked_count": summary["blocked"],
-                "problem_score": score,
-            }
-        )
+        score = (summary["unfinished"] * 3) + (summary["blocked"] * 2) + summary["open"] + summary["done_recent"]
+        if summary["open"] or summary["unfinished"] or summary["blocked"] or summary["done_recent"]:
+            location_items.append(
+                {
+                    "location_id": location_id,
+                    "location_name": summary["location_name"],
+                    "open_count": summary["open"],
+                    "unfinished_count": summary["unfinished"],
+                    "blocked_count": summary["blocked"],
+                    "done_recent_count": summary["done_recent"],
+                    "activity_score": score,
+                }
+            )
 
     location_items.sort(
         key=lambda item: (
-            -item["problem_score"],
-            -item["overdue_count"],
+            -item["activity_score"],
+            -item["unfinished_count"],
             -item["blocked_count"],
             -item["open_count"],
+            -item["done_recent_count"],
             item["location_name"].lower(),
         )
     )
@@ -234,22 +255,123 @@ def build_manager_dashboard_data(
 
     kpis = [
         {"key": "today", "label": "Today Tasks", "value": len(today_tasks)},
-        {"key": "overdue", "label": "Overdue", "value": len(overdue_tasks)},
-        {"key": "in_progress", "label": "In Progress", "value": sum(1 for task in open_tasks if is_in_progress(task))},
-        {"key": "blocked", "label": "Blocked", "value": sum(1 for task in open_tasks if is_blocked(task))},
+        {"key": "overdue", "label": "Unfinished", "value": len(unfinished_tasks)},
+        {"key": "in_progress", "label": "In Progress", "value": sum(1 for task in open_task_items if task["status"] == "in_progress" or task["started_at"])},
+        {"key": "blocked", "label": "Blocked", "value": sum(1 for task in open_task_items if task["status"] == "blocked")},
         {"key": "done_today", "label": "Done Today", "value": len(completed_today)},
-        {"key": "urgent", "label": "Urgent", "value": sum(1 for task in open_tasks if compute_priority(task) == "urgent")},
+        {"key": "urgent", "label": "Urgent", "value": sum(1 for task in open_task_items if task["priority"] == "urgent")},
     ]
+
+    completion_trend = []
+    trend_max = 1
+    for day_offset in range(6, -1, -1):
+        trend_day = today_value - timedelta(days=day_offset)
+        count = completion_counter.get(trend_day, 0)
+        completion_trend.append(
+            {
+                "date": trend_day,
+                "date_label": trend_day.strftime("%d %b"),
+                "weekday_label": trend_day.strftime("%a"),
+                "count": count,
+            }
+        )
+        trend_max = max(trend_max, count)
 
     return {
         "generated_at": datetime.now(),
         "today": today_value,
-        "kpis": kpis,
         "today_tasks": sorted(today_tasks, key=task_sort_key),
-        "overdue_tasks": sorted(overdue_tasks, key=task_sort_key),
+        "overdue_tasks": sorted(unfinished_tasks, key=task_sort_key),
+        "unfinished_tasks": sorted(unfinished_tasks, key=task_sort_key),
         "upcoming_tasks": sorted(upcoming_tasks, key=task_sort_key),
         "status_summary": status_summary,
         "priority_summary": priority_summary,
         "location_summary": location_items[:8],
-        "recent_completions_today": sorted(completed_today, key=lambda item: item["completed_at"] or datetime.min, reverse=True)[:8],
+        "recent_completions_today": sorted(completed_today, key=completion_sort_key, reverse=True)[:8],
+        "recent_completed_tasks": sorted(recent_completed_tasks, key=completion_sort_key, reverse=True)[:10],
+        "completion_trend": completion_trend,
+        "completion_trend_max": trend_max,
+        "kpis": kpis,
+        "open_task_count": len(open_task_items),
+        "unfinished_count": len(unfinished_tasks),
+        "blocked_count": sum(1 for task in open_task_items if task["status"] == "blocked"),
+        "done_today_count": len(completed_today),
+        "done_last_7_days_count": len(recent_completed_tasks),
+        "active_locations_count": len(location_items),
+    }
+
+
+def build_manager_dashboard_data(
+    db,
+    *,
+    Task,
+    TaskAssignee,
+    User,
+    Location,
+    Issue,
+    get_task_schedule_date,
+    today: date | None = None,
+):
+    base = _collect_manager_task_data(
+        db,
+        Task=Task,
+        TaskAssignee=TaskAssignee,
+        User=User,
+        Location=Location,
+        Issue=Issue,
+        get_task_schedule_date=get_task_schedule_date,
+        today=today,
+    )
+    return {
+        "generated_at": base["generated_at"],
+        "today": base["today"],
+        "kpis": base["kpis"],
+        "today_tasks": base["today_tasks"],
+        "overdue_tasks": base["overdue_tasks"],
+        "upcoming_tasks": base["upcoming_tasks"],
+        "status_summary": base["status_summary"],
+        "priority_summary": base["priority_summary"],
+        "location_summary": base["location_summary"],
+        "recent_completions_today": base["recent_completions_today"],
+    }
+
+
+def build_manager_reports_data(
+    db,
+    *,
+    Task,
+    TaskAssignee,
+    User,
+    Location,
+    Issue,
+    get_task_schedule_date,
+    today: date | None = None,
+):
+    base = _collect_manager_task_data(
+        db,
+        Task=Task,
+        TaskAssignee=TaskAssignee,
+        User=User,
+        Location=Location,
+        Issue=Issue,
+        get_task_schedule_date=get_task_schedule_date,
+        today=today,
+    )
+    return {
+        "generated_at": base["generated_at"],
+        "today": base["today"],
+        "report_kpis": [
+            {"key": "open", "label": "Open Tasks", "value": base["open_task_count"]},
+            {"key": "unfinished", "label": "Unfinished", "value": base["unfinished_count"]},
+            {"key": "blocked", "label": "Blocked", "value": base["blocked_count"]},
+            {"key": "done_today", "label": "Done Today", "value": base["done_today_count"]},
+            {"key": "done_last_7_days", "label": "Done Last 7 Days", "value": base["done_last_7_days_count"]},
+            {"key": "active_locations", "label": "Active Locations", "value": base["active_locations_count"]},
+        ],
+        "completion_trend": base["completion_trend"],
+        "completion_trend_max": base["completion_trend_max"],
+        "location_performance": base["location_summary"],
+        "status_summary": base["status_summary"],
+        "priority_summary": base["priority_summary"],
+        "recent_completed_tasks": base["recent_completed_tasks"],
     }

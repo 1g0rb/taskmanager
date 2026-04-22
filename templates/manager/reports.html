@@ -1,0 +1,202 @@
+{% extends "manager/layout.html" %}
+
+{% block content %}
+{% set done_tasks_url = "https://task.ordoapps.app/admin/tasks?flt=done" %}
+{% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
+{% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
+
+<section class="manager-frame manager-layout manager-dashboard">
+  <aside class="manager-sidebar">
+    <div class="manager-brand">
+      <div class="manager-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" class="manager-brand-icon">
+          <circle cx="20" cy="20" r="6"></circle>
+          <path d="M20 3v7M20 30v7M3 20h7M30 20h7M8.2 8.2l4.9 4.9M26.9 26.9l4.9 4.9M31.8 8.2l-4.9 4.9M13.1 26.9l-4.9 4.9"></path>
+        </svg>
+      </div>
+      <div class="manager-brand-copy">
+        <span class="manager-brand-name brand-title">Meneghetti</span>
+        <span class="manager-brand-sub brand-subtitle">Estate Operations</span>
+      </div>
+    </div>
+
+    <nav class="manager-nav" aria-label="Manager navigation">
+      <a class="manager-nav-item manager-nav-link" href="/">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"></path><path d="M7.5 10.5V19h9v-8.5"></path></svg>
+        </span>
+        <span>Manager Dashboard</span>
+      </a>
+      <a class="manager-nav-item manager-nav-link" href="{{ done_tasks_url }}" target="_blank" rel="noopener noreferrer">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="15" rx="2"></rect><path d="M8 9.5h8M8 13h6"></path></svg>
+        </span>
+        <span>Done Tasks</span>
+      </a>
+      <a class="manager-nav-item manager-nav-link is-active" href="{{ url_for('manager_reports') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M6 17.5h12"></path><path d="M8 17.5v-6"></path><path d="M12 17.5v-9"></path><path d="M16 17.5v-4"></path></svg>
+        </span>
+        <span>Reports</span>
+      </a>
+    </nav>
+
+    <div class="manager-sidebar-footer">
+      <a class="manager-signout" href="{{ logout_url if logout_url else url_for('logout') }}">Sign out</a>
+    </div>
+  </aside>
+
+  <div class="manager-main manager-shell">
+    <header class="manager-header">
+      <div class="manager-header-copy">
+        <p class="manager-eyebrow eyebrow">Meneghetti Collection</p>
+        <h1 class="manager-title">Reports</h1>
+        <p class="manager-subtitle">Read-only operational summaries and recent trends</p>
+      </div>
+      <div class="manager-timestamp">
+        <span class="manager-timestamp-value">
+          {% if last_updated_label %}
+            {{ last_updated_label }}
+          {% elif generated_at %}
+            {{ generated_at.strftime('%d %b %Y · %H:%M') if generated_at.strftime else generated_at }}
+          {% else %}
+            Last updated just now
+          {% endif %}
+        </span>
+      </div>
+    </header>
+
+    <section class="manager-kpis manager-kpi-grid" aria-label="Reports summary indicators">
+      {% for kpi in report_kpis %}
+      <article class="manager-kpi manager-kpi-card kpi-card{% if kpi.key == 'unfinished' %} is-overdue{% endif %}">
+        <div class="manager-kpi-value kpi-value">{{ kpi.value }}</div>
+        <div class="manager-kpi-label kpi-label">{{ kpi.label }}</div>
+      </article>
+      {% endfor %}
+    </section>
+
+    <section class="manager-reports-grid">
+      <article class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Recent Completion Activity</h2>
+          <span class="manager-card-count card-count">Last 7 Days</span>
+        </div>
+        <div class="manager-trend-list">
+          {% for item in completion_trend %}
+          <div class="manager-trend-row">
+            <div class="manager-trend-date">
+              <span class="manager-trend-day">{{ item.weekday_label }}</span>
+              <span class="manager-trend-label">{{ item.date_label }}</span>
+            </div>
+            <div class="manager-summary-track manager-trend-track">
+              <div class="manager-summary-fill{% if item.count == 0 %} is-muted{% endif %}" style="width: {{ (item.count / (completion_trend_max or 1) * 100)|round(0, 'ceil') }}%"></div>
+            </div>
+            <div class="manager-summary-value">{{ item.count }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+
+      <article class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">By Location</h2>
+          <span class="manager-card-count card-count">Open · Unfinished · Blocked · Done Recently</span>
+        </div>
+        <div class="manager-location-list">
+          <div class="manager-location-head manager-location-head-wide">
+            <span></span>
+            <span>Open</span>
+            <span>Unfinished</span>
+            <span>Blocked</span>
+            <span>Done</span>
+          </div>
+          {% for item in location_performance %}
+          <div class="manager-location-row manager-location-row-wide">
+            <div class="manager-location-name">
+              <span class="manager-location-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 4 20 8.5v7L12 20l-8-4.5v-7L12 4Z"></path><path d="M12 4v16"></path><path d="M4 8.5 12 13l8-4.5"></path></svg>
+              </span>
+              <span>{{ item.location_name }}</span>
+            </div>
+            <span class="manager-location-num">{{ item.open_count }}</span>
+            <span class="manager-location-num is-overdue">{{ item.unfinished_count }}</span>
+            <span class="manager-location-num is-blocked">{{ item.blocked_count }}</span>
+            <span class="manager-location-num">{{ item.done_recent_count }}</span>
+          </div>
+          {% else %}
+          <p class="manager-empty">No location summary available.</p>
+          {% endfor %}
+        </div>
+      </article>
+
+      <article class="manager-panel manager-card dashboard-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Task Distribution</h2>
+        </div>
+        <div class="manager-distribution-grid">
+          <section class="manager-summary-block">
+            <h3 class="manager-subsection-title">By Status</h3>
+            <div class="manager-summary-list">
+              {% for item in status_summary %}
+              {% set status_label = (item.label or item.status or '')|lower %}
+              <div class="manager-summary-row">
+                <div class="manager-summary-label">{{ item.label or item.status or 'Status' }}</div>
+                <div class="manager-summary-track">
+                  <div class="manager-summary-fill{% if status_label in ['blocked', 'unfinished'] %} is-warm{% elif status_label in ['done', 'done today'] %} is-muted{% endif %}" style="width: {{ (item.count / (max_status_count or 1) * 100)|round(0, 'ceil') }}%"></div>
+                </div>
+                <div class="manager-summary-value">{{ item.count }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section class="manager-summary-block">
+            <h3 class="manager-subsection-title">By Priority</h3>
+            <div class="manager-summary-list">
+              {% for item in priority_summary %}
+              {% set priority_label = (item.label or item.priority or '')|lower %}
+              <div class="manager-summary-row">
+                <div class="manager-summary-label">{{ item.label or item.priority or 'Priority' }}</div>
+                <div class="manager-summary-track">
+                  <div class="manager-summary-fill{% if priority_label in ['urgent', 'high'] %} is-warm{% elif priority_label == 'low' %} is-muted{% endif %}" style="width: {{ (item.count / (max_priority_count or 1) * 100)|round(0, 'ceil') }}%"></div>
+                </div>
+                <div class="manager-summary-value">{{ item.count }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+      </article>
+
+      <article class="manager-panel manager-card dashboard-card manager-recently-completed-card">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Recently Completed</h2>
+          <span class="manager-card-count card-count">{{ recent_completed_tasks|length }}</span>
+        </div>
+        <div class="manager-task-list">
+          {% for task in recent_completed_tasks[:10] %}
+          <article class="manager-task-row manager-task-item">
+            <div class="manager-task-main">
+              <div class="manager-task-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
+                <span>{{ task.location_name or 'No location' }}</span>
+                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
+              </div>
+            </div>
+            <div class="manager-task-aside">
+              <div class="manager-badges">
+                <span class="manager-badge status-done">Done</span>
+                <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+              </div>
+              <span class="manager-task-date">{{ task.completed_at.strftime('%d %b') if task.completed_at and task.completed_at.strftime else 'Recently' }}</span>
+            </div>
+          </article>
+          {% else %}
+          <p class="manager-empty">No recently completed tasks available.</p>
+          {% endfor %}
+        </div>
+      </article>
+    </section>
+  </div>
+</section>
+{% endblock %}
