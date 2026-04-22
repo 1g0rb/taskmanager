@@ -762,11 +762,19 @@ body.manager-page {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0;
 }
 
 .manager-location-report-icon {
   flex: 0 0 18px;
+}
+
+.manager-location-report svg {
+  display: block;
+  width: 100%;
+  max-width: 18px;
+  height: auto;
+  max-height: 18px;
 }
 
 .manager-location-report-title {
