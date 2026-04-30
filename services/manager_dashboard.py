@@ -296,6 +296,7 @@ def _collect_manager_task_data(
         "completion_trend": completion_trend,
         "completion_trend_max": trend_max,
         "kpis": kpis,
+        "open_tasks": sorted(open_task_items, key=task_sort_key),
         "open_task_count": len(open_task_items),
         "unfinished_count": len(unfinished_tasks),
         "blocked_count": sum(1 for task in open_task_items if task["status"] == "blocked"),
@@ -337,6 +338,8 @@ def build_manager_dashboard_data(
         "priority_summary": base["priority_summary"],
         "location_summary": base["location_summary"],
         "recent_completions_today": base["recent_completions_today"],
+        "operational_status": _build_operational_status(base["unfinished_count"], base["blocked_count"]),
+        "key_problems": _build_key_problems(base["open_tasks"]),
     }
 
 
@@ -448,3 +451,84 @@ def build_manager_done_tasks_data(
         "done_task_groups": grouped_items,
         "done_task_count": sum(group["count"] for group in grouped_items),
     }
+
+
+def _build_operational_status(unfinished_count: int, blocked_count: int) -> dict:
+    if blocked_count >= 2 or unfinished_count >= 8:
+        label = "Critical attention"
+        tone = "critical"
+    elif blocked_count >= 1 or unfinished_count >= 4:
+        label = "Needs attention"
+        tone = "attention"
+    else:
+        label = "Under control"
+        tone = "control"
+
+    fragments = []
+    if unfinished_count:
+        fragments.append(f"{unfinished_count} unfinished task{'s' if unfinished_count != 1 else ''}")
+    if blocked_count:
+        fragments.append(f"{blocked_count} blocked task{'s' if blocked_count != 1 else ''}")
+
+    if fragments:
+        message = f"{label} · {' and '.join(fragments)} need review"
+    else:
+        message = f"{label} · no immediate operational risks are visible"
+
+    return {"label": label, "tone": tone, "message": message}
+
+
+def _build_key_problems(open_tasks: list[dict]) -> list[dict]:
+    candidates = []
+    for item in open_tasks:
+        is_blocked = item["status"] == "blocked"
+        is_unfinished = item.get("days_overdue") is not None
+        is_unassigned = not item.get("assigned_user_display_names")
+        if not (is_blocked or is_unfinished or is_unassigned):
+            continue
+
+        candidates.append(
+            {
+                **item,
+                "_blocked_rank": 0 if is_blocked else 1,
+                "_unfinished_rank": -(item.get("days_overdue") or 0),
+                "_unassigned_rank": 0 if is_unassigned else 1,
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: (
+            item["_blocked_rank"],
+            item["_unfinished_rank"],
+            item["_unassigned_rank"],
+            item["title"].lower(),
+            item["id"],
+        )
+    )
+
+    key_problems = []
+    for item in candidates[:5]:
+        problem_note = None
+        if item["status"] == "blocked":
+            if item.get("days_overdue"):
+                problem_note = f"Blocked · {item['days_overdue']}d unfinished"
+            else:
+                problem_note = "Blocked"
+        elif item.get("days_overdue"):
+            problem_note = f"{item['days_overdue']}d unfinished"
+        elif not item.get("assigned_user_display_names"):
+            problem_note = "Unassigned"
+
+        key_problems.append(
+            {
+                "id": item["id"],
+                "title": item["title"],
+                "location_name": item["location_name"],
+                "assigned_user_display_names": item.get("assigned_user_display_names", []),
+                "status": item["status"],
+                "priority": item["priority"],
+                "problem_note": problem_note,
+            }
+        )
+
+    return key_problems

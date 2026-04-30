@@ -261,6 +261,43 @@ body.manager-page {
   padding-top: 14px;
 }
 
+.manager-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 26px;
+  padding: 16px 20px;
+  border-radius: 20px;
+  border: 1px solid var(--md-border-soft);
+  background: linear-gradient(180deg, rgba(251, 248, 243, 0.92) 0%, rgba(247, 241, 232, 0.94) 100%);
+  box-shadow: var(--md-shadow-soft);
+}
+
+.manager-status-label {
+  flex: 0 0 auto;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: #3a3027;
+}
+
+.manager-status-copy {
+  color: var(--md-text-soft);
+  line-height: 1.5;
+}
+
+.manager-status-critical .manager-status-label {
+  color: var(--md-terracotta);
+}
+
+.manager-status-attention .manager-status-label {
+  color: var(--md-gold);
+}
+
+.manager-status-control .manager-status-label {
+  color: var(--md-olive);
+}
+
 .manager-kpis,
 .manager-kpi-grid {
   display: grid;
@@ -331,6 +368,14 @@ body.manager-page {
   grid-template-columns: 1.2fr 1.2fr 0.82fr;
   gap: 22px;
   align-items: start;
+}
+
+.manager-grid-feature {
+  grid-column: 1 / -1;
+}
+
+.manager-grid-wide {
+  grid-column: 1 / span 2;
 }
 
 .manager-reports-grid {
@@ -848,6 +893,14 @@ body.manager-page {
   min-height: unset;
 }
 
+.manager-problem-item {
+  background: rgba(248, 243, 236, 0.82);
+}
+
+.manager-problem-note {
+  color: #8d6e61;
+}
+
 @media (max-width: 1480px) {
   .manager-kpis,
   .manager-kpi-grid {
@@ -862,7 +915,8 @@ body.manager-page {
     grid-template-columns: 1fr;
   }
 
-  .manager-grid > :nth-child(5) {
+  .manager-grid-wide,
+  .manager-grid-feature {
     grid-column: 1 / -1;
   }
 }
@@ -901,6 +955,11 @@ body.manager-page {
 
   .manager-header {
     flex-direction: column;
+  }
+
+  .manager-status-strip {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .manager-header-copy h1,

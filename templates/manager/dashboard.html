@@ -85,6 +85,11 @@
       </div>
     </header>
 
+    <section class="manager-status-strip manager-status-{{ operational_status.tone }}">
+      <div class="manager-status-label">{{ operational_status.label }}</div>
+      <div class="manager-status-copy">{{ operational_status.message }}</div>
+    </section>
+
     <section class="manager-kpis manager-kpi-grid" aria-label="Key performance indicators">
       <article class="manager-kpi manager-kpi-card kpi-card">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.today }}</div>
@@ -113,6 +118,37 @@
     </section>
 
     <section class="manager-grid">
+      <article class="manager-panel manager-card dashboard-card manager-grid-feature">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Key Problems</h2>
+          <span class="manager-card-count card-count">{{ key_problems|length }}</span>
+        </div>
+        <div class="manager-task-list">
+          {% for task in key_problems %}
+          <article class="manager-task-row manager-task-item manager-problem-item">
+            <div class="manager-task-main">
+              <div class="manager-task-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
+                <span>{{ task.location_name or 'No location' }}</span>
+                <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
+              </div>
+            </div>
+            <div class="manager-task-aside">
+              <div class="manager-badges">
+                <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+                <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+              </div>
+              {% if task.problem_note %}
+              <span class="manager-task-date manager-problem-note">{{ task.problem_note }}</span>
+              {% endif %}
+            </div>
+          </article>
+          {% else %}
+          <p class="manager-empty">No critical problems at the moment.</p>
+          {% endfor %}
+        </div>
+      </article>
+
       <article id="today-tasks" class="manager-panel manager-card dashboard-card compact-if-few">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Today Tasks</h2>
@@ -210,7 +246,7 @@
         </div>
       </article>
 
-      <article id="upcoming-tasks" class="manager-panel manager-card dashboard-card">
+      <article id="upcoming-tasks" class="manager-panel manager-card dashboard-card manager-grid-wide">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Upcoming Tasks</h2>
           <span class="manager-card-count card-count">Next 7 Days</span>
