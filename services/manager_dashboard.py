@@ -465,10 +465,10 @@ def _build_operational_status(unfinished_count: int, blocked_count: int) -> dict
         tone = "control"
 
     fragments = []
-    if unfinished_count:
-        fragments.append(f"{unfinished_count} unfinished task{'s' if unfinished_count != 1 else ''}")
     if blocked_count:
         fragments.append(f"{blocked_count} blocked task{'s' if blocked_count != 1 else ''}")
+    if unfinished_count:
+        fragments.append(f"{unfinished_count} unfinished task{'s' if unfinished_count != 1 else ''}")
 
     if fragments:
         message = f"{label} · {' and '.join(fragments)} need review"
@@ -507,7 +507,7 @@ def _build_key_problems(open_tasks: list[dict]) -> list[dict]:
     )
 
     key_problems = []
-    for item in candidates[:5]:
+    for item in candidates[:3]:
         problem_note = None
         if item["status"] == "blocked":
             if item.get("days_overdue"):

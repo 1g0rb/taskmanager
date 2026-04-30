@@ -85,9 +85,9 @@
       </div>
     </header>
 
-    <section class="manager-status-strip manager-status-{{ operational_status.tone }}">
-      <div class="manager-status-label">{{ operational_status.label }}</div>
-      <div class="manager-status-copy">{{ operational_status.message }}</div>
+    <section class="manager-status-hero manager-status-{{ operational_status.tone }}">
+      <div class="manager-status-title">{{ operational_status.label }}</div>
+      <div class="manager-status-message">{{ operational_status.message }}</div>
     </section>
 
     <section class="manager-kpis manager-kpi-grid" aria-label="Key performance indicators">
@@ -118,7 +118,7 @@
     </section>
 
     <section class="manager-grid">
-      <article class="manager-panel manager-card dashboard-card manager-grid-feature">
+      <article class="manager-panel manager-card dashboard-card manager-grid-key-problems">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Key Problems</h2>
           <span class="manager-card-count card-count">{{ key_problems|length }}</span>
@@ -149,7 +149,7 @@
         </div>
       </article>
 
-      <article id="today-tasks" class="manager-panel manager-card dashboard-card compact-if-few">
+      <article id="today-tasks" class="manager-panel manager-card dashboard-card compact-if-few manager-grid-secondary">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Today Tasks</h2>
           <span class="manager-card-count card-count">{{ today_tasks|length }}</span>
@@ -181,7 +181,7 @@
         </div>
       </article>
 
-      <article class="manager-panel manager-card dashboard-card compact-if-few">
+      <article class="manager-panel manager-card dashboard-card compact-if-few manager-grid-secondary">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Unfinished Tasks</h2>
           <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
