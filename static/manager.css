@@ -889,47 +889,74 @@ body.manager-page {
   font-weight: 600;
 }
 
-.manager-unfinished-panel .manager-task-item,
-.manager-unfinished-panel .manager-task-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding: 14px 16px;
+.manager-unfinished-list {
+  display: grid;
+  gap: 8px;
 }
 
-.manager-unfinished-panel .manager-task-title {
-  -webkit-line-clamp: 2;
-  max-width: 100%;
+.manager-unfinished-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 54px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(230, 221, 208, 0.72);
+}
+
+.manager-unfinished-row:first-child {
+  padding-top: 2px;
+  border-top: 0;
+}
+
+.manager-unfinished-main {
+  min-width: 0;
+}
+
+.manager-unfinished-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
   line-height: 1.16;
-  margin-bottom: 6px;
+  color: #3a3027;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.manager-unfinished-panel .manager-task-subline {
+.manager-unfinished-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px 10px;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   color: #8b8277;
+  line-height: 1.4;
 }
 
-.manager-unfinished-panel .manager-task-aside {
-  min-width: 104px;
+.manager-unfinished-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
 }
 
-.manager-unfinished-panel .manager-badges {
-  gap: 6px;
-  align-items: flex-start;
-}
-
-.manager-unfinished-panel .manager-badge {
+.manager-unfinished-badges .manager-badge {
   min-height: 30px;
   padding: 0 12px;
   font-size: 0.72rem;
 }
 
-.manager-unfinished-panel .manager-task-date {
-  font-size: 0.88rem;
+.manager-unfinished-age {
+  text-align: right;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: #9b7f67;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.manager-unfinished-panel .manager-task-list {
-  gap: 12px;
+.manager-unfinished-age.is-strong {
+  color: #ab6f5d;
 }
 
 @media (max-width: 1480px) {
@@ -1005,6 +1032,18 @@ body.manager-page {
   .manager-trend-row,
   .manager-task-aside {
     align-items: flex-start;
+  }
+
+  .manager-unfinished-row {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-unfinished-badges {
+    justify-content: flex-start;
+  }
+
+  .manager-unfinished-age {
+    text-align: left;
   }
 
   .manager-badges {
