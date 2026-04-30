@@ -889,48 +889,117 @@ body.manager-page {
   font-weight: 600;
 }
 
-.manager-unfinished-list {
+.manager-compact-list {
   display: grid;
+  gap: 0;
+}
+
+.manager-compact-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  align-items: center;
   gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(230, 221, 208, 0.72);
 }
 
-.manager-unfinished-panel .manager-task-item,
-.manager-unfinished-panel .manager-task-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  padding: 14px 16px;
+.manager-compact-item:first-child {
+  padding-top: 2px;
 }
 
-.manager-unfinished-panel .manager-task-title {
-  -webkit-line-clamp: 2;
-  max-width: 100%;
-  line-height: 1.16;
-  margin-bottom: 6px;
+.manager-compact-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 2px;
 }
 
-.manager-unfinished-panel .manager-task-subline {
-  gap: 4px 10px;
-  font-size: 0.88rem;
+.manager-compact-main {
+  min-width: 0;
+}
+
+.manager-compact-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.98rem;
+  line-height: 1.25;
+  color: #3a3027;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manager-compact-meta {
+  display: flex;
+  min-width: 0;
+  margin-top: 5px;
   color: #8b8277;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.manager-unfinished-panel .manager-task-aside {
-  min-width: 104px;
+.manager-compact-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manager-compact-meta span + span::before {
+  content: "·";
+  margin: 0 6px;
+  color: #b0a698;
+}
+
+.manager-compact-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
+  min-width: 78px;
 }
 
-.manager-unfinished-panel .manager-badges {
-  gap: 6px;
-  align-items: flex-start;
+.manager-compact-days {
+  color: #9b7f67;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.manager-unfinished-panel .manager-badge {
-  min-height: 30px;
-  padding: 0 12px;
-  font-size: 0.72rem;
+.manager-compact-days.is-strong {
+  color: #ab6f5d;
 }
 
-.manager-unfinished-panel .manager-task-date {
-  font-size: 0.88rem;
+.manager-compact-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eee8df;
+  color: #6f6558;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.manager-compact-status.status-blocked {
+  background: #eadacf;
+  border: 1px solid rgba(184, 125, 105, 0.16);
+  color: #9a6a58;
+}
+
+.manager-unfinished-panel .manager-panel-footer {
+  margin-top: 10px;
+  text-align: right;
+}
+
+.manager-unfinished-panel .manager-subtle-link {
+  color: #8b8174;
+  font-size: 0.84rem;
 }
 
 @media (max-width: 1480px) {
