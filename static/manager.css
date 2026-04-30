@@ -378,6 +378,21 @@ body.manager-page {
   margin-bottom: 18px;
 }
 
+.manager-panel-footer {
+  margin-top: 14px;
+  padding-top: 2px;
+}
+
+.manager-subtle-link {
+  color: var(--md-text-soft);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.manager-subtle-link:hover {
+  color: var(--md-text);
+}
+
 .manager-card-title,
 .card-title {
   font-family: Georgia, "Times New Roman", serif;
@@ -877,25 +892,44 @@ body.manager-page {
 .manager-unfinished-panel .manager-task-item,
 .manager-unfinished-panel .manager-task-row {
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 16px 18px;
+  padding: 14px 16px;
 }
 
 .manager-unfinished-panel .manager-task-title {
   -webkit-line-clamp: 2;
   max-width: 100%;
+  line-height: 1.16;
+  margin-bottom: 6px;
 }
 
 .manager-unfinished-panel .manager-task-subline {
   gap: 4px 10px;
+  font-size: 0.88rem;
+  color: #8b8277;
 }
 
 .manager-unfinished-panel .manager-task-aside {
-  min-width: 96px;
-  gap: 8px;
+  min-width: 104px;
+  gap: 6px;
 }
 
 .manager-unfinished-panel .manager-badges {
   gap: 6px;
+  align-items: flex-start;
+}
+
+.manager-unfinished-panel .manager-badge {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+}
+
+.manager-unfinished-panel .manager-task-date {
+  font-size: 0.88rem;
+}
+
+.manager-unfinished-panel .manager-task-list {
+  gap: 12px;
 }
 
 @media (max-width: 1480px) {

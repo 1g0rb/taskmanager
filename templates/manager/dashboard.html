@@ -176,13 +176,13 @@
         </div>
       </article>
 
-      <article class="manager-panel manager-card dashboard-card compact-if-few manager-grid-primary manager-unfinished-panel">
+      <article id="unfinished-tasks" class="manager-panel manager-card dashboard-card compact-if-few manager-grid-primary manager-unfinished-panel">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Unfinished Tasks</h2>
           <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
         </div>
         <div class="manager-task-list">
-          {% for task in overdue_tasks[:5] %}
+          {% for task in overdue_tasks[:3] %}
           <article class="manager-task-row manager-task-item {% if task.days_overdue and task.days_overdue >= 7 %}is-overdue-strong{% else %}is-overdue-mild{% endif %}">
             <div class="manager-task-main">
               <div class="manager-task-title">{{ task.title }}</div>
@@ -203,6 +203,11 @@
           <p class="manager-empty">Nothing unfinished right now.</p>
           {% endfor %}
         </div>
+        {% if overdue_tasks|length > 3 %}
+        <div class="manager-panel-footer">
+          <a class="manager-subtle-link" href="/#unfinished-tasks">View all unfinished tasks</a>
+        </div>
+        {% endif %}
       </article>
 
       <article id="status-summary" class="manager-panel manager-card dashboard-card">
