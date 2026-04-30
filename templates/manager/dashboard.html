@@ -85,11 +85,6 @@
       </div>
     </header>
 
-    <section class="manager-status-hero manager-status-{{ operational_status.tone }}">
-      <div class="manager-status-title">{{ operational_status.label }}</div>
-      <div class="manager-status-message">{{ operational_status.message }}</div>
-    </section>
-
     <section class="manager-kpis manager-kpi-grid" aria-label="Key performance indicators">
       <article class="manager-kpi manager-kpi-card kpi-card">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.today }}</div>
@@ -118,7 +113,7 @@
     </section>
 
     <section class="manager-grid">
-      <article class="manager-panel manager-card dashboard-card manager-grid-key-problems">
+      <article class="manager-panel manager-card dashboard-card manager-grid-primary">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Key Problems</h2>
           <span class="manager-card-count card-count">{{ key_problems|length }}</span>
@@ -149,7 +144,7 @@
         </div>
       </article>
 
-      <article id="today-tasks" class="manager-panel manager-card dashboard-card compact-if-few manager-grid-secondary">
+      <article id="today-tasks" class="manager-panel manager-card dashboard-card compact-if-few manager-grid-primary">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Today Tasks</h2>
           <span class="manager-card-count card-count">{{ today_tasks|length }}</span>
@@ -181,7 +176,7 @@
         </div>
       </article>
 
-      <article class="manager-panel manager-card dashboard-card compact-if-few manager-grid-secondary">
+      <article class="manager-panel manager-card dashboard-card compact-if-few manager-grid-primary manager-unfinished-panel">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Unfinished Tasks</h2>
           <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
@@ -246,31 +241,6 @@
         </div>
       </article>
 
-      <article id="upcoming-tasks" class="manager-panel manager-card dashboard-card manager-grid-wide">
-        <div class="manager-panel-head manager-card-header card-header">
-          <h2 class="manager-card-title card-title">Upcoming Tasks</h2>
-          <span class="manager-card-count card-count">Next 7 Days</span>
-        </div>
-        <div class="manager-upcoming-list">
-          {% for task in upcoming_tasks[:5] %}
-          <article class="manager-upcoming-row">
-            <div>
-              <div class="manager-upcoming-title">{{ task.title }}</div>
-              <div class="manager-task-subline manager-task-meta">
-                <span>{{ task.location_name or task.location or 'No location' }}</span>
-                <span>{{ (task.assigned_user_display_names or task.assigned_names or [])|join(', ') if (task.assigned_user_display_names or task.assigned_names) else 'Unassigned' }}</span>
-              </div>
-            </div>
-            {% set upcoming_due = task.scheduled_date or task.due_date %}
-            <span class="manager-upcoming-date">{{ upcoming_due.strftime('%d %b') if upcoming_due and upcoming_due.strftime else (upcoming_due if upcoming_due else 'No date') }}</span>
-            <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-          </article>
-          {% else %}
-          <p class="manager-empty">No upcoming tasks in the next seven days.</p>
-          {% endfor %}
-        </div>
-      </article>
-
       <article id="location-summary" class="manager-panel manager-card dashboard-card">
         <div class="manager-panel-head manager-card-header card-header">
           <h2 class="manager-card-title card-title">Tasks by Location</h2>
@@ -296,6 +266,31 @@
           </div>
           {% else %}
           <p class="manager-empty">No location pressure points to show.</p>
+          {% endfor %}
+        </div>
+      </article>
+
+      <article id="upcoming-tasks" class="manager-panel manager-card dashboard-card manager-grid-wide">
+        <div class="manager-panel-head manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Upcoming Tasks</h2>
+          <span class="manager-card-count card-count">Next 7 Days</span>
+        </div>
+        <div class="manager-upcoming-list">
+          {% for task in upcoming_tasks[:5] %}
+          <article class="manager-upcoming-row">
+            <div>
+              <div class="manager-upcoming-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
+                <span>{{ task.location_name or task.location or 'No location' }}</span>
+                <span>{{ (task.assigned_user_display_names or task.assigned_names or [])|join(', ') if (task.assigned_user_display_names or task.assigned_names) else 'Unassigned' }}</span>
+              </div>
+            </div>
+            {% set upcoming_due = task.scheduled_date or task.due_date %}
+            <span class="manager-upcoming-date">{{ upcoming_due.strftime('%d %b') if upcoming_due and upcoming_due.strftime else (upcoming_due if upcoming_due else 'No date') }}</span>
+            <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+          </article>
+          {% else %}
+          <p class="manager-empty">No upcoming tasks in the next seven days.</p>
           {% endfor %}
         </div>
       </article>

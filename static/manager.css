@@ -261,45 +261,6 @@ body.manager-page {
   padding-top: 14px;
 }
 
-.manager-status-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0 0 30px;
-  padding: 24px 28px;
-  border-radius: 24px;
-  border: 1px solid rgba(184, 125, 105, 0.18);
-  background: linear-gradient(180deg, rgba(250, 242, 236, 0.96) 0%, rgba(247, 239, 230, 0.98) 100%);
-  box-shadow: 0 16px 34px rgba(86, 66, 41, 0.08);
-}
-
-.manager-status-title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #3a3027;
-  line-height: 1.1;
-}
-
-.manager-status-message {
-  color: var(--md-text-soft);
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
-.manager-status-critical .manager-status-title {
-  color: var(--md-terracotta);
-}
-
-.manager-status-attention .manager-status-title {
-  color: var(--md-gold);
-}
-
-.manager-status-control .manager-status-title {
-  color: var(--md-olive);
-}
-
 .manager-kpis,
 .manager-kpi-grid {
   display: grid;
@@ -367,16 +328,13 @@ body.manager-page {
 
 .manager-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.95fr);
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 22px;
   align-items: start;
+  grid-auto-flow: row;
 }
 
-.manager-grid-key-problems {
-  grid-column: 1 / 3;
-}
-
-.manager-grid-secondary {
+.manager-grid-primary {
   min-width: 0;
 }
 
@@ -451,6 +409,7 @@ body.manager-page {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 16px;
+  min-width: 0;
 }
 
 .manager-task-main {
@@ -488,6 +447,7 @@ body.manager-page {
   align-items: flex-end;
   gap: 10px;
   min-width: 110px;
+  flex: 0 0 auto;
 }
 
 .manager-task-date,
@@ -914,6 +874,30 @@ body.manager-page {
   font-weight: 600;
 }
 
+.manager-unfinished-panel .manager-task-item,
+.manager-unfinished-panel .manager-task-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 16px 18px;
+}
+
+.manager-unfinished-panel .manager-task-title {
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+}
+
+.manager-unfinished-panel .manager-task-subline {
+  gap: 4px 10px;
+}
+
+.manager-unfinished-panel .manager-task-aside {
+  min-width: 96px;
+  gap: 8px;
+}
+
+.manager-unfinished-panel .manager-badges {
+  gap: 6px;
+}
+
 @media (max-width: 1480px) {
   .manager-kpis,
   .manager-kpi-grid {
@@ -928,8 +912,7 @@ body.manager-page {
     grid-template-columns: 1fr;
   }
 
-  .manager-grid-wide,
-  .manager-grid-key-problems {
+  .manager-grid-wide {
     grid-column: 1 / -1;
   }
 }
@@ -968,10 +951,6 @@ body.manager-page {
 
   .manager-header {
     flex-direction: column;
-  }
-
-  .manager-status-hero {
-    padding: 20px 22px;
   }
 
   .manager-header-copy h1,
