@@ -181,21 +181,23 @@
           <h2 class="manager-card-title card-title">Unfinished Tasks</h2>
           <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
         </div>
-        <div class="manager-unfinished-list">
+        <div class="manager-task-list manager-unfinished-list">
           {% for task in overdue_tasks[:3] %}
-          <article class="manager-unfinished-row {% if task.days_overdue and task.days_overdue >= 7 %}is-overdue-strong{% else %}is-overdue-mild{% endif %}">
-            <div class="manager-unfinished-main">
-              <div class="manager-unfinished-title">{{ task.title }}</div>
-              <div class="manager-unfinished-meta">
+          <article class="manager-task-row manager-task-item {% if task.days_overdue and task.days_overdue >= 7 %}is-overdue-strong{% else %}is-overdue-mild{% endif %}">
+            <div class="manager-task-main">
+              <div class="manager-task-title">{{ task.title }}</div>
+              <div class="manager-task-subline manager-task-meta">
                 <span>{{ task.location_name or task.location or 'No location' }}</span>
                 <span>{{ (task.assigned_user_display_names or task.assigned_names or [])|join(', ') if (task.assigned_user_display_names or task.assigned_names) else 'Unassigned' }}</span>
               </div>
             </div>
-            <div class="manager-unfinished-badges">
+            <div class="manager-task-aside">
+              <div class="manager-badges">
                 <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
                 <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+              </div>
+              <span class="manager-task-date manager-task-overdue{% if task.days_overdue and task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d</span>
             </div>
-            <span class="manager-unfinished-age{% if task.days_overdue and task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d</span>
           </article>
           {% else %}
           <p class="manager-empty">Nothing unfinished right now.</p>
@@ -203,7 +205,7 @@
         </div>
         {% if overdue_tasks|length > 3 %}
         <div class="manager-panel-footer">
-          <a class="manager-subtle-link" href="/#unfinished-tasks">View all unfinished tasks</a>
+          <a class="manager-subtle-link" href="{{ url_for('manager_dashboard') }}#unfinished-tasks">View all unfinished tasks</a>
         </div>
         {% endif %}
       </article>
