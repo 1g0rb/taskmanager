@@ -22,7 +22,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from werkzeug.exceptions import RequestEntityTooLarge
 from PIL import Image, ImageOps, UnidentifiedImageError
 import requests
-from services.manager_dashboard import build_manager_dashboard_data, build_manager_done_tasks_data, build_manager_reports_data
+from services.manager_dashboard import (
+    build_manager_dashboard_data,
+    build_manager_done_tasks_data,
+    build_manager_reports_data,
+    build_manager_unfinished_tasks_data,
+)
 # ---------------- DB ----------------
 DB_URL = os.environ.get("DATABASE_URL")
 if not DB_URL:
@@ -888,7 +893,16 @@ def restrict_manager_host_surface():
     if request.path.startswith("/static/"):
         return None
 
-    allowed_endpoints = {"index", "manager_dashboard", "manager_reports", "manager_done_tasks", "health", "logout", "static"}
+    allowed_endpoints = {
+        "index",
+        "manager_dashboard",
+        "manager_reports",
+        "manager_done_tasks",
+        "manager_unfinished_tasks",
+        "health",
+        "logout",
+        "static",
+    }
     if (request.endpoint or "") in allowed_endpoints:
         return None
 
@@ -1769,6 +1783,32 @@ def render_manager_done_tasks_page(user: User):
         db.close()
 
 
+def render_manager_unfinished_tasks_page(user: User):
+    db = SessionLocal()
+    try:
+        unfinished_tasks_data = build_manager_unfinished_tasks_data(
+            db,
+            Task=Task,
+            TaskAssignee=TaskAssignee,
+            User=User,
+            Location=Location,
+            Issue=Issue,
+            get_task_schedule_date=get_task_schedule_date,
+        )
+        request.cf_user = user  # type: ignore[attr-defined]
+        return render_template(
+            "manager/unfinished_tasks.html",
+            title="Unfinished Tasks",
+            body_class="manager",
+            autorefresh=False,
+            active_tab="manager",
+            last_updated_label=unfinished_tasks_data["generated_at"].strftime("%d %b %Y Â· %H:%M"),
+            **unfinished_tasks_data,
+        )
+    finally:
+        db.close()
+
+
 # ---------------- Health ----------------
 @app.get("/health")
 def health():
@@ -1796,6 +1836,13 @@ def manager_reports():
 def manager_done_tasks():
     user = request.cf_user  # type: ignore[attr-defined]
     return render_manager_done_tasks_page(user)
+
+
+@app.get("/manager/unfinished-tasks")
+@manager_required
+def manager_unfinished_tasks():
+    user = request.cf_user  # type: ignore[attr-defined]
+    return render_manager_unfinished_tasks_page(user)
 
 
 @app.get("/")

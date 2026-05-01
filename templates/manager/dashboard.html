@@ -204,7 +204,7 @@
         </div>
         {% if overdue_tasks|length > 3 %}
         <div class="manager-panel-footer">
-          <a class="manager-subtle-link" href="{{ url_for('manager_dashboard') }}#unfinished-tasks">View all unfinished tasks</a>
+          <a class="manager-subtle-link" href="{{ url_for('manager_unfinished_tasks') }}">View all unfinished tasks</a>
         </div>
         {% endif %}
       </article>

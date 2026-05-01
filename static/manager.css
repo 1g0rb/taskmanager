@@ -393,6 +393,29 @@ body.manager-page {
   color: var(--md-text);
 }
 
+.manager-page-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: -8px 0 22px;
+}
+
+.manager-back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgba(157, 122, 70, 0.12);
+  border-radius: 999px;
+  background: rgba(251, 248, 243, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.manager-back-link::before {
+  content: "←";
+  margin-right: 8px;
+  color: #9d7a46;
+}
+
 .manager-card-title,
 .card-title {
   font-family: Georgia, "Times New Roman", serif;

@@ -134,6 +134,7 @@ def _collect_manager_task_data(
             "assigned_user_display_names": assignee_names,
             "status": (getattr(task, "status", "open") or "open").strip().lower(),
             "priority": compute_priority(task),
+            "created_at": getattr(task, "created_at", None),
             "scheduled_date": schedule_date,
             "started_at": getattr(task, "started_at", None),
             "completed_at": getattr(task, "finished_at", None),
@@ -450,6 +451,36 @@ def build_manager_done_tasks_data(
         "today": base["today"],
         "done_task_groups": grouped_items,
         "done_task_count": sum(group["count"] for group in grouped_items),
+    }
+
+
+def build_manager_unfinished_tasks_data(
+    db,
+    *,
+    Task,
+    TaskAssignee,
+    User,
+    Location,
+    Issue,
+    get_task_schedule_date,
+    today: date | None = None,
+):
+    base = _collect_manager_task_data(
+        db,
+        Task=Task,
+        TaskAssignee=TaskAssignee,
+        User=User,
+        Location=Location,
+        Issue=Issue,
+        get_task_schedule_date=get_task_schedule_date,
+        today=today,
+    )
+
+    return {
+        "generated_at": base["generated_at"],
+        "today": base["today"],
+        "unfinished_tasks": base["open_tasks"],
+        "unfinished_task_count": base["open_task_count"],
     }
 
 
