@@ -1,0 +1,117 @@
+{% extends "manager/layout.html" %}
+
+{% block content %}
+<section class="manager-frame manager-layout manager-dashboard">
+  <aside class="manager-sidebar">
+    <div class="manager-brand">
+      <div class="manager-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" class="manager-brand-icon">
+          <circle cx="20" cy="20" r="6"></circle>
+          <path d="M20 3v7M20 30v7M3 20h7M30 20h7M8.2 8.2l4.9 4.9M26.9 26.9l4.9 4.9M31.8 8.2l-4.9 4.9M13.1 26.9l-4.9 4.9"></path>
+        </svg>
+      </div>
+      <div class="manager-brand-copy">
+        <span class="manager-brand-name brand-title">Meneghetti</span>
+        <span class="manager-brand-sub brand-subtitle">Task Manager</span>
+      </div>
+    </div>
+
+    <nav class="manager-nav" aria-label="Manager navigation">
+      <a class="manager-nav-item manager-nav-link is-active" href="/">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"></path><path d="M7.5 10.5V19h9v-8.5"></path></svg>
+        </span>
+        <span>Manager Dashboard</span>
+      </a>
+      <a class="manager-nav-item manager-nav-link" href="{{ url_for('manager_done_tasks') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="15" rx="2"></rect><path d="M8 9.5h8M8 13h6"></path></svg>
+        </span>
+        <span>Done Tasks</span>
+      </a>
+      <a class="manager-nav-item manager-nav-link" href="{{ url_for('manager_reports') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M6 17.5h12"></path><path d="M8 17.5v-6"></path><path d="M12 17.5v-9"></path><path d="M16 17.5v-4"></path></svg>
+        </span>
+        <span>Reports</span>
+      </a>
+    </nav>
+
+    <div class="manager-sidebar-footer">
+      <a class="manager-signout" href="{{ logout_url if logout_url else url_for('logout') }}">Sign out</a>
+    </div>
+  </aside>
+
+  <div class="manager-main manager-shell">
+    <header class="manager-header">
+      <div class="manager-header-copy">
+        <p class="manager-eyebrow eyebrow">Operations Overview</p>
+        <h1 class="manager-title">{{ page_title }}</h1>
+        <p class="manager-subtitle">Read-only task detail for the selected dashboard indicator</p>
+      </div>
+      <div class="manager-timestamp">
+        <span class="manager-timestamp-value">
+          {% if last_updated_label %}
+            {{ last_updated_label }}
+          {% elif generated_at %}
+            {{ generated_at.strftime('%d %b %Y Â· %H:%M') if generated_at.strftime else generated_at }}
+          {% else %}
+            Last updated just now
+          {% endif %}
+        </span>
+      </div>
+    </header>
+
+    <div class="manager-page-actions">
+      <a class="manager-back-link manager-subtle-link" href="{{ url_for('manager_dashboard') }}">Back to Manager Dashboard</a>
+    </div>
+
+    <section class="manager-panel manager-card dashboard-card">
+      <div class="manager-panel-head manager-card-header card-header">
+        <h2 class="manager-card-title card-title">{{ page_title }}</h2>
+        <div class="manager-panel-meta">
+          <span class="manager-filter-badge">{{ active_filter_label }}</span>
+          <span class="manager-card-count card-count">{{ task_count }}</span>
+        </div>
+      </div>
+
+      <div class="manager-task-list">
+        {% for task in tasks %}
+        <article class="manager-task-row manager-task-item{% if task.days_overdue is not none %} is-overdue-mild{% endif %}">
+          <div class="manager-task-main">
+            <div class="manager-task-title">{{ task.title }}</div>
+            <div class="manager-task-subline manager-task-meta">
+              <span>{{ task.location_name or 'No location' }}</span>
+              <span>{{ task.assigned_user_display_names|join(', ') if task.assigned_user_display_names else 'Unassigned' }}</span>
+            </div>
+          </div>
+          <div class="manager-task-aside">
+            <div class="manager-badges">
+              {% if task.status %}
+              <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+              {% endif %}
+              {% if task.priority %}
+              <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
+              {% endif %}
+            </div>
+            {% if task.days_overdue is not none %}
+            <span class="manager-task-date manager-task-overdue{% if task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d unfinished</span>
+            {% elif task.completed_at %}
+            <span class="manager-task-date">{{ task.completed_at.strftime('%d %b %Y') if task.completed_at.strftime else task.completed_at }}</span>
+            {% elif task.scheduled_date %}
+            <span class="manager-task-date">{{ task.scheduled_date.strftime('%d %b %Y') if task.scheduled_date.strftime else task.scheduled_date }}</span>
+            {% elif task.created_at %}
+            <span class="manager-task-date">{{ task.created_at.strftime('%d %b %Y') if task.created_at.strftime else task.created_at }}</span>
+            {% else %}
+            <span class="manager-task-date">No date</span>
+            {% endif %}
+          </div>
+        </article>
+        {% else %}
+        <p class="manager-empty">No tasks found for this filter.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</section>
+{% endblock %}

@@ -26,7 +26,7 @@ from services.manager_dashboard import (
     build_manager_dashboard_data,
     build_manager_done_tasks_data,
     build_manager_reports_data,
-    build_manager_unfinished_tasks_data,
+    build_manager_tasks_list_data,
 )
 # ---------------- DB ----------------
 DB_URL = os.environ.get("DATABASE_URL")
@@ -898,6 +898,7 @@ def restrict_manager_host_surface():
         "manager_dashboard",
         "manager_reports",
         "manager_done_tasks",
+        "manager_tasks",
         "manager_unfinished_tasks",
         "health",
         "logout",
@@ -1783,10 +1784,10 @@ def render_manager_done_tasks_page(user: User):
         db.close()
 
 
-def render_manager_unfinished_tasks_page(user: User):
+def render_manager_tasks_page(user: User):
     db = SessionLocal()
     try:
-        unfinished_tasks_data = build_manager_unfinished_tasks_data(
+        tasks_data = build_manager_tasks_list_data(
             db,
             Task=Task,
             TaskAssignee=TaskAssignee,
@@ -1794,16 +1795,17 @@ def render_manager_unfinished_tasks_page(user: User):
             Location=Location,
             Issue=Issue,
             get_task_schedule_date=get_task_schedule_date,
+            filter_key=(request.args.get("filter", "today") or "today").strip().lower(),
         )
         request.cf_user = user  # type: ignore[attr-defined]
         return render_template(
-            "manager/unfinished_tasks.html",
-            title="Unfinished Tasks",
+            "manager/tasks_list.html",
+            title=tasks_data["page_title"],
             body_class="manager",
             autorefresh=False,
             active_tab="manager",
-            last_updated_label=unfinished_tasks_data["generated_at"].strftime("%d %b %Y Â· %H:%M"),
-            **unfinished_tasks_data,
+            last_updated_label=tasks_data["generated_at"].strftime("%d %b %Y Â· %H:%M"),
+            **tasks_data,
         )
     finally:
         db.close()
@@ -1838,11 +1840,17 @@ def manager_done_tasks():
     return render_manager_done_tasks_page(user)
 
 
+@app.get("/manager/tasks")
+@manager_required
+def manager_tasks():
+    user = request.cf_user  # type: ignore[attr-defined]
+    return render_manager_tasks_page(user)
+
+
 @app.get("/manager/unfinished-tasks")
 @manager_required
 def manager_unfinished_tasks():
-    user = request.cf_user  # type: ignore[attr-defined]
-    return render_manager_unfinished_tasks_page(user)
+    return redirect(url_for("manager_tasks", filter="unfinished"))
 
 
 @app.get("/")

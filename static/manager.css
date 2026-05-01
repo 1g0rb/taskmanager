@@ -285,6 +285,23 @@ body.manager-page {
   position: relative;
 }
 
+.manager-kpi-link {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.manager-kpi-link:hover {
+  box-shadow: 0 16px 42px rgba(66, 52, 34, 0.11);
+  transform: translateY(-2px);
+}
+
+.manager-kpi-link:focus-visible {
+  outline: 2px solid rgba(157, 122, 70, 0.34);
+  outline-offset: 4px;
+}
+
 .manager-kpi-card::before,
 .kpi-card::before,
 .manager-kpi::before {
@@ -414,6 +431,26 @@ body.manager-page {
   content: "←";
   margin-right: 8px;
   color: #9d7a46;
+}
+
+.manager-panel-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manager-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(157, 122, 70, 0.13);
+  border-radius: 999px;
+  background: rgba(238, 232, 223, 0.72);
+  color: #756750;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .manager-card-title,

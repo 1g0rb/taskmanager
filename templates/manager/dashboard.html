@@ -86,30 +86,30 @@
     </header>
 
     <section class="manager-kpis manager-kpi-grid" aria-label="Key performance indicators">
-      <article class="manager-kpi manager-kpi-card kpi-card">
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='today') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.today }}</div>
         <div class="manager-kpi-label kpi-label">Today Tasks</div>
-      </article>
-      <article class="manager-kpi manager-kpi-card kpi-card is-overdue">
+      </a>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link is-overdue" href="{{ url_for('manager_tasks', filter='unfinished') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.overdue }}</div>
         <div class="manager-kpi-label kpi-label">Unfinished</div>
-      </article>
-      <article class="manager-kpi manager-kpi-card kpi-card">
+      </a>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='in_progress') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.in_progress }}</div>
         <div class="manager-kpi-label kpi-label">In Progress</div>
-      </article>
-      <article class="manager-kpi manager-kpi-card kpi-card">
+      </a>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='blocked') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.blocked }}</div>
         <div class="manager-kpi-label kpi-label">Blocked</div>
-      </article>
-      <article class="manager-kpi manager-kpi-card kpi-card">
+      </a>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='done_today') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.done_today }}</div>
         <div class="manager-kpi-label kpi-label">Done Today</div>
-      </article>
-      <article class="manager-kpi manager-kpi-card kpi-card is-urgent">
+      </a>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link is-urgent" href="{{ url_for('manager_tasks', filter='urgent') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.urgent }}</div>
         <div class="manager-kpi-label kpi-label">Urgent</div>
-      </article>
+      </a>
     </section>
 
     <section class="manager-grid">
@@ -204,7 +204,7 @@
         </div>
         {% if overdue_tasks|length > 3 %}
         <div class="manager-panel-footer">
-          <a class="manager-subtle-link" href="{{ url_for('manager_unfinished_tasks') }}">View all unfinished tasks</a>
+          <a class="manager-subtle-link" href="{{ url_for('manager_tasks', filter='unfinished') }}">View all unfinished tasks</a>
         </div>
         {% endif %}
       </article>

@@ -291,6 +291,7 @@ def _collect_manager_task_data(
         "status_summary": status_summary,
         "priority_summary": priority_summary,
         "location_summary": location_items[:8],
+        "done_today_tasks": sorted(completed_today, key=completion_sort_key, reverse=True),
         "recent_completions_today": sorted(completed_today, key=completion_sort_key, reverse=True)[:8],
         "completed_tasks": sorted(completed_task_items, key=completion_sort_key, reverse=True),
         "recent_completed_tasks": sorted(recent_completed_tasks, key=completion_sort_key, reverse=True)[:10],
@@ -481,6 +482,84 @@ def build_manager_unfinished_tasks_data(
         "today": base["today"],
         "unfinished_tasks": base["open_tasks"],
         "unfinished_task_count": base["open_task_count"],
+    }
+
+
+def build_manager_tasks_list_data(
+    db,
+    *,
+    Task,
+    TaskAssignee,
+    User,
+    Location,
+    Issue,
+    get_task_schedule_date,
+    filter_key: str = "today",
+    today: date | None = None,
+):
+    base = _collect_manager_task_data(
+        db,
+        Task=Task,
+        TaskAssignee=TaskAssignee,
+        User=User,
+        Location=Location,
+        Issue=Issue,
+        get_task_schedule_date=get_task_schedule_date,
+        today=today,
+    )
+
+    filter_config = {
+        "today": {
+            "title": "Today Tasks",
+            "label": "Today",
+            "tasks": base["today_tasks"],
+        },
+        "unfinished": {
+            "title": "Unfinished Tasks",
+            "label": "Unfinished",
+            "tasks": base["open_tasks"],
+        },
+        "in_progress": {
+            "title": "In Progress Tasks",
+            "label": "In Progress",
+            "tasks": [
+                task
+                for task in base["open_tasks"]
+                if task["status"] == "in_progress" or task.get("started_at")
+            ],
+        },
+        "blocked": {
+            "title": "Blocked Tasks",
+            "label": "Blocked",
+            "tasks": [task for task in base["open_tasks"] if task["status"] == "blocked"],
+        },
+        "done_today": {
+            "title": "Done Today",
+            "label": "Done Today",
+            "tasks": base["done_today_tasks"],
+        },
+        "urgent": {
+            "title": "Urgent Tasks",
+            "label": "Urgent",
+            "tasks": [
+                task
+                for task in base["open_tasks"]
+                if task["priority"] in {"urgent", "high"}
+            ],
+        },
+    }
+
+    active_filter = filter_key if filter_key in filter_config else "today"
+    active_config = filter_config[active_filter]
+
+    return {
+        "generated_at": base["generated_at"],
+        "today": base["today"],
+        "active_filter": active_filter,
+        "active_filter_label": active_config["label"],
+        "page_title": active_config["title"],
+        "tasks": active_config["tasks"],
+        "task_count": len(active_config["tasks"]),
     }
 
 
