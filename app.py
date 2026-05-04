@@ -11,7 +11,7 @@ import secrets
 from sqlalchemy.exc import IntegrityError
 from types import SimpleNamespace
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
-from urllib.parse import urlparse
+from urllib.parse import quote, unquote, urlparse
 from werkzeug.security import generate_password_hash
 
 from sqlalchemy import (
@@ -270,10 +270,12 @@ class UserActivity(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     user_email = Column(String, nullable=True, index=True)
     user_name = Column(String, nullable=True)
+    access_type = Column(String(20), nullable=False, default="worker", index=True)
     path = Column(String, nullable=False)
     method = Column(String(10), nullable=False)
     activity_type = Column(String(20), nullable=False, default="view")
     ip_address = Column(String(64), nullable=True)
+    activity_date = Column(Date, default=date.today, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
@@ -590,6 +592,19 @@ def ensure_user_activity_schema():
                     text("ALTER TABLE user_activity ADD COLUMN activity_type VARCHAR(20) NOT NULL DEFAULT 'view'")
                 )
                 print("Added column: user_activity.activity_type")
+            if "access_type" not in names:
+                conn.execute(
+                    text("ALTER TABLE user_activity ADD COLUMN access_type VARCHAR(20) NOT NULL DEFAULT 'worker'")
+                )
+                print("Added column: user_activity.access_type")
+            if "activity_date" not in names:
+                conn.execute(
+                    text("ALTER TABLE user_activity ADD COLUMN activity_date DATE")
+                )
+                conn.execute(
+                    text("UPDATE user_activity SET activity_date = DATE(created_at) WHERE activity_date IS NULL")
+                )
+                print("Added column: user_activity.activity_date")
 
         conn.execute(
             text("CREATE INDEX IF NOT EXISTS ix_user_activity_user_id ON user_activity (user_id)")
@@ -599,6 +614,12 @@ def ensure_user_activity_schema():
         )
         conn.execute(
             text("CREATE INDEX IF NOT EXISTS ix_user_activity_user_email ON user_activity (user_email)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_activity_access_type ON user_activity (access_type)")
+        )
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_user_activity_activity_date ON user_activity (activity_date)")
         )
 
 
@@ -659,6 +680,14 @@ DEV_BYPASS = os.environ.get("DEV_BYPASS", "").lower() in ("1", "true", "yes")
 DEV_LAN_BYPASS = os.environ.get("DEV_LAN_BYPASS", "").lower() in ("1", "true", "yes")
 IGNORED_ACTIVITY_PATH_PREFIXES = ("/static/", "/cdn-cgi/")
 IGNORED_ACTIVITY_PATHS = {"/favicon.ico", "/health"}
+MANAGER_ACTIVITY_ENDPOINTS = {
+    "index",
+    "manager_dashboard",
+    "manager_reports",
+    "manager_done_tasks",
+    "manager_tasks",
+    "manager_unfinished_tasks",
+}
 
 
 def redirect_back(default="admin_tasks"):
@@ -786,14 +815,28 @@ def should_log_user_activity() -> bool:
     return bool(endpoint)
 
 
+def get_activity_access_type() -> str:
+    endpoint = request.endpoint or ""
+    path = request.path or ""
+
+    if endpoint in MANAGER_ACTIVITY_ENDPOINTS and (
+        is_manager_request() or path.startswith("/manager/") or path in {"/reports", "/done-tasks"}
+    ):
+        return "manager"
+    if path.startswith("/admin/"):
+        return "admin"
+    return "worker"
+
+
 def log_user_activity() -> None:
     if not should_log_user_activity():
         return
 
+    access_type = get_activity_access_type()
     user_email = get_cf_email()
     user_name = get_cf_name()
 
-    if not user_email and not user_name:
+    if access_type != "manager" and not user_email and not user_name:
         return
 
     db = SessionLocal()
@@ -805,11 +848,15 @@ def log_user_activity() -> None:
         activity = UserActivity(
             user_id=matched_user.id if matched_user else None,
             user_email=user_email,
-            user_name=user_name or (matched_user.display_name if matched_user else None),
+            user_name=user_name or (matched_user.display_name if matched_user else None) or (
+                "Unknown manager user" if access_type == "manager" else None
+            ),
+            access_type=access_type,
             path=request.path,
             method=request.method,
             activity_type="view" if request.method == "GET" else "action",
             ip_address=get_request_ip(),
+            activity_date=date.today(),
         )
         db.add(activity)
         db.commit()
@@ -1598,7 +1645,7 @@ def start_of_current_week(today_value: date) -> date:
     return today_value - timedelta(days=today_value.weekday())
 
 
-def build_activity_stats(db: Session, users: list[User], today_value: date):
+def build_activity_stats(db: Session, users: list[User], today_value: date, access_type: str = "worker"):
     stats = {
         user.id: {"last_seen": None, "today_count": 0, "week_count": 0}
         for user in users
@@ -1621,6 +1668,7 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
         .filter(
             UserActivity.user_id.in_(user_ids),
             UserActivity.user_id.isnot(None),
+            UserActivity.access_type == access_type,
         )
         .group_by(UserActivity.user_id)
         .all()
@@ -1634,6 +1682,7 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
         .filter(
             UserActivity.user_id.is_(None),
             UserActivity.user_email.in_(user_emails),
+            UserActivity.access_type == access_type,
         )
         .group_by(UserActivity.user_email)
         .all()
@@ -1650,6 +1699,7 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
         .filter(
             UserActivity.user_id.in_(user_ids),
             UserActivity.user_id.isnot(None),
+            UserActivity.access_type == access_type,
             UserActivity.created_at >= start_today,
         )
         .group_by(UserActivity.user_id)
@@ -1664,6 +1714,7 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
         .filter(
             UserActivity.user_id.is_(None),
             UserActivity.user_email.in_(user_emails),
+            UserActivity.access_type == access_type,
             UserActivity.created_at >= start_today,
         )
         .group_by(UserActivity.user_email)
@@ -1679,6 +1730,7 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
         .filter(
             UserActivity.user_id.in_(user_ids),
             UserActivity.user_id.isnot(None),
+            UserActivity.access_type == access_type,
             UserActivity.created_at >= start_week,
         )
         .group_by(UserActivity.user_id)
@@ -1693,6 +1745,7 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
         .filter(
             UserActivity.user_id.is_(None),
             UserActivity.user_email.in_(user_emails),
+            UserActivity.access_type == access_type,
             UserActivity.created_at >= start_week,
         )
         .group_by(UserActivity.user_email)
@@ -1704,6 +1757,71 @@ def build_activity_stats(db: Session, users: list[User], today_value: date):
             stats[mapped_user_id]["week_count"] += count
 
     return stats
+
+
+def manager_activity_user_key(activity: UserActivity) -> str:
+    if activity.user_id:
+        return f"user-{activity.user_id}"
+    if activity.user_email:
+        return f"email-{quote(activity.user_email, safe='')}"
+    return "unknown"
+
+
+def manager_activity_display_name(activity: UserActivity) -> str:
+    if activity.user_name:
+        return activity.user_name
+    if activity.user_email:
+        return activity.user_email.split("@")[0]
+    return "Unknown manager user"
+
+
+def build_manager_activity_rows(db: Session, today_value: date):
+    start_today = datetime.combine(today_value, datetime.min.time())
+    start_week = datetime.combine(start_of_current_week(today_value), datetime.min.time())
+    rows_by_key: dict[str, dict] = {}
+
+    activities = (
+        db.query(UserActivity)
+        .filter(UserActivity.access_type == "manager")
+        .order_by(UserActivity.created_at.desc())
+        .all()
+    )
+
+    for activity in activities:
+        key = manager_activity_user_key(activity)
+        row = rows_by_key.get(key)
+        if not row:
+            row = {
+                "user_key": key,
+                "name": manager_activity_display_name(activity),
+                "email": activity.user_email,
+                "last_seen": activity.created_at,
+                "today_count": 0,
+                "week_count": 0,
+                "last_path": activity.path,
+            }
+            rows_by_key[key] = row
+
+        if activity.created_at and activity.created_at >= start_today:
+            row["today_count"] += 1
+        if activity.created_at and activity.created_at >= start_week:
+            row["week_count"] += 1
+
+    return sorted(rows_by_key.values(), key=lambda row: row["last_seen"] or datetime.min, reverse=True)
+
+
+def manager_activity_filter_for_key(user_key: str):
+    if user_key.startswith("user-"):
+        raw_id = user_key.removeprefix("user-")
+        if raw_id.isdigit():
+            return UserActivity.user_id == int(raw_id)
+    if user_key.startswith("email-"):
+        email = unquote(user_key.removeprefix("email-")).strip().lower()
+        if email:
+            return UserActivity.user_email == email
+    if user_key == "unknown":
+        return UserActivity.user_email.is_(None)
+    return None
 
 
 def render_manager_dashboard_page(user: User):
@@ -2374,7 +2492,8 @@ def admin_activity_detail(user_id: int):
                 or_(
                     UserActivity.user_id == user.id,
                     (UserActivity.user_id.is_(None) & (UserActivity.user_email == user.username)),
-                )
+                ),
+                UserActivity.access_type == "worker",
             )
             .order_by(UserActivity.created_at.desc())
             .limit(50)
@@ -2385,6 +2504,92 @@ def admin_activity_detail(user_id: int):
             "admin_activity_detail.html",
             title="User Activity Detail",
             user=user,
+            stats=stats,
+            activities=activities,
+            today=today_value,
+        )
+    finally:
+        db.close()
+
+
+@app.get("/admin/manager-activity")
+@admin_required
+def admin_manager_activity():
+    db = SessionLocal()
+    try:
+        today_value = date.today()
+        rows = build_manager_activity_rows(db, today_value)
+
+        return render_template(
+            "admin_manager_activity.html",
+            title="Manager Activity",
+            rows=rows,
+            today=today_value,
+        )
+    finally:
+        db.close()
+
+
+@app.get("/admin/manager-activity/<path:user_key>")
+@admin_required
+def admin_manager_activity_detail(user_key: str):
+    db = SessionLocal()
+    try:
+        base_filter = manager_activity_filter_for_key(user_key)
+        if base_filter is None:
+            flash("Manager activity user not found.")
+            return redirect(url_for("admin_manager_activity"))
+
+        user = None
+        if user_key.startswith("user-"):
+            raw_id = user_key.removeprefix("user-")
+            if raw_id.isdigit():
+                user = db.get(User, int(raw_id))
+                if user:
+                    base_filter = or_(UserActivity.user_id == user.id, UserActivity.user_email == user.username)
+
+        activities = (
+            db.query(UserActivity)
+            .filter(UserActivity.access_type == "manager", base_filter)
+            .order_by(UserActivity.created_at.desc())
+            .limit(100)
+            .all()
+        )
+
+        if not activities:
+            flash("Manager activity user not found.")
+            return redirect(url_for("admin_manager_activity"))
+
+        today_value = date.today()
+        start_today = datetime.combine(today_value, datetime.min.time())
+        start_week = datetime.combine(start_of_current_week(today_value), datetime.min.time())
+        stats = {
+            "last_seen": (
+                db.query(func.max(UserActivity.created_at))
+                .filter(UserActivity.access_type == "manager", base_filter)
+                .scalar()
+            ),
+            "today_count": (
+                db.query(func.count(UserActivity.id))
+                .filter(UserActivity.access_type == "manager", base_filter, UserActivity.created_at >= start_today)
+                .scalar()
+            ),
+            "week_count": (
+                db.query(func.count(UserActivity.id))
+                .filter(UserActivity.access_type == "manager", base_filter, UserActivity.created_at >= start_week)
+                .scalar()
+            ),
+        }
+        identity = {
+            "name": (user.display_name if user else None) or manager_activity_display_name(activities[0]),
+            "email": (user.username if user else None) or activities[0].user_email,
+        }
+
+        return render_template(
+            "admin_manager_activity_detail.html",
+            title="Manager Activity Detail",
+            user_key=user_key,
+            identity=identity,
             stats=stats,
             activities=activities,
             today=today_value,

@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="card">
+  <div class="page-head">
+    <div class="page-title">
+      <h2>Manager Activity</h2>
+      <div class="small">Pregled pristupa Manager Dashboardu.</div>
+    </div>
+  </div>
+
+  <div style="overflow:auto;">
+    <table class="users-table activity-table">
+      <colgroup>
+        <col style="width:24%">
+        <col style="width:18%">
+        <col style="width:14%">
+        <col style="width:14%">
+        <col style="width:20%">
+        <col style="width:10%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Ime / email</th>
+          <th>Last seen</th>
+          <th>Aktivnosti danas</th>
+          <th>Ovaj tjedan</th>
+          <th>Last route</th>
+          <th>Detalji</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <div class="activity-user-cell">
+              <strong>{{ row.name }}</strong>
+              <span class="small">{{ row.email or "No email available" }}</span>
+            </div>
+          </td>
+          <td>
+            {% if row.last_seen %}
+              <div class="activity-user-cell">
+                <strong>{{ row.last_seen.strftime("%Y-%m-%d %H:%M") }}</strong>
+                <span class="small">{{ row.last_seen.strftime("%A") }}</span>
+              </div>
+            {% else %}
+              <span class="small">No activity yet</span>
+            {% endif %}
+          </td>
+          <td><span class="pill users-pill">{{ row.today_count or 0 }}</span></td>
+          <td><span class="pill users-pill">{{ row.week_count or 0 }}</span></td>
+          <td class="activity-path-cell">{{ row.last_path }}</td>
+          <td>
+            <a class="btn" href="{{ url_for('admin_manager_activity_detail', user_key=row.user_key) }}">Details</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6"><span class="small">Nema zabiljezenih manager aktivnosti.</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

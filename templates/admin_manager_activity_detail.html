@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="page-head">
+  <div class="page-title">
+    <h2>Manager Activity</h2>
+    <div class="small">{{ identity.name }}{% if identity.email %} &middot; {{ identity.email }}{% endif %}</div>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="{{ url_for('admin_manager_activity') }}">Back</a>
+  </div>
+</div>
+
+<div class="stats stats-3">
+  <div class="stat">
+    <div>
+      <div class="stat-label">Last seen</div>
+      <div class="stat-value activity-stat-text">
+        {{ stats.last_seen.strftime("%Y-%m-%d %H:%M") if stats.last_seen else "No activity" }}
+      </div>
+    </div>
+  </div>
+  <div class="stat">
+    <div>
+      <div class="stat-label">Aktivnosti danas</div>
+      <div class="stat-value">{{ stats.today_count or 0 }}</div>
+    </div>
+  </div>
+  <div class="stat">
+    <div>
+      <div class="stat-label">Aktivnosti ovaj tjedan</div>
+      <div class="stat-value">{{ stats.week_count or 0 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="page-head">
+    <div class="page-title">
+      <h2 style="font-size:24px;">Zadnjih 100 manager posjeta</h2>
+      <div class="small">GET = view, ostalo = action</div>
+    </div>
+  </div>
+
+  <div style="overflow:auto;">
+    <table class="users-table activity-table">
+      <colgroup>
+        <col style="width:22%">
+        <col style="width:12%">
+        <col style="width:12%">
+        <col style="width:34%">
+        <col style="width:20%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Vrijeme</th>
+          <th>Tip</th>
+          <th>Method</th>
+          <th>Path</th>
+          <th>IP adresa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for activity in activities %}
+        <tr>
+          <td>
+            <div class="activity-user-cell">
+              <strong>{{ activity.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</strong>
+            </div>
+          </td>
+          <td>
+            <span class="users-badge manager">
+              {{ activity.activity_type }}
+            </span>
+          </td>
+          <td><span class="pill users-pill">{{ activity.method }}</span></td>
+          <td class="activity-path-cell">{{ activity.path }}</td>
+          <td>{{ activity.ip_address or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5"><span class="small">Nema zabiljezenih manager aktivnosti za ovog korisnika.</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
