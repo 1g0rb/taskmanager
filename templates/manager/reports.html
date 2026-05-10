@@ -67,7 +67,7 @@
 
     <section class="manager-kpis manager-kpi-grid" aria-label="Reports summary indicators">
       {% for kpi in report_kpis %}
-      <article class="manager-kpi manager-kpi-card kpi-card{% if kpi.key == 'aging' %} is-overdue{% endif %}">
+      <article class="manager-kpi manager-kpi-card kpi-card{% if kpi.key == 'blocked' %} is-overdue{% endif %}">
         <div class="manager-kpi-value kpi-value">{{ kpi.value }}</div>
         <div class="manager-kpi-label kpi-label">{{ kpi.label }}</div>
       </article>
@@ -107,17 +107,15 @@
               <tr>
                 <th scope="col" class="manager-location-col-name">Location</th>
                 <th scope="col">Open</th>
-                <th scope="col">Aging</th>
                 <th scope="col">Blocked</th>
-                <th scope="col">Done Recently</th>
+                <th scope="col">Done Last 7 Days</th>
               </tr>
             </thead>
             <tbody>
               {% for item in location_performance %}
               <tr>
                 <th scope="row" class="manager-location-table-name">{{ item.location_name }}</th>
-                <td class="manager-location-table-metric">{{ item.open_count }}</td>
-                <td class="manager-location-table-metric is-unfinished">{{ item.aging_count }}</td>
+                <td class="manager-location-table-metric">{{ item.report_open_count }}</td>
                 <td class="manager-location-table-metric is-blocked">{{ item.blocked_count }}</td>
                 <td class="manager-location-table-metric">{{ item.done_recent_count }}</td>
               </tr>

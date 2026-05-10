@@ -30,6 +30,7 @@ def _collect_manager_task_data(
     task_ids = [task.id for task in tasks if getattr(task, "id", None)]
     locations = {row.id: row for row in db.query(Location).all()}
     active_work_session_task_ids = set()
+    recent_work_session_user_ids = set()
     if TaskWorkSession is not None and task_ids:
         active_work_session_task_ids = {
             task_id
@@ -43,6 +44,19 @@ def _collect_manager_task_data(
                 .distinct()
                 .all()
             )
+        }
+        recent_work_session_user_ids = {
+            user_id
+            for (user_id,) in (
+                db.query(TaskWorkSession.user_id)
+                .filter(
+                    TaskWorkSession.task_id.in_(task_ids),
+                    TaskWorkSession.started_at >= datetime.combine(recent_window_start, datetime.min.time()),
+                )
+                .distinct()
+                .all()
+            )
+            if user_id
         }
 
     assignee_rows = (
@@ -62,6 +76,7 @@ def _collect_manager_task_data(
         legacy_user_id = getattr(task, "assigned_to", None)
         if legacy_user_id:
             user_ids.add(legacy_user_id)
+    user_ids.update(recent_work_session_user_ids)
 
     users = (
         {
@@ -200,11 +215,13 @@ def _collect_manager_task_data(
         lambda: {
             "location_name": "Unknown location",
             "open": 0,
+            "report_open": 0,
             "unfinished": 0,
             "blocked": 0,
             "done_recent": 0,
         }
     )
+    active_worker_ids = set(recent_work_session_user_ids)
 
     for task, item in zip(tasks, prepared_tasks):
         schedule_date = item["_schedule_date"]
@@ -224,6 +241,8 @@ def _collect_manager_task_data(
             status_counter[workflow_status] += 1
             priority_counter[item["priority"]] += 1
             location_row["open"] += 1
+            if workflow_status != "blocked":
+                location_row["report_open"] += 1
             if aging:
                 location_row["unfinished"] += 1
             if workflow_status == "in_progress":
@@ -248,16 +267,23 @@ def _collect_manager_task_data(
             recent_completed_tasks.append(item)
             completion_counter[completion_date] += 1
             location_row["done_recent"] += 1
+            for user_id in assignees_by_task_id.get(task.id, []):
+                if user_id:
+                    active_worker_ids.add(user_id)
+            legacy_user_id = getattr(task, "assigned_to", None)
+            if legacy_user_id:
+                active_worker_ids.add(legacy_user_id)
 
     location_items = []
     for location_id, summary in location_summary.items():
-        score = (summary["unfinished"] * 3) + (summary["blocked"] * 2) + summary["open"] + summary["done_recent"]
-        if summary["open"] or summary["unfinished"] or summary["blocked"] or summary["done_recent"]:
+        score = (summary["blocked"] * 3) + (summary["report_open"] * 2) + summary["done_recent"]
+        if summary["report_open"] or summary["blocked"] or summary["done_recent"]:
             location_items.append(
                 {
                     "location_id": location_id,
                     "location_name": summary["location_name"],
                     "open_count": summary["open"],
+                    "report_open_count": summary["report_open"],
                     "unfinished_count": summary["unfinished"],
                     "aging_count": summary["unfinished"],
                     "blocked_count": summary["blocked"],
@@ -269,9 +295,8 @@ def _collect_manager_task_data(
     location_items.sort(
         key=lambda item: (
             -item["activity_score"],
-            -item["unfinished_count"],
             -item["blocked_count"],
-            -item["open_count"],
+            -item["report_open_count"],
             -item["done_recent_count"],
             item["location_name"].lower(),
         )
@@ -289,6 +314,17 @@ def _collect_manager_task_data(
     status_snapshot["done"] = len(completed_today)
     for key in status_order:
         status_summary.append({"key": key, "label": status_labels[key], "count": status_snapshot.get(key, 0)})
+
+    report_status_summary = [
+        {
+            "key": "open",
+            "label": "Open",
+            "count": sum(1 for task in open_task_items if task["workflow_status"] != "blocked"),
+        },
+        {"key": "blocked", "label": "Blocked", "count": len(blocked_tasks)},
+        {"key": "done_today", "label": "Done Today", "count": len(completed_today)},
+        {"key": "done_last_7_days", "label": "Done Last 7 Days", "count": len(recent_completed_tasks)},
+    ]
 
     priority_order = ["urgent", "high", "normal", "low"]
     priority_labels = {
@@ -338,6 +374,7 @@ def _collect_manager_task_data(
         "blocked_tasks": sorted(blocked_tasks, key=task_sort_key),
         "urgent_tasks": sorted(urgent_tasks, key=task_sort_key),
         "status_summary": status_summary,
+        "report_status_summary": report_status_summary,
         "priority_summary": priority_summary,
         "location_summary": location_items[:8],
         "done_today_tasks": sorted(completed_today, key=completion_sort_key, reverse=True),
@@ -349,6 +386,7 @@ def _collect_manager_task_data(
         "kpis": kpis,
         "open_tasks": sorted(open_task_items, key=task_sort_key),
         "open_task_count": len(open_task_items),
+        "report_open_task_count": sum(1 for task in open_task_items if task["workflow_status"] != "blocked"),
         "aging_count": len(aging_tasks),
         "unfinished_count": len(aging_tasks),
         "in_progress_count": len(in_progress_tasks),
@@ -356,6 +394,10 @@ def _collect_manager_task_data(
         "done_today_count": len(completed_today),
         "done_last_7_days_count": len(recent_completed_tasks),
         "active_locations_count": len(location_items),
+        "active_workers_count": len(active_worker_ids),
+        "active_worker_names": sorted(
+            [display_user_name(users.get(user_id)) for user_id in active_worker_ids if users.get(user_id)]
+        ),
     }
 
 
@@ -421,21 +463,23 @@ def build_manager_reports_data(
         TaskWorkSession=TaskWorkSession,
         today=today,
     )
+    # Reports KPIs intentionally focus on output and operational pulse, not aging.
+    # Open excludes blocked; active workers/locations use the last 7 days of work/completion activity.
     return {
         "generated_at": base["generated_at"],
         "today": base["today"],
         "report_kpis": [
-            {"key": "open", "label": "Open Tasks", "value": base["open_task_count"]},
-            {"key": "aging", "label": "Aging", "value": base["aging_count"]},
-            {"key": "blocked", "label": "Blocked", "value": base["blocked_count"]},
-            {"key": "done_today", "label": "Done Today", "value": base["done_today_count"]},
-            {"key": "done_last_7_days", "label": "Done Last 7 Days", "value": base["done_last_7_days_count"]},
+            {"key": "open", "label": "Open Tasks", "value": base["report_open_task_count"]},
+            {"key": "blocked", "label": "Blocked Issues", "value": base["blocked_count"]},
+            {"key": "completed_today", "label": "Completed Today", "value": base["done_today_count"]},
+            {"key": "completed_last_7_days", "label": "Completed Last 7 Days", "value": base["done_last_7_days_count"]},
             {"key": "active_locations", "label": "Active Locations", "value": base["active_locations_count"]},
+            {"key": "active_workers", "label": "Active Workers", "value": base["active_workers_count"]},
         ],
         "completion_trend": base["completion_trend"],
         "completion_trend_max": base["completion_trend_max"],
         "location_performance": base["location_summary"],
-        "status_summary": base["status_summary"],
+        "status_summary": base["report_status_summary"],
         "priority_summary": base["priority_summary"],
         "recent_completed_tasks": base["recent_completed_tasks"],
     }

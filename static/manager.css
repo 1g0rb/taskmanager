@@ -878,12 +878,7 @@ body.manager-page {
 
 .manager-location-table th:nth-child(4),
 .manager-location-table td:nth-child(4) {
-  width: 70px;
-}
-
-.manager-location-table th:nth-child(5),
-.manager-location-table td:nth-child(5) {
-  width: 110px;
+  width: 120px;
 }
 
 .manager-location-table-metric.is-unfinished {
