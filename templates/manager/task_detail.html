@@ -59,7 +59,7 @@
     </div>
 
     <article class="manager-record">
-      <section class="manager-record-hero manager-card dashboard-card">
+      <section class="manager-record-hero manager-card dashboard-card{% if not primary_image %} has-no-image{% endif %}">
         {% if primary_image %}
         <div class="manager-record-image-wrap">
           <img class="manager-record-image" src="{{ url_for('static', filename=primary_image.path) }}" alt="{{ task.title }}">
@@ -79,6 +79,29 @@
           {% else %}
           <p class="manager-record-description is-muted">No additional task description was recorded.</p>
           {% endif %}
+        </div>
+      </section>
+
+      <section class="manager-record-summary manager-card dashboard-card" aria-label="Task summary">
+        <div class="manager-record-summary-item">
+          <span>Location</span>
+          <strong>{{ location.name if location else 'Unknown location' }}</strong>
+        </div>
+        <div class="manager-record-summary-item">
+          <span>Status</span>
+          <strong>{{ task.status|replace('_', ' ')|title }}</strong>
+        </div>
+        <div class="manager-record-summary-item">
+          <span>Assigned</span>
+          <strong>{{ assignee_names|join(', ') if assignee_names else 'Unassigned' }}</strong>
+        </div>
+        <div class="manager-record-summary-item">
+          <span>Completed</span>
+          <strong>{{ completed_at_label or '-' }}</strong>
+        </div>
+        <div class="manager-record-summary-item">
+          <span>Recorded Work</span>
+          <strong>{{ total_duration_label or '-' }}</strong>
         </div>
       </section>
 
