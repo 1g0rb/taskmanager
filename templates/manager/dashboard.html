@@ -3,7 +3,7 @@
 {% block content %}
 {% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
 {% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
-{% set kpi_map = namespace(today=0, in_progress=0, blocked=0, done_today=0, urgent=0, upcoming=0) %}
+{% set kpi_map = namespace(today=0, in_progress=0, blocked=0, done_today=0, observations=0, upcoming=0) %}
 {% if kpis %}
   {% for kpi in kpis %}
     {% if kpi.key == 'today' %}
@@ -14,8 +14,8 @@
       {% set kpi_map.blocked = kpi.value %}
     {% elif kpi.key == 'done_today' %}
       {% set kpi_map.done_today = kpi.value %}
-    {% elif kpi.key == 'urgent' %}
-      {% set kpi_map.urgent = kpi.value %}
+    {% elif kpi.key == 'observations' %}
+      {% set kpi_map.observations = kpi.value %}
     {% elif kpi.key == 'upcoming' %}
       {% set kpi_map.upcoming = kpi.value %}
     {% endif %}
@@ -102,9 +102,9 @@
         <div class="manager-kpi-value kpi-value">{{ kpi_map.done_today }}</div>
         <div class="manager-kpi-label kpi-label">Done Today</div>
       </a>
-      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link is-urgent" href="{{ url_for('manager_tasks', filter='urgent') }}">
-        <div class="manager-kpi-value kpi-value">{{ kpi_map.urgent }}</div>
-        <div class="manager-kpi-label kpi-label">Urgent</div>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_observations') }}">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.observations }}</div>
+        <div class="manager-kpi-label kpi-label">Observations</div>
       </a>
       <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='upcoming') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.upcoming }}</div>

@@ -12,6 +12,7 @@ def _collect_manager_task_data(
     User,
     Location,
     Issue,
+    Observation=None,
     get_task_schedule_date,
     TaskWorkSession=None,
     today: date | None = None,
@@ -26,6 +27,14 @@ def _collect_manager_task_data(
         .order_by(Task.task_date.asc(), Task.created_at.desc())
         .all()
     )
+    observations = []
+    if Observation is not None:
+        observations = (
+            db.query(Observation)
+            .filter(Observation.status != "done")
+            .order_by(Observation.created_at.desc(), Observation.id.desc())
+            .all()
+        )
 
     task_ids = [task.id for task in tasks if getattr(task, "id", None)]
     locations = {row.id: row for row in db.query(Location).all()}
@@ -76,6 +85,16 @@ def _collect_manager_task_data(
         legacy_user_id = getattr(task, "assigned_to", None)
         if legacy_user_id:
             user_ids.add(legacy_user_id)
+    for observation in observations:
+        assigned_user_id = getattr(observation, "assigned_user_id", None)
+        created_by_user_id = getattr(observation, "created_by_user_id", None)
+        if assigned_user_id:
+            user_ids.add(assigned_user_id)
+        if created_by_user_id:
+            user_ids.add(created_by_user_id)
+        for user in getattr(observation, "assigned_users", []) or []:
+            if getattr(user, "id", None):
+                user_ids.add(user.id)
     user_ids.update(recent_work_session_user_ids)
 
     users = (
@@ -153,6 +172,30 @@ def _collect_manager_task_data(
             return None
         return notes if len(notes) <= 160 else f"{notes[:157].rstrip()}..."
 
+    def prepare_observation(observation) -> dict:
+        note = (getattr(observation, "note", "") or "").strip()
+        location = locations.get(getattr(observation, "location_id", None))
+        assigned_names = []
+        assigned_user = users.get(getattr(observation, "assigned_user_id", None))
+        if assigned_user:
+            assigned_names.append(display_user_name(assigned_user))
+        for user in getattr(observation, "assigned_users", []) or []:
+            name = display_user_name(user)
+            if name not in assigned_names:
+                assigned_names.append(name)
+
+        return {
+            "id": observation.id,
+            "title": note if len(note) <= 90 else f"{note[:87].rstrip()}...",
+            "note": note,
+            "location_name": getattr(location, "name", "General observation"),
+            "assigned_user_display_names": assigned_names,
+            "created_by_name": display_user_name(users.get(getattr(observation, "created_by_user_id", None))),
+            "status": (getattr(observation, "status", "new") or "new").strip().lower(),
+            "is_read": bool(getattr(observation, "is_read", False)),
+            "created_at": getattr(observation, "created_at", None),
+        }
+
     def task_sort_key(item: dict) -> tuple:
         raw_date = item.get("_schedule_date")
         schedule_key = raw_date or date.max
@@ -196,6 +239,7 @@ def _collect_manager_task_data(
         return item
 
     prepared_tasks = [prepare_task(task) for task in tasks]
+    observation_items = [prepare_observation(observation) for observation in observations]
 
     today_tasks = []
     aging_tasks = []
@@ -206,7 +250,7 @@ def _collect_manager_task_data(
     open_task_items = []
     in_progress_tasks = []
     blocked_tasks = []
-    urgent_tasks = []
+    high_priority_tasks = []
 
     status_counter = Counter()
     priority_counter = Counter()
@@ -250,8 +294,8 @@ def _collect_manager_task_data(
             if workflow_status == "blocked":
                 blocked_tasks.append(item)
                 location_row["blocked"] += 1
-            if item["priority"] == "urgent":
-                urgent_tasks.append(item)
+            if item["priority"] in {"urgent", "high"}:
+                high_priority_tasks.append(item)
 
         if due_today:
             today_tasks.append(item)
@@ -343,7 +387,7 @@ def _collect_manager_task_data(
         {"key": "in_progress", "label": "In Progress", "value": len(in_progress_tasks)},
         {"key": "blocked", "label": "Blocked Issues", "value": len(blocked_tasks)},
         {"key": "done_today", "label": "Done Today", "value": len(completed_today)},
-        {"key": "urgent", "label": "Urgent", "value": len(urgent_tasks)},
+        {"key": "observations", "label": "Observations", "value": len(observation_items)},
         {"key": "upcoming", "label": "Upcoming", "value": len(upcoming_tasks)},
     ]
 
@@ -372,7 +416,9 @@ def _collect_manager_task_data(
         "upcoming_tasks": sorted(upcoming_tasks, key=task_sort_key),
         "in_progress_tasks": sorted(in_progress_tasks, key=task_sort_key),
         "blocked_tasks": sorted(blocked_tasks, key=task_sort_key),
-        "urgent_tasks": sorted(urgent_tasks, key=task_sort_key),
+        "high_priority_tasks": sorted(high_priority_tasks, key=task_sort_key),
+        "observation_items": observation_items,
+        "observations_count": len(observation_items),
         "status_summary": status_summary,
         "report_status_summary": report_status_summary,
         "priority_summary": priority_summary,
@@ -409,6 +455,7 @@ def build_manager_dashboard_data(
     User,
     Location,
     Issue,
+    Observation=None,
     get_task_schedule_date,
     TaskWorkSession=None,
     today: date | None = None,
@@ -420,6 +467,7 @@ def build_manager_dashboard_data(
         User=User,
         Location=Location,
         Issue=Issue,
+        Observation=Observation,
         get_task_schedule_date=get_task_schedule_date,
         TaskWorkSession=TaskWorkSession,
         today=today,
@@ -448,6 +496,7 @@ def build_manager_reports_data(
     User,
     Location,
     Issue,
+    Observation=None,
     get_task_schedule_date,
     TaskWorkSession=None,
     today: date | None = None,
@@ -459,6 +508,7 @@ def build_manager_reports_data(
         User=User,
         Location=Location,
         Issue=Issue,
+        Observation=Observation,
         get_task_schedule_date=get_task_schedule_date,
         TaskWorkSession=TaskWorkSession,
         today=today,
@@ -493,6 +543,7 @@ def build_manager_done_tasks_data(
     User,
     Location,
     Issue,
+    Observation=None,
     get_task_schedule_date,
     TaskWorkSession=None,
     today: date | None = None,
@@ -504,6 +555,7 @@ def build_manager_done_tasks_data(
         User=User,
         Location=Location,
         Issue=Issue,
+        Observation=Observation,
         get_task_schedule_date=get_task_schedule_date,
         TaskWorkSession=TaskWorkSession,
         today=today,
@@ -564,6 +616,7 @@ def build_manager_unfinished_tasks_data(
     User,
     Location,
     Issue,
+    Observation=None,
     get_task_schedule_date,
     TaskWorkSession=None,
     today: date | None = None,
@@ -575,6 +628,7 @@ def build_manager_unfinished_tasks_data(
         User=User,
         Location=Location,
         Issue=Issue,
+        Observation=Observation,
         get_task_schedule_date=get_task_schedule_date,
         TaskWorkSession=TaskWorkSession,
         today=today,
@@ -596,6 +650,7 @@ def build_manager_tasks_list_data(
     User,
     Location,
     Issue,
+    Observation=None,
     get_task_schedule_date,
     filter_key: str = "today",
     TaskWorkSession=None,
@@ -608,6 +663,7 @@ def build_manager_tasks_list_data(
         User=User,
         Location=Location,
         Issue=Issue,
+        Observation=Observation,
         get_task_schedule_date=get_task_schedule_date,
         TaskWorkSession=TaskWorkSession,
         today=today,
@@ -645,9 +701,9 @@ def build_manager_tasks_list_data(
             "tasks": base["done_today_tasks"],
         },
         "urgent": {
-            "title": "Urgent Tasks",
-            "label": "Urgent",
-            "tasks": base["urgent_tasks"],
+            "title": "High Priority Tasks",
+            "label": "High Priority",
+            "tasks": base["high_priority_tasks"],
         },
         "upcoming": {
             "title": "Upcoming Tasks",
@@ -667,6 +723,39 @@ def build_manager_tasks_list_data(
         "page_title": active_config["title"],
         "tasks": active_config["tasks"],
         "task_count": len(active_config["tasks"]),
+    }
+
+
+def build_manager_observations_data(
+    db,
+    *,
+    Task,
+    TaskAssignee,
+    User,
+    Location,
+    Issue,
+    Observation,
+    get_task_schedule_date,
+    TaskWorkSession=None,
+    today: date | None = None,
+):
+    base = _collect_manager_task_data(
+        db,
+        Task=Task,
+        TaskAssignee=TaskAssignee,
+        User=User,
+        Location=Location,
+        Issue=Issue,
+        Observation=Observation,
+        get_task_schedule_date=get_task_schedule_date,
+        TaskWorkSession=TaskWorkSession,
+        today=today,
+    )
+    return {
+        "generated_at": base["generated_at"],
+        "today": base["today"],
+        "observations": base["observation_items"],
+        "observation_count": base["observations_count"],
     }
 
 
