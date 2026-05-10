@@ -1830,6 +1830,7 @@ def render_manager_dashboard_page(user: User):
         dashboard_data = build_manager_dashboard_data(
             db,
             Task=Task,
+            TaskWorkSession=TaskWorkSession,
             TaskAssignee=TaskAssignee,
             User=User,
             Location=Location,
@@ -1856,6 +1857,7 @@ def render_manager_reports_page(user: User):
         reports_data = build_manager_reports_data(
             db,
             Task=Task,
+            TaskWorkSession=TaskWorkSession,
             TaskAssignee=TaskAssignee,
             User=User,
             Location=Location,
@@ -1882,6 +1884,7 @@ def render_manager_done_tasks_page(user: User):
         done_tasks_data = build_manager_done_tasks_data(
             db,
             Task=Task,
+            TaskWorkSession=TaskWorkSession,
             TaskAssignee=TaskAssignee,
             User=User,
             Location=Location,
@@ -1908,6 +1911,7 @@ def render_manager_tasks_page(user: User):
         tasks_data = build_manager_tasks_list_data(
             db,
             Task=Task,
+            TaskWorkSession=TaskWorkSession,
             TaskAssignee=TaskAssignee,
             User=User,
             Location=Location,
@@ -1968,7 +1972,7 @@ def manager_tasks():
 @app.get("/manager/unfinished-tasks")
 @manager_required
 def manager_unfinished_tasks():
-    return redirect(url_for("manager_tasks", filter="unfinished"))
+    return redirect(url_for("manager_tasks", filter="aging"))
 
 
 @app.get("/")

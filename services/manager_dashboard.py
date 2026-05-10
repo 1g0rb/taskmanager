@@ -13,6 +13,7 @@ def _collect_manager_task_data(
     Location,
     Issue,
     get_task_schedule_date,
+    TaskWorkSession=None,
     today: date | None = None,
 ):
     today_value = today or date.today()
@@ -28,6 +29,21 @@ def _collect_manager_task_data(
 
     task_ids = [task.id for task in tasks if getattr(task, "id", None)]
     locations = {row.id: row for row in db.query(Location).all()}
+    active_work_session_task_ids = set()
+    if TaskWorkSession is not None and task_ids:
+        active_work_session_task_ids = {
+            task_id
+            for (task_id,) in (
+                db.query(TaskWorkSession.task_id)
+                .filter(
+                    TaskWorkSession.task_id.in_(task_ids),
+                    TaskWorkSession.status == "active",
+                    TaskWorkSession.finished_at.is_(None),
+                )
+                .distinct()
+                .all()
+            )
+        }
 
     assignee_rows = (
         db.query(TaskAssignee)
@@ -92,9 +108,23 @@ def _collect_manager_task_data(
     def is_blocked(task) -> bool:
         return (getattr(task, "status", "") or "").strip().lower() == "blocked"
 
+    def has_active_work_session(task) -> bool:
+        return getattr(task, "id", None) in active_work_session_task_ids
+
+    def manager_workflow_status(task) -> str:
+        # Manager dashboard status is mutually exclusive:
+        # done and blocked win first; in_progress requires an active/open work session.
+        if is_done(task):
+            return "done"
+        if is_blocked(task):
+            return "blocked"
+        if has_active_work_session(task):
+            return "in_progress"
+        return "open"
+
     def is_in_progress(task) -> bool:
         status = (getattr(task, "status", "") or "").strip().lower()
-        return status == "in_progress" or (bool(getattr(task, "started_at", None)) and not is_done(task))
+        return status == "in_progress"
 
     def completed_on(task) -> date | None:
         finished_at = getattr(task, "finished_at", None)
@@ -111,7 +141,10 @@ def _collect_manager_task_data(
     def task_sort_key(item: dict) -> tuple:
         raw_date = item.get("_schedule_date")
         schedule_key = raw_date or date.max
-        status_weight = {"blocked": 0, "in_progress": 1, "open": 2, "done": 3}.get(item["status"], 9)
+        status_weight = {"blocked": 0, "in_progress": 1, "open": 2, "done": 3}.get(
+            item.get("workflow_status", item["status"]),
+            9,
+        )
         return (schedule_key, status_weight, item["title"].lower(), item["id"])
 
     def completion_sort_key(item: dict) -> tuple:
@@ -133,6 +166,8 @@ def _collect_manager_task_data(
             "location_name": getattr(location, "name", "Unknown location"),
             "assigned_user_display_names": assignee_names,
             "status": (getattr(task, "status", "open") or "open").strip().lower(),
+            "workflow_status": manager_workflow_status(task),
+            "has_active_work_session": has_active_work_session(task),
             "priority": compute_priority(task),
             "created_at": getattr(task, "created_at", None),
             "scheduled_date": schedule_date,
@@ -148,12 +183,15 @@ def _collect_manager_task_data(
     prepared_tasks = [prepare_task(task) for task in tasks]
 
     today_tasks = []
-    unfinished_tasks = []
+    aging_tasks = []
     upcoming_tasks = []
     completed_today = []
     completed_task_items = []
     recent_completed_tasks = []
     open_task_items = []
+    in_progress_tasks = []
+    blocked_tasks = []
+    urgent_tasks = []
 
     status_counter = Counter()
     priority_counter = Counter()
@@ -172,28 +210,34 @@ def _collect_manager_task_data(
         schedule_date = item["_schedule_date"]
         completion_date = completed_on(task)
         done_today = completion_date == today_value
-        unfinished = bool(schedule_date and schedule_date < today_value and not is_done(task))
+        aging = bool(schedule_date and schedule_date < today_value and not is_done(task))
         due_today = bool(schedule_date == today_value and not is_done(task))
         upcoming = bool(schedule_date and today_value < schedule_date <= upcoming_until and not is_done(task))
         completed_recently = bool(completion_date and recent_window_start <= completion_date <= today_value)
+        workflow_status = item["workflow_status"]
 
         location_row = location_summary[getattr(task, "location_id", None)]
         location_row["location_name"] = item["location_name"]
 
         if not is_done(task):
             open_task_items.append(item)
-            status_counter[item["status"]] += 1
+            status_counter[workflow_status] += 1
             priority_counter[item["priority"]] += 1
             location_row["open"] += 1
-            if unfinished:
+            if aging:
                 location_row["unfinished"] += 1
-            if is_blocked(task):
+            if workflow_status == "in_progress":
+                in_progress_tasks.append(item)
+            if workflow_status == "blocked":
+                blocked_tasks.append(item)
                 location_row["blocked"] += 1
+            if item["priority"] == "urgent":
+                urgent_tasks.append(item)
 
         if due_today:
             today_tasks.append(item)
-        if unfinished:
-            unfinished_tasks.append(item)
+        if aging:
+            aging_tasks.append(item)
         if upcoming:
             upcoming_tasks.append(item)
         if is_done(task):
@@ -215,6 +259,7 @@ def _collect_manager_task_data(
                     "location_name": summary["location_name"],
                     "open_count": summary["open"],
                     "unfinished_count": summary["unfinished"],
+                    "aging_count": summary["unfinished"],
                     "blocked_count": summary["blocked"],
                     "done_recent_count": summary["done_recent"],
                     "activity_score": score,
@@ -259,11 +304,11 @@ def _collect_manager_task_data(
 
     kpis = [
         {"key": "today", "label": "Today Tasks", "value": len(today_tasks)},
-        {"key": "overdue", "label": "Unfinished", "value": len(unfinished_tasks)},
-        {"key": "in_progress", "label": "In Progress", "value": sum(1 for task in open_task_items if task["status"] == "in_progress" or task["started_at"])},
-        {"key": "blocked", "label": "Blocked", "value": sum(1 for task in open_task_items if task["status"] == "blocked")},
+        {"key": "in_progress", "label": "In Progress", "value": len(in_progress_tasks)},
+        {"key": "blocked", "label": "Blocked Issues", "value": len(blocked_tasks)},
         {"key": "done_today", "label": "Done Today", "value": len(completed_today)},
-        {"key": "urgent", "label": "Urgent", "value": sum(1 for task in open_task_items if task["priority"] == "urgent")},
+        {"key": "urgent", "label": "Urgent", "value": len(urgent_tasks)},
+        {"key": "upcoming", "label": "Upcoming", "value": len(upcoming_tasks)},
     ]
 
     completion_trend = []
@@ -285,9 +330,13 @@ def _collect_manager_task_data(
         "generated_at": datetime.now(),
         "today": today_value,
         "today_tasks": sorted(today_tasks, key=task_sort_key),
-        "overdue_tasks": sorted(unfinished_tasks, key=task_sort_key),
-        "unfinished_tasks": sorted(unfinished_tasks, key=task_sort_key),
+        "overdue_tasks": sorted(aging_tasks, key=task_sort_key),
+        "aging_tasks": sorted(aging_tasks, key=task_sort_key),
+        "unfinished_tasks": sorted(aging_tasks, key=task_sort_key),
         "upcoming_tasks": sorted(upcoming_tasks, key=task_sort_key),
+        "in_progress_tasks": sorted(in_progress_tasks, key=task_sort_key),
+        "blocked_tasks": sorted(blocked_tasks, key=task_sort_key),
+        "urgent_tasks": sorted(urgent_tasks, key=task_sort_key),
         "status_summary": status_summary,
         "priority_summary": priority_summary,
         "location_summary": location_items[:8],
@@ -300,8 +349,10 @@ def _collect_manager_task_data(
         "kpis": kpis,
         "open_tasks": sorted(open_task_items, key=task_sort_key),
         "open_task_count": len(open_task_items),
-        "unfinished_count": len(unfinished_tasks),
-        "blocked_count": sum(1 for task in open_task_items if task["status"] == "blocked"),
+        "aging_count": len(aging_tasks),
+        "unfinished_count": len(aging_tasks),
+        "in_progress_count": len(in_progress_tasks),
+        "blocked_count": len(blocked_tasks),
         "done_today_count": len(completed_today),
         "done_last_7_days_count": len(recent_completed_tasks),
         "active_locations_count": len(location_items),
@@ -317,6 +368,7 @@ def build_manager_dashboard_data(
     Location,
     Issue,
     get_task_schedule_date,
+    TaskWorkSession=None,
     today: date | None = None,
 ):
     base = _collect_manager_task_data(
@@ -327,6 +379,7 @@ def build_manager_dashboard_data(
         Location=Location,
         Issue=Issue,
         get_task_schedule_date=get_task_schedule_date,
+        TaskWorkSession=TaskWorkSession,
         today=today,
     )
     return {
@@ -340,7 +393,7 @@ def build_manager_dashboard_data(
         "priority_summary": base["priority_summary"],
         "location_summary": base["location_summary"],
         "recent_completions_today": base["recent_completions_today"],
-        "operational_status": _build_operational_status(base["unfinished_count"], base["blocked_count"]),
+        "operational_status": _build_operational_status(base["aging_count"], base["blocked_count"]),
         "key_problems": _build_key_problems(base["open_tasks"]),
     }
 
@@ -354,6 +407,7 @@ def build_manager_reports_data(
     Location,
     Issue,
     get_task_schedule_date,
+    TaskWorkSession=None,
     today: date | None = None,
 ):
     base = _collect_manager_task_data(
@@ -364,6 +418,7 @@ def build_manager_reports_data(
         Location=Location,
         Issue=Issue,
         get_task_schedule_date=get_task_schedule_date,
+        TaskWorkSession=TaskWorkSession,
         today=today,
     )
     return {
@@ -371,7 +426,7 @@ def build_manager_reports_data(
         "today": base["today"],
         "report_kpis": [
             {"key": "open", "label": "Open Tasks", "value": base["open_task_count"]},
-            {"key": "unfinished", "label": "Unfinished", "value": base["unfinished_count"]},
+            {"key": "aging", "label": "Aging", "value": base["aging_count"]},
             {"key": "blocked", "label": "Blocked", "value": base["blocked_count"]},
             {"key": "done_today", "label": "Done Today", "value": base["done_today_count"]},
             {"key": "done_last_7_days", "label": "Done Last 7 Days", "value": base["done_last_7_days_count"]},
@@ -395,6 +450,7 @@ def build_manager_done_tasks_data(
     Location,
     Issue,
     get_task_schedule_date,
+    TaskWorkSession=None,
     today: date | None = None,
 ):
     base = _collect_manager_task_data(
@@ -405,6 +461,7 @@ def build_manager_done_tasks_data(
         Location=Location,
         Issue=Issue,
         get_task_schedule_date=get_task_schedule_date,
+        TaskWorkSession=TaskWorkSession,
         today=today,
     )
 
@@ -464,6 +521,7 @@ def build_manager_unfinished_tasks_data(
     Location,
     Issue,
     get_task_schedule_date,
+    TaskWorkSession=None,
     today: date | None = None,
 ):
     base = _collect_manager_task_data(
@@ -474,6 +532,7 @@ def build_manager_unfinished_tasks_data(
         Location=Location,
         Issue=Issue,
         get_task_schedule_date=get_task_schedule_date,
+        TaskWorkSession=TaskWorkSession,
         today=today,
     )
 
@@ -495,6 +554,7 @@ def build_manager_tasks_list_data(
     Issue,
     get_task_schedule_date,
     filter_key: str = "today",
+    TaskWorkSession=None,
     today: date | None = None,
 ):
     base = _collect_manager_task_data(
@@ -505,6 +565,7 @@ def build_manager_tasks_list_data(
         Location=Location,
         Issue=Issue,
         get_task_schedule_date=get_task_schedule_date,
+        TaskWorkSession=TaskWorkSession,
         today=today,
     )
 
@@ -515,23 +576,24 @@ def build_manager_tasks_list_data(
             "tasks": base["today_tasks"],
         },
         "unfinished": {
-            "title": "Unfinished Tasks",
-            "label": "Unfinished",
-            "tasks": base["open_tasks"],
+            "title": "Aging Tasks",
+            "label": "Aging",
+            "tasks": base["aging_tasks"],
+        },
+        "aging": {
+            "title": "Aging Tasks",
+            "label": "Aging",
+            "tasks": base["aging_tasks"],
         },
         "in_progress": {
             "title": "In Progress Tasks",
             "label": "In Progress",
-            "tasks": [
-                task
-                for task in base["open_tasks"]
-                if task["status"] == "in_progress" or task.get("started_at")
-            ],
+            "tasks": base["in_progress_tasks"],
         },
         "blocked": {
-            "title": "Blocked Tasks",
+            "title": "Blocked Issues",
             "label": "Blocked",
-            "tasks": [task for task in base["open_tasks"] if task["status"] == "blocked"],
+            "tasks": base["blocked_tasks"],
         },
         "done_today": {
             "title": "Done Today",
@@ -541,11 +603,12 @@ def build_manager_tasks_list_data(
         "urgent": {
             "title": "Urgent Tasks",
             "label": "Urgent",
-            "tasks": [
-                task
-                for task in base["open_tasks"]
-                if task["priority"] in {"urgent", "high"}
-            ],
+            "tasks": base["urgent_tasks"],
+        },
+        "upcoming": {
+            "title": "Upcoming Tasks",
+            "label": "Upcoming",
+            "tasks": base["upcoming_tasks"],
         },
     }
 
@@ -563,11 +626,11 @@ def build_manager_tasks_list_data(
     }
 
 
-def _build_operational_status(unfinished_count: int, blocked_count: int) -> dict:
-    if blocked_count >= 2 or unfinished_count >= 8:
+def _build_operational_status(aging_count: int, blocked_count: int) -> dict:
+    if blocked_count >= 2 or aging_count >= 8:
         label = "Critical attention"
         tone = "critical"
-    elif blocked_count >= 1 or unfinished_count >= 4:
+    elif blocked_count >= 1 or aging_count >= 4:
         label = "Needs attention"
         tone = "attention"
     else:
@@ -577,8 +640,8 @@ def _build_operational_status(unfinished_count: int, blocked_count: int) -> dict
     fragments = []
     if blocked_count:
         fragments.append(f"{blocked_count} blocked task{'s' if blocked_count != 1 else ''}")
-    if unfinished_count:
-        fragments.append(f"{unfinished_count} unfinished task{'s' if unfinished_count != 1 else ''}")
+    if aging_count:
+        fragments.append(f"{aging_count} aging task{'s' if aging_count != 1 else ''}")
 
     if fragments:
         message = f"{label} · {' and '.join(fragments)} need review"
@@ -591,26 +654,27 @@ def _build_operational_status(unfinished_count: int, blocked_count: int) -> dict
 def _build_key_problems(open_tasks: list[dict]) -> list[dict]:
     candidates = []
     for item in open_tasks:
-        is_blocked = item["status"] == "blocked"
-        is_unfinished = item.get("days_overdue") is not None
-        is_unassigned = not item.get("assigned_user_display_names")
-        if not (is_blocked or is_unfinished or is_unassigned):
+        is_blocked = item.get("workflow_status") == "blocked"
+        is_urgent = item.get("priority") == "urgent"
+        is_high_priority = item.get("priority") == "high"
+        is_aging = item.get("days_overdue") is not None
+        if not (is_blocked or is_urgent or is_high_priority or is_aging):
             continue
 
         candidates.append(
             {
                 **item,
                 "_blocked_rank": 0 if is_blocked else 1,
-                "_unfinished_rank": -(item.get("days_overdue") or 0),
-                "_unassigned_rank": 0 if is_unassigned else 1,
+                "_priority_rank": 0 if is_urgent else (1 if is_high_priority else 2),
+                "_aging_rank": -(item.get("days_overdue") or 0),
             }
         )
 
     candidates.sort(
         key=lambda item: (
             item["_blocked_rank"],
-            item["_unfinished_rank"],
-            item["_unassigned_rank"],
+            item["_priority_rank"],
+            item["_aging_rank"],
             item["title"].lower(),
             item["id"],
         )
@@ -619,15 +683,17 @@ def _build_key_problems(open_tasks: list[dict]) -> list[dict]:
     key_problems = []
     for item in candidates[:3]:
         problem_note = None
-        if item["status"] == "blocked":
+        if item.get("workflow_status") == "blocked":
             if item.get("days_overdue"):
-                problem_note = f"Blocked · {item['days_overdue']}d unfinished"
+                problem_note = f"Blocked - {item['days_overdue']}d aging"
             else:
                 problem_note = "Blocked"
+        elif item.get("priority") == "urgent":
+            problem_note = "Urgent"
+        elif item.get("priority") == "high":
+            problem_note = "High priority"
         elif item.get("days_overdue"):
-            problem_note = f"{item['days_overdue']}d unfinished"
-        elif not item.get("assigned_user_display_names"):
-            problem_note = "Unassigned"
+            problem_note = f"{item['days_overdue']}d aging"
 
         key_problems.append(
             {
@@ -635,7 +701,7 @@ def _build_key_problems(open_tasks: list[dict]) -> list[dict]:
                 "title": item["title"],
                 "location_name": item["location_name"],
                 "assigned_user_display_names": item.get("assigned_user_display_names", []),
-                "status": item["status"],
+                "status": item.get("workflow_status", item["status"]),
                 "priority": item["priority"],
                 "problem_note": problem_note,
             }

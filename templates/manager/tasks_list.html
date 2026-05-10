@@ -88,14 +88,15 @@
           <div class="manager-task-aside">
             <div class="manager-badges">
               {% if task.status %}
-              <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+              {% set display_status = task.workflow_status or task.status %}
+              <span class="manager-badge status-{{ display_status }}">{{ display_status.replace('_', ' ')|title }}</span>
               {% endif %}
               {% if task.priority %}
               <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
               {% endif %}
             </div>
             {% if task.days_overdue is not none %}
-            <span class="manager-task-date manager-task-overdue{% if task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d unfinished</span>
+            <span class="manager-task-date manager-task-overdue{% if task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d aging</span>
             {% elif task.completed_at %}
             <span class="manager-task-date">{{ task.completed_at.strftime('%d %b %Y') if task.completed_at.strftime else task.completed_at }}</span>
             {% elif task.scheduled_date %}

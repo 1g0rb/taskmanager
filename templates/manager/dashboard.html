@@ -3,13 +3,11 @@
 {% block content %}
 {% set max_status_count = (status_summary | map(attribute='count') | list | max) if status_summary else 1 %}
 {% set max_priority_count = (priority_summary | map(attribute='count') | list | max) if priority_summary else 1 %}
-{% set kpi_map = namespace(today=0, overdue=0, in_progress=0, blocked=0, done_today=0, urgent=0) %}
+{% set kpi_map = namespace(today=0, in_progress=0, blocked=0, done_today=0, urgent=0, upcoming=0) %}
 {% if kpis %}
   {% for kpi in kpis %}
     {% if kpi.key == 'today' %}
       {% set kpi_map.today = kpi.value %}
-    {% elif kpi.key == 'overdue' %}
-      {% set kpi_map.overdue = kpi.value %}
     {% elif kpi.key == 'in_progress' %}
       {% set kpi_map.in_progress = kpi.value %}
     {% elif kpi.key == 'blocked' %}
@@ -18,6 +16,8 @@
       {% set kpi_map.done_today = kpi.value %}
     {% elif kpi.key == 'urgent' %}
       {% set kpi_map.urgent = kpi.value %}
+    {% elif kpi.key == 'upcoming' %}
+      {% set kpi_map.upcoming = kpi.value %}
     {% endif %}
   {% endfor %}
 {% endif %}
@@ -90,17 +90,13 @@
         <div class="manager-kpi-value kpi-value">{{ kpi_map.today }}</div>
         <div class="manager-kpi-label kpi-label">Today Tasks</div>
       </a>
-      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link is-overdue" href="{{ url_for('manager_tasks', filter='unfinished') }}">
-        <div class="manager-kpi-value kpi-value">{{ kpi_map.overdue }}</div>
-        <div class="manager-kpi-label kpi-label">Unfinished</div>
-      </a>
       <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='in_progress') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.in_progress }}</div>
         <div class="manager-kpi-label kpi-label">In Progress</div>
       </a>
       <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='blocked') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.blocked }}</div>
-        <div class="manager-kpi-label kpi-label">Blocked</div>
+        <div class="manager-kpi-label kpi-label">Blocked Issues</div>
       </a>
       <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='done_today') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.done_today }}</div>
@@ -109,6 +105,10 @@
       <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link is-urgent" href="{{ url_for('manager_tasks', filter='urgent') }}">
         <div class="manager-kpi-value kpi-value">{{ kpi_map.urgent }}</div>
         <div class="manager-kpi-label kpi-label">Urgent</div>
+      </a>
+      <a class="manager-kpi manager-kpi-card kpi-card manager-kpi-link" href="{{ url_for('manager_tasks', filter='upcoming') }}">
+        <div class="manager-kpi-value kpi-value">{{ kpi_map.upcoming }}</div>
+        <div class="manager-kpi-label kpi-label">Upcoming</div>
       </a>
     </section>
 
@@ -130,7 +130,8 @@
             </div>
             <div class="manager-task-aside">
               <div class="manager-badges">
-                <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+                {% set display_status = task.workflow_status or task.status %}
+                <span class="manager-badge status-{{ display_status }}">{{ display_status.replace('_', ' ')|title }}</span>
                 <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
               </div>
               {% if task.problem_note %}
@@ -161,7 +162,8 @@
             </div>
             <div class="manager-task-aside">
               <div class="manager-badges">
-                <span class="manager-badge status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+                {% set display_status = task.workflow_status or task.status %}
+                <span class="manager-badge status-{{ display_status }}">{{ display_status.replace('_', ' ')|title }}</span>
                 <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
               </div>
               <span class="manager-task-date">
@@ -171,14 +173,14 @@
             </div>
           </article>
           {% else %}
-          <p class="manager-empty">No open tasks scheduled for today.</p>
+          <p class="manager-empty">No scheduled tasks today. Focus is on blocked issues, upcoming work, and ongoing operations.</p>
           {% endfor %}
         </div>
       </article>
 
       <article id="unfinished-tasks" class="manager-panel manager-card dashboard-card compact-if-few manager-grid-primary manager-unfinished-panel">
         <div class="manager-panel-head manager-card-header card-header">
-          <h2 class="manager-card-title card-title">Unfinished Tasks</h2>
+          <h2 class="manager-card-title card-title">Aging Tasks</h2>
           <span class="manager-card-count card-count">{{ overdue_tasks|length }}</span>
         </div>
         <div class="manager-compact-list">
@@ -194,17 +196,18 @@
             <div class="manager-compact-side">
               <span class="manager-compact-days{% if task.days_overdue and task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue if task.days_overdue is not none else 0 }}d</span>
               {% if task.status %}
-              <span class="manager-compact-status status-{{ task.status }}">{{ task.status.replace('_', ' ')|title }}</span>
+              {% set display_status = task.workflow_status or task.status %}
+              <span class="manager-compact-status status-{{ display_status }}">{{ display_status.replace('_', ' ')|title }}</span>
               {% endif %}
             </div>
           </article>
           {% else %}
-          <p class="manager-empty">Nothing unfinished right now.</p>
+          <p class="manager-empty">No aging tasks need attention right now.</p>
           {% endfor %}
         </div>
         {% if overdue_tasks|length > 3 %}
         <div class="manager-panel-footer">
-          <a class="manager-subtle-link" href="{{ url_for('manager_tasks', filter='unfinished') }}">View all unfinished tasks</a>
+          <a class="manager-subtle-link" href="{{ url_for('manager_tasks', filter='aging') }}">View all aging tasks</a>
         </div>
         {% endif %}
       </article>
@@ -253,7 +256,7 @@
           <div class="manager-location-head">
             <span></span>
             <span>Open</span>
-            <span>Unfinished</span>
+            <span>Aging</span>
             <span>Blocked</span>
           </div>
           {% for item in location_summary %}
@@ -265,7 +268,7 @@
               <span>{{ item.location_name or item.name or item.location or 'Unknown' }}</span>
             </div>
             <span class="manager-location-num">{{ item.open_count if item.open_count is defined else (item.open if item.open is defined else 0) }}</span>
-            <span class="manager-location-num is-overdue">{{ item.overdue_count if item.overdue_count is defined else (item.overdue if item.overdue is defined else 0) }}</span>
+            <span class="manager-location-num is-overdue">{{ item.aging_count if item.aging_count is defined else (item.unfinished_count if item.unfinished_count is defined else 0) }}</span>
             <span class="manager-location-num is-blocked">{{ item.blocked_count if item.blocked_count is defined else (item.blocked if item.blocked is defined else 0) }}</span>
           </div>
           {% else %}
