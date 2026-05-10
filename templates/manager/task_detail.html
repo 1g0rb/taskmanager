@@ -1,0 +1,178 @@
+{% extends "manager/layout.html" %}
+
+{% block content %}
+<section class="manager-frame manager-layout manager-dashboard">
+  <aside class="manager-sidebar">
+    <div class="manager-brand">
+      <div class="manager-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" class="manager-brand-icon">
+          <circle cx="20" cy="20" r="6"></circle>
+          <path d="M20 3v7M20 30v7M3 20h7M30 20h7M8.2 8.2l4.9 4.9M26.9 26.9l4.9 4.9M31.8 8.2l-4.9 4.9M13.1 26.9l-4.9 4.9"></path>
+        </svg>
+      </div>
+      <div class="manager-brand-copy">
+        <span class="manager-brand-name brand-title">Meneghetti</span>
+        <span class="manager-brand-sub brand-subtitle">Task Manager</span>
+      </div>
+    </div>
+
+    <nav class="manager-nav" aria-label="Manager navigation">
+      <a class="manager-nav-item manager-nav-link" href="/">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"></path><path d="M7.5 10.5V19h9v-8.5"></path></svg>
+        </span>
+        <span>Manager Dashboard</span>
+      </a>
+      <a class="manager-nav-item manager-nav-link" href="{{ url_for('manager_done_tasks') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="15" rx="2"></rect><path d="M8 9.5h8M8 13h6"></path></svg>
+        </span>
+        <span>Done Tasks</span>
+      </a>
+      <a class="manager-nav-item manager-nav-link" href="{{ url_for('manager_reports') }}">
+        <span class="manager-nav-icon">
+          <svg viewBox="0 0 24 24"><path d="M6 17.5h12"></path><path d="M8 17.5v-6"></path><path d="M12 17.5v-9"></path><path d="M16 17.5v-4"></path></svg>
+        </span>
+        <span>Reports</span>
+      </a>
+    </nav>
+
+    <div class="manager-sidebar-footer">
+      <a class="manager-signout" href="{{ logout_url if logout_url else url_for('logout') }}">Sign out</a>
+    </div>
+  </aside>
+
+  <div class="manager-main manager-shell">
+    <header class="manager-header">
+      <div class="manager-header-copy">
+        <p class="manager-eyebrow eyebrow">Operational Archive</p>
+        <h1 class="manager-title">Task Record</h1>
+        <p class="manager-subtitle">Read-only field record and completion context</p>
+      </div>
+      <div class="manager-timestamp">
+        <span class="manager-timestamp-value">{{ last_updated_label }}</span>
+      </div>
+    </header>
+
+    <div class="manager-page-actions">
+      <a class="manager-back-link manager-subtle-link" href="{{ url_for('manager_done_tasks') }}">Back to Done Tasks</a>
+    </div>
+
+    <article class="manager-record">
+      <section class="manager-record-hero manager-card dashboard-card">
+        {% if primary_image %}
+        <div class="manager-record-image-wrap">
+          <img class="manager-record-image" src="{{ url_for('static', filename=primary_image.path) }}" alt="{{ task.title }}">
+        </div>
+        {% endif %}
+        <div class="manager-record-copy">
+          <div class="manager-badges manager-record-badges">
+            <span class="manager-badge status-{{ task.status }}">{{ task.status|replace('_', ' ')|title }}</span>
+            {% if priority_label %}
+            <span class="manager-badge priority-{{ priority_key }}">{{ priority_label }}</span>
+            {% endif %}
+            <span class="manager-badge status-open">{{ location.name if location else 'Unknown location' }}</span>
+          </div>
+          <h2 class="manager-record-title">{{ task.title }}</h2>
+          {% if task.notes %}
+          <p class="manager-record-description">{{ task.notes }}</p>
+          {% else %}
+          <p class="manager-record-description is-muted">No additional task description was recorded.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="manager-record-grid">
+        <div class="manager-card dashboard-card">
+          <div class="manager-card-header card-header">
+            <h2 class="manager-card-title card-title">People & Dates</h2>
+          </div>
+          <dl class="manager-record-meta">
+            <div>
+              <dt>Assigned Workers</dt>
+              <dd>{{ assignee_names|join(', ') if assignee_names else 'Unassigned' }}</dd>
+            </div>
+            <div>
+              <dt>Created By</dt>
+              <dd>{{ created_by_name }}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{{ created_at_label }}</dd>
+            </div>
+            <div>
+              <dt>Scheduled</dt>
+              <dd>{{ scheduled_date.strftime('%d %b %Y') if scheduled_date and scheduled_date.strftime else (scheduled_date if scheduled_date else '-') }}</dd>
+            </div>
+            <div>
+              <dt>Completed</dt>
+              <dd>{{ completed_at_label or '-' }}</dd>
+            </div>
+            {% if total_duration_label %}
+            <div>
+              <dt>Recorded Work</dt>
+              <dd>{{ total_duration_label }}</dd>
+            </div>
+            {% endif %}
+          </dl>
+        </div>
+
+        <div class="manager-card dashboard-card">
+          <div class="manager-card-header card-header">
+            <h2 class="manager-card-title card-title">Context Notes</h2>
+          </div>
+          <div class="manager-record-notes">
+            {% for item in notes_items %}
+            <article class="manager-record-note">
+              <div class="manager-record-note-label">{{ item.label }}</div>
+              <p>{{ item.text }}</p>
+            </article>
+            {% else %}
+            <p class="manager-empty">No extra notes were recorded for this task.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      {% if attachment_items %}
+      <section class="manager-card dashboard-card">
+        <div class="manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Photos & Attachments</h2>
+          <span class="manager-card-count card-count">{{ attachment_items|length }}</span>
+        </div>
+        <div class="manager-record-gallery">
+          {% for item in attachment_items %}
+          <a class="manager-record-photo" href="{{ url_for('static', filename=item.path) }}" target="_blank" rel="noopener noreferrer">
+            <img src="{{ url_for('static', filename=item.path) }}" alt="{{ item.label }}">
+            <span>{{ item.label }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if session_items %}
+      <section class="manager-card dashboard-card">
+        <div class="manager-card-header card-header">
+          <h2 class="manager-card-title card-title">Work Sessions</h2>
+          {% if total_duration_label %}
+          <span class="manager-card-count card-count">{{ total_duration_label }}</span>
+          {% endif %}
+        </div>
+        <div class="manager-record-session-list">
+          {% for session in session_items %}
+          <div class="manager-record-session">
+            <div>
+              <div class="manager-record-session-worker">{{ session.worker }}</div>
+              <div class="manager-task-meta">{{ session.started_at }} - {{ session.finished_at }}</div>
+            </div>
+            <div class="manager-task-date">{{ session.duration_label or session.status }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    </article>
+  </div>
+</section>
+{% endblock %}

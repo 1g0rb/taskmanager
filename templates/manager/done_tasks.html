@@ -78,7 +78,7 @@
 
           <div class="manager-task-list">
             {% for task in group.tasks %}
-            <article class="manager-task-row manager-task-item">
+            <a class="manager-task-row manager-task-item manager-task-link" href="{{ url_for('manager_task_detail', task_id=task.id) }}">
               <div class="manager-task-main">
                 <div class="manager-task-title">{{ task.title }}</div>
                 <div class="manager-task-subline manager-task-meta">
@@ -95,7 +95,7 @@
               </div>
               <span class="manager-task-date">{{ task.completed_time_label or 'Completed' }}</span>
             </div>
-          </article>
+          </a>
             {% endfor %}
           </div>
         </section>

@@ -687,6 +687,7 @@ MANAGER_ACTIVITY_ENDPOINTS = {
     "manager_reports",
     "manager_done_tasks",
     "manager_observations",
+    "manager_task_detail",
     "manager_tasks",
     "manager_unfinished_tasks",
 }
@@ -948,6 +949,7 @@ def restrict_manager_host_surface():
         "manager_reports",
         "manager_done_tasks",
         "manager_observations",
+        "manager_task_detail",
         "manager_tasks",
         "manager_unfinished_tasks",
         "health",
@@ -1940,6 +1942,157 @@ def render_manager_tasks_page(user: User):
         db.close()
 
 
+def render_manager_task_detail_page(user: User, task_id: int):
+    db = SessionLocal()
+    try:
+        task = db.get(Task, task_id)
+        if not task:
+            abort(404)
+
+        def display_user_name(row: User | None) -> str:
+            if not row:
+                return "TaskManager"
+            return (row.display_name or row.username.split("@")[0]).strip()
+
+        def format_datetime(value: datetime | None) -> str:
+            return value.strftime("%d %b %Y - %H:%M") if value else "-"
+
+        location = db.get(Location, task.location_id) if task.location_id else None
+        assigned_rows = (
+            db.query(TaskAssignee)
+            .filter(TaskAssignee.task_id == task.id)
+            .all()
+        )
+        assignee_ids = [row.user_id for row in assigned_rows]
+        if not assignee_ids and task.assigned_to:
+            assignee_ids = [task.assigned_to]
+
+        linked_issue = (
+            db.query(Issue)
+            .filter(Issue.linked_task_id == task.id)
+            .order_by(Issue.created_at.desc(), Issue.id.desc())
+            .first()
+        )
+        task_photos = (
+            db.query(TaskPhoto)
+            .filter(TaskPhoto.task_id == task.id)
+            .order_by(TaskPhoto.created_at.desc(), TaskPhoto.id.desc())
+            .all()
+        )
+        issue_photos = []
+        if linked_issue:
+            issue_photos = (
+                db.query(IssuePhoto)
+                .filter(IssuePhoto.issue_id == linked_issue.id)
+                .order_by(IssuePhoto.created_at.desc(), IssuePhoto.id.desc())
+                .all()
+            )
+        work_sessions = (
+            db.query(TaskWorkSession)
+            .filter(TaskWorkSession.task_id == task.id)
+            .order_by(TaskWorkSession.started_at.desc(), TaskWorkSession.id.desc())
+            .all()
+        )
+
+        user_ids = set(assignee_ids)
+        if linked_issue and linked_issue.created_by:
+            user_ids.add(linked_issue.created_by)
+        for session in work_sessions:
+            if session.user_id:
+                user_ids.add(session.user_id)
+        users = {
+            row.id: row
+            for row in db.query(User).filter(User.id.in_(user_ids)).all()
+        } if user_ids else {}
+
+        assignee_names = [display_user_name(users.get(user_id)) for user_id in assignee_ids]
+        if linked_issue and linked_issue.created_by:
+            created_by_name = display_user_name(users.get(linked_issue.created_by))
+        elif task.carryover_from_task_id:
+            created_by_name = "Carryover task"
+        else:
+            created_by_name = "TaskManager"
+
+        attachment_items = []
+        seen_paths = set()
+        for photo in task_photos:
+            path = normalize_static_file_path(photo.file_path)
+            if not path or path in seen_paths:
+                continue
+            seen_paths.add(path)
+            attachment_items.append({
+                "path": path,
+                "label": "Task photo",
+                "created_at": format_datetime(photo.created_at),
+            })
+        for photo in issue_photos:
+            path = normalize_static_file_path(photo.file_path)
+            if not path or path in seen_paths:
+                continue
+            seen_paths.add(path)
+            attachment_items.append({
+                "path": path,
+                "label": f"Issue #{linked_issue.id} reference" if linked_issue else "Reference",
+                "created_at": format_datetime(photo.created_at),
+            })
+
+        session_items = []
+        total_minutes = 0
+        for session in work_sessions:
+            minutes = session.duration_minutes
+            if minutes is None and session.started_at and session.finished_at:
+                minutes = max(0, int((session.finished_at - session.started_at).total_seconds() // 60))
+            if minutes:
+                total_minutes += minutes
+            session_items.append({
+                "worker": display_user_name(users.get(session.user_id)),
+                "started_at": format_datetime(session.started_at),
+                "finished_at": format_datetime(session.finished_at) if session.finished_at else "Active",
+                "duration_label": f"{minutes // 60}h {minutes % 60}m" if minutes else None,
+                "status": (session.status or "active").replace("_", " ").title(),
+            })
+
+        priority_key = "normal"
+        priority_label = None
+        if linked_issue and linked_issue.severity in {"medium", "high"}:
+            priority_key = "urgent" if linked_issue.severity == "high" else "high"
+            priority_label = f"{linked_issue.severity.title()} priority"
+
+        notes_items = []
+        if task.notes:
+            notes_items.append({"label": "Task Description", "text": task.notes})
+        if linked_issue and linked_issue.notes:
+            notes_items.append({"label": f"Issue #{linked_issue.id}", "text": linked_issue.notes})
+        if task.status == "blocked" and task.blocked_reason:
+            notes_items.append({"label": "Blocked Reason", "text": task.blocked_reason.replace("_", " ").title()})
+        if task.carryover_from_task_id:
+            notes_items.append({"label": "Carryover", "text": f"Created from task #{task.carryover_from_task_id}."})
+
+        return render_template(
+            "manager/task_detail.html",
+            title=task.title,
+            body_class="manager",
+            task=task,
+            location=location,
+            assignee_names=assignee_names,
+            created_by_name=created_by_name,
+            created_at_label=format_datetime(task.created_at),
+            scheduled_date=get_task_schedule_date(task),
+            completed_at_label=format_datetime(task.finished_at) if task.finished_at else None,
+            attachment_items=attachment_items,
+            primary_image=attachment_items[0] if attachment_items else None,
+            notes_items=notes_items,
+            linked_issue=linked_issue,
+            priority_label=priority_label,
+            priority_key=priority_key,
+            session_items=session_items,
+            total_duration_label=f"{total_minutes // 60}h {total_minutes % 60}m" if total_minutes else None,
+            last_updated_label=datetime.utcnow().strftime("%d %b %Y - %H:%M"),
+        )
+    finally:
+        db.close()
+
+
 def render_manager_observations_page(user: User):
     db = SessionLocal()
     try:
@@ -2002,6 +2155,13 @@ def manager_done_tasks():
 def manager_tasks():
     user = request.cf_user  # type: ignore[attr-defined]
     return render_manager_tasks_page(user)
+
+
+@app.get("/manager/task/<int:task_id>")
+@manager_required
+def manager_task_detail(task_id: int):
+    user = request.cf_user  # type: ignore[attr-defined]
+    return render_manager_task_detail_page(user, task_id)
 
 
 @app.get("/manager/observations")

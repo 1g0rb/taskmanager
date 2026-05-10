@@ -284,7 +284,7 @@
         </div>
         <div class="manager-upcoming-list">
           {% for task in upcoming_tasks[:5] %}
-          <article class="manager-upcoming-row">
+          <a class="manager-upcoming-row manager-task-link" href="{{ url_for('manager_task_detail', task_id=task.id) }}">
             <div>
               <div class="manager-upcoming-title">{{ task.title }}</div>
               <div class="manager-task-subline manager-task-meta">
@@ -295,7 +295,7 @@
             {% set upcoming_due = task.scheduled_date or task.due_date %}
             <span class="manager-upcoming-date">{{ upcoming_due.strftime('%d %b') if upcoming_due and upcoming_due.strftime else (upcoming_due if upcoming_due else 'No date') }}</span>
             <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
-          </article>
+          </a>
           {% else %}
           <p class="manager-empty">No upcoming tasks in the next seven days.</p>
           {% endfor %}
