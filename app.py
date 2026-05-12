@@ -1545,17 +1545,23 @@ def finish_task_work_session(
 
 
 def get_worker_task_finish_validation_error(
+    db: Session,
     task: Task,
+    user_id: int,
     as_of: datetime | None = None,
 ) -> str | None:
     now = as_of or datetime.utcnow()
     task_status = (task.status or "open")
     if task_status == "blocked":
         return "Task needs to be restarted after being blocked."
-    if task_status != "in_progress" or not task.started_at:
+    if task_status != "in_progress":
         return "Task must be started before finishing."
 
-    active_task_minutes = _duration_minutes_between(task.started_at, now)
+    active_session = get_active_task_work_session(db, task.id, user_id)
+    if not active_session:
+        return "Task must be started before finishing."
+
+    active_task_minutes = _duration_minutes_between(active_session.started_at, now)
     if active_task_minutes < 1:
         return "You can't finish a task with less than 1 minute worked."
 
@@ -3494,7 +3500,7 @@ def worker_task_done(task_id: int):
             flash("Not allowed.")
             return redirect(next_url)
 
-        finish_validation_error = get_worker_task_finish_validation_error(t, as_of=now)
+        finish_validation_error = get_worker_task_finish_validation_error(db, t, user.id, as_of=now)
         if finish_validation_error:
             flash(finish_validation_error)
             return redirect(next_url)
@@ -3669,6 +3675,7 @@ def worker_task_unblock(task_id: int):
         t.blocked_reason = None
         t.blocked_until = None
         t.blocked_at = None
+        t.blocked_location_id = None
         t.finished_at = None
         db.commit()
 
@@ -4258,10 +4265,29 @@ def admin_tasks_batch_block():
         task_ids = get_task_ids_from_request()
         if not task_ids:
             return redirect_back()
-        db.query(Task).filter(
+
+        now = datetime.utcnow()
+        blocked_reason = (request.form.get("reason") or "").strip().lower() or None
+        blocked_until = None
+        until_raw = (request.form.get("blocked_until") or "").strip()
+        if until_raw:
+            y, m, d = until_raw.split("-")
+            blocked_until = date(int(y), int(m), int(d))
+
+        rows = db.query(Task).filter(
             Task.id.in_(task_ids),
             Task.status != "done"
-            ).update({Task.status: "blocked"}, synchronize_session=False)
+        ).all()
+        for task in rows:
+            task.status = "blocked"
+            task.blocked_at = now
+            if blocked_reason:
+                task.blocked_reason = blocked_reason
+            if blocked_until:
+                task.blocked_until = blocked_until
+            task.finished_at = None
+
+        finish_active_sessions_for_tasks(db, [task.id for task in rows], finished_at=now)
 
         db.commit()
         return redirect_back()
@@ -4533,10 +4559,16 @@ def admin_tasks_batch_unblock():
         task_ids = get_task_ids_from_request()
         if not task_ids:
             return redirect_back()
-        db.query(Task).filter(
+        rows = db.query(Task).filter(
             Task.id.in_(task_ids),
             Task.status != "done"
-            ).update({Task.status: "open"}, synchronize_session=False)
+        ).all()
+        for task in rows:
+            task.status = "open"
+            task.blocked_reason = None
+            task.blocked_until = None
+            task.blocked_at = None
+            task.blocked_location_id = None
 
         db.commit()
         return redirect_back()
