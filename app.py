@@ -3511,7 +3511,23 @@ def worker_task_done(task_id: int):
             flash(finish_validation_error)
             return redirect(next_url)
 
-        finish_active_sessions_for_tasks(db, [t.id], finished_at=now)
+        finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
+
+        has_active_sessions = (
+            db.query(TaskWorkSession.id)
+            .filter(
+                TaskWorkSession.task_id == t.id,
+                TaskWorkSession.status == "active",
+                TaskWorkSession.finished_at.is_(None),
+            )
+            .first()
+            is not None
+        )
+
+        if has_active_sessions:
+            t.status = "in_progress"
+            db.commit()
+            return redirect(next_url)
 
         if getattr(t, "carryover_from_task_id", None):
             orig_id = t.carryover_from_task_id
