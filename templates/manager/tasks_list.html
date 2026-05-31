@@ -54,7 +54,7 @@
           {% if last_updated_label %}
             {{ last_updated_label }}
           {% elif generated_at %}
-            {{ generated_at.strftime('%d %b %Y Â· %H:%M') if generated_at.strftime else generated_at }}
+            {{ generated_at|zagreb_datetime('%d %b %Y · %H:%M') }}
           {% else %}
             Last updated just now
           {% endif %}
@@ -98,11 +98,11 @@
             {% if task.days_overdue is not none %}
             <span class="manager-task-date manager-task-overdue{% if task.days_overdue >= 7 %} is-strong{% endif %}">{{ task.days_overdue }}d aging</span>
             {% elif task.completed_at %}
-            <span class="manager-task-date">{{ task.completed_at.strftime('%d %b %Y') if task.completed_at.strftime else task.completed_at }}</span>
+            <span class="manager-task-date">{{ task.completed_at|zagreb_datetime('%d %b %Y') }}</span>
             {% elif task.scheduled_date %}
-            <span class="manager-task-date">{{ task.scheduled_date.strftime('%d %b %Y') if task.scheduled_date.strftime else task.scheduled_date }}</span>
+            <span class="manager-task-date">{{ task.scheduled_date|zagreb_datetime('%d %b %Y') }}</span>
             {% elif task.created_at %}
-            <span class="manager-task-date">{{ task.created_at.strftime('%d %b %Y') if task.created_at.strftime else task.created_at }}</span>
+            <span class="manager-task-date">{{ task.created_at|zagreb_datetime('%d %b %Y') }}</span>
             {% else %}
             <span class="manager-task-date">No date</span>
             {% endif %}

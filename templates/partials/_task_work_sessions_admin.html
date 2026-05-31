@@ -24,7 +24,7 @@
       <div class="done-detail-label">First start</div>
       <div class="done-detail-value">
         {% if work_summary.get('first_start') %}
-          {{ work_summary.get('first_start').strftime("%Y-%m-%d %H:%M") }}
+          {{ work_summary.get('first_start')|zagreb_datetime("%Y-%m-%d %H:%M") }}
         {% else %}
           -
         {% endif %}
@@ -35,7 +35,7 @@
       <div class="done-detail-label">Last finish</div>
       <div class="done-detail-value">
         {% if work_summary.get('last_finish') %}
-          {{ work_summary.get('last_finish').strftime("%Y-%m-%d %H:%M") }}
+          {{ work_summary.get('last_finish')|zagreb_datetime("%Y-%m-%d %H:%M") }}
         {% else %}
           -
         {% endif %}
@@ -69,7 +69,7 @@
       <tbody>
         {% for session in work_sessions %}
         <tr>
-          <td>{{ session.started_at.strftime("%Y-%m-%d") }}</td>
+          <td>{{ session.started_at|zagreb_datetime("%Y-%m-%d") }}</td>
           <td>
             {% if session.user_id in users %}
               {{ users[session.user_id].display_name or users[session.user_id].username.split('@')[0] }}
@@ -77,10 +77,10 @@
               User #{{ session.user_id }}
             {% endif %}
           </td>
-          <td>{{ session.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td>{{ session.started_at|zagreb_datetime("%Y-%m-%d %H:%M") }}</td>
           <td>
             {% if session.finished_at %}
-              {{ session.finished_at.strftime("%Y-%m-%d %H:%M") }}
+              {{ session.finished_at|zagreb_datetime("%Y-%m-%d %H:%M") }}
             {% else %}
               In progress
             {% endif %}

@@ -15,7 +15,7 @@
     <div>
       <div class="stat-label">Last seen</div>
       <div class="stat-value activity-stat-text">
-        {{ stats.last_seen.strftime("%Y-%m-%d %H:%M") if stats.last_seen else "No activity" }}
+        {{ stats.last_seen|zagreb_datetime("%Y-%m-%d %H:%M", "No activity") }}
       </div>
     </div>
   </div>
@@ -64,7 +64,7 @@
         <tr>
           <td>
             <div class="activity-user-cell">
-              <strong>{{ activity.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</strong>
+              <strong>{{ activity.created_at|zagreb_datetime("%Y-%m-%d %H:%M:%S") }}</strong>
             </div>
           </td>
           <td>

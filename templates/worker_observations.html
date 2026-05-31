@@ -50,7 +50,7 @@
                 </div>
               </div>
               <div class="worker-observation-time">
-                {{ o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "" }}
+                {{ o.created_at|zagreb_datetime("%Y-%m-%d %H:%M", "") }}
               </div>
             </div>
 

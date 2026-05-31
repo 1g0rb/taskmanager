@@ -3,6 +3,14 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
+from timezone_utils import (
+    format_zagreb_datetime,
+    utc_naive_to_zagreb,
+    utc_now_naive,
+    zagreb_day_start_utc_naive,
+    zagreb_today,
+)
+
 
 def _collect_manager_task_data(
     db,
@@ -17,7 +25,7 @@ def _collect_manager_task_data(
     TaskWorkSession=None,
     today: date | None = None,
 ):
-    today_value = today or date.today()
+    today_value = today or zagreb_today()
     upcoming_until = today_value + timedelta(days=7)
     recent_window_start = today_value - timedelta(days=6)
 
@@ -60,7 +68,7 @@ def _collect_manager_task_data(
                 db.query(TaskWorkSession.user_id)
                 .filter(
                     TaskWorkSession.task_id.in_(task_ids),
-                    TaskWorkSession.started_at >= datetime.combine(recent_window_start, datetime.min.time()),
+                    TaskWorkSession.started_at >= zagreb_day_start_utc_naive(recent_window_start),
                 )
                 .distinct()
                 .all()
@@ -164,7 +172,8 @@ def _collect_manager_task_data(
         finished_at = getattr(task, "finished_at", None)
         if not finished_at:
             return None
-        return finished_at.date() if hasattr(finished_at, "date") else None
+        local_finished_at = utc_naive_to_zagreb(finished_at) if isinstance(finished_at, datetime) else finished_at
+        return local_finished_at.date() if hasattr(local_finished_at, "date") else None
 
     def short_description(task) -> str | None:
         notes = (getattr(task, "notes", None) or "").strip()
@@ -399,15 +408,15 @@ def _collect_manager_task_data(
         completion_trend.append(
             {
                 "date": trend_day,
-                "date_label": trend_day.strftime("%d %b"),
-                "weekday_label": trend_day.strftime("%a"),
+                "date_label": format_zagreb_datetime(trend_day, "%d %b"),
+                "weekday_label": format_zagreb_datetime(trend_day, "%a"),
                 "count": count,
             }
         )
         trend_max = max(trend_max, count)
 
     return {
-        "generated_at": datetime.now(),
+        "generated_at": utc_now_naive(),
         "today": today_value,
         "today_tasks": sorted(today_tasks, key=task_sort_key),
         "overdue_tasks": sorted(aging_tasks, key=task_sort_key),
@@ -564,7 +573,8 @@ def build_manager_done_tasks_data(
     grouped = defaultdict(list)
     for task in base["completed_tasks"]:
         completed_at = task.get("completed_at")
-        completed_date = completed_at.date() if completed_at and hasattr(completed_at, "date") else None
+        local_completed_at = utc_naive_to_zagreb(completed_at) if isinstance(completed_at, datetime) else completed_at
+        completed_date = local_completed_at.date() if local_completed_at and hasattr(local_completed_at, "date") else None
         if not completed_date:
             continue
 
@@ -578,8 +588,8 @@ def build_manager_done_tasks_data(
             {
                 **task,
                 "completed_date": completed_date,
-                "completed_date_label": completed_date.strftime("%A, %d %b %Y"),
-                "completed_time_label": completed_at.strftime("%H:%M") if hasattr(completed_at, "strftime") else None,
+                "completed_date_label": format_zagreb_datetime(completed_date, "%A, %d %b %Y"),
+                "completed_time_label": format_zagreb_datetime(completed_at, "%H:%M", "") if completed_at else None,
                 "duration_minutes": duration_minutes,
             }
         )
@@ -594,7 +604,7 @@ def build_manager_done_tasks_data(
         grouped_items.append(
             {
                 "date": completed_date,
-                "date_label": completed_date.strftime("%A, %d %b %Y"),
+                "date_label": format_zagreb_datetime(completed_date, "%A, %d %b %Y"),
                 "count": len(items),
                 "tasks": items,
             }

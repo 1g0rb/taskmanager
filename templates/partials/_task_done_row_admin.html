@@ -14,7 +14,7 @@
         <span>{{ location.name if location else "Unknown location" }}</span>
         <span>{{ "Garden" if (t.module or "")|lower == "garden" else "Horticulture" }}</span>
         {% if t.finished_at %}
-          <span>{{ t.finished_at.strftime("%H:%M") }}</span>
+          <span>{{ t.finished_at|zagreb_datetime("%H:%M") }}</span>
         {% elif t.task_date %}
           <span>{{ t.task_date }}</span>
         {% endif %}
@@ -60,7 +60,7 @@
         <div class="done-detail-label">Finished</div>
         <div class="done-detail-value">
           {% if t.finished_at %}
-            {{ t.finished_at.strftime("%Y-%m-%d %H:%M") }}
+            {{ t.finished_at|zagreb_datetime("%Y-%m-%d %H:%M") }}
           {% else %}
             {{ t.task_date if t.task_date else "Not set" }}
           {% endif %}

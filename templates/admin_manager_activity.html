@@ -40,8 +40,8 @@
           <td>
             {% if row.last_seen %}
               <div class="activity-user-cell">
-                <strong>{{ row.last_seen.strftime("%Y-%m-%d %H:%M") }}</strong>
-                <span class="small">{{ row.last_seen.strftime("%A") }}</span>
+                <strong>{{ row.last_seen|zagreb_datetime("%Y-%m-%d %H:%M") }}</strong>
+                <span class="small">{{ row.last_seen|zagreb_datetime("%A") }}</span>
               </div>
             {% else %}
               <span class="small">No activity yet</span>

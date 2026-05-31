@@ -125,7 +125,7 @@
             </div>
             <div>
               <dt>Scheduled</dt>
-              <dd>{{ scheduled_date.strftime('%d %b %Y') if scheduled_date and scheduled_date.strftime else (scheduled_date if scheduled_date else '-') }}</dd>
+              <dd>{{ scheduled_date|zagreb_datetime('%d %b %Y') }}</dd>
             </div>
             <div>
               <dt>Completed</dt>

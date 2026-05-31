@@ -75,7 +75,7 @@
           {% if last_updated_label %}
             {{ last_updated_label }}
           {% elif generated_at %}
-            {{ generated_at.strftime('%d %b %Y · %H:%M') if generated_at.strftime else generated_at }}
+            {{ generated_at|zagreb_datetime('%d %b %Y · %H:%M') }}
           {% elif last_updated %}
             {{ last_updated }}
           {% else %}
@@ -168,7 +168,7 @@
               </div>
               <span class="manager-task-date">
                 {% set task_due = task.scheduled_date or task.due_date %}
-                {{ task_due.strftime('%d %b') if task_due and task_due.strftime else (task_due if task_due else 'No date') }}
+                {{ task_due|zagreb_datetime('%d %b', 'No date') }}
               </span>
             </div>
           </article>
@@ -293,7 +293,7 @@
               </div>
             </div>
             {% set upcoming_due = task.scheduled_date or task.due_date %}
-            <span class="manager-upcoming-date">{{ upcoming_due.strftime('%d %b') if upcoming_due and upcoming_due.strftime else (upcoming_due if upcoming_due else 'No date') }}</span>
+            <span class="manager-upcoming-date">{{ upcoming_due|zagreb_datetime('%d %b', 'No date') }}</span>
             <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
           </a>
           {% else %}

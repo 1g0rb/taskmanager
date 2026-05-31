@@ -1,7 +1,6 @@
 # app.py
 from __future__ import annotations
 import os
-import calendar
 from ipaddress import ip_address, ip_network
 from uuid import uuid4
 from werkzeug.utils import secure_filename
@@ -28,6 +27,15 @@ from services.manager_dashboard import (
     build_manager_observations_data,
     build_manager_reports_data,
     build_manager_tasks_list_data,
+)
+from timezone_utils import (
+    ZAGREB_TZ,
+    format_zagreb_datetime,
+    utc_naive_to_zagreb,
+    utc_now_naive,
+    zagreb_datetime_to_utc_naive,
+    zagreb_day_start_utc_naive,
+    zagreb_today,
 )
 # ---------------- DB ----------------
 DB_URL = os.environ.get("DATABASE_URL")
@@ -82,7 +90,7 @@ class Team(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class Task(Base):
@@ -96,7 +104,7 @@ class Task(Base):
 
     assigned_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
 
-    task_date = Column(Date, default=date.today)
+    task_date = Column(Date, default=zagreb_today)
     next_action_date = Column(Date, nullable=True)
     is_todo = Column(Boolean, default=False, nullable=False)
 
@@ -114,7 +122,7 @@ class Task(Base):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 
 class TaskAssignee(Base):
@@ -135,7 +143,7 @@ class TaskWorkSession(Base):
     finished_at = Column(DateTime, nullable=True)
     duration_minutes = Column(Integer, nullable=True)
     status = Column(String(20), nullable=False, default="active")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
 
 class Issue(Base):
@@ -152,7 +160,7 @@ class Issue(Base):
     linked_task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
 
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
     notes = Column(String, nullable=True)
 
@@ -178,7 +186,7 @@ class Location(Base):
     phase_id = Column(Integer, ForeignKey("phases.id"), nullable=True)
 
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
     def __repr__(self):
         return f"<Location {self.name}>"
@@ -196,7 +204,7 @@ class ResidenceBlock(Base):
     until_date = Column(Date, nullable=True)
 
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now_naive)
 
 class TaskPhoto(Base):
     __tablename__ = "task_photos"
@@ -206,7 +214,7 @@ class TaskPhoto(Base):
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
 
 class IssuePhoto(Base):
@@ -217,7 +225,7 @@ class IssuePhoto(Base):
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
 
 observation_workers = Table(
@@ -236,7 +244,7 @@ class ObservationPhoto(Base):
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
 
 class Observation(Base):
@@ -255,7 +263,7 @@ class Observation(Base):
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     status = Column(String(20), nullable=False, default="new")  # new / seen / done
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
     location = relationship("Location")
     assigned_user = relationship("User", foreign_keys=[assigned_user_id])
@@ -276,8 +284,8 @@ class UserActivity(Base):
     method = Column(String(10), nullable=False)
     activity_type = Column(String(20), nullable=False, default="view")
     ip_address = Column(String(64), nullable=True)
-    activity_date = Column(Date, default=date.today, nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    activity_date = Column(Date, default=zagreb_today, nullable=True, index=True)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False, index=True)
 
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "heic"}
 
@@ -668,6 +676,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 app.config["MANAGER_HOST"] = (os.environ.get("MANAGER_HOST") or "manager.ordoapps.app").strip().lower()
+app.jinja_env.filters["zagreb_datetime"] = format_zagreb_datetime
 
 # ---------------- Cloudflare Access auth ----------------
 CF_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
@@ -859,7 +868,7 @@ def log_user_activity() -> None:
             method=request.method,
             activity_type="view" if request.method == "GET" else "action",
             ip_address=get_request_ip(),
-            activity_date=date.today(),
+            activity_date=zagreb_today(),
         )
         db.add(activity)
         db.commit()
@@ -1221,7 +1230,7 @@ def notify_task_users(db: Session, task: Task, user_ids: list[int], label: str) 
     if not schedule_date:
         return
 
-    today = date.today()
+    today = zagreb_today()
     if schedule_date < today:
         return
 
@@ -1440,17 +1449,13 @@ def _duration_minutes_between(started_at: datetime, finished_at: datetime) -> in
     return max(int(delta.total_seconds() // 60), 0)
 
 
-def _utc_naive_to_local(value: datetime) -> datetime:
-    return datetime.fromtimestamp(calendar.timegm(value.timetuple()))
-
-
 def _local_workday_end_to_utc_naive(local_day: date) -> datetime:
-    local_cutoff = datetime.combine(local_day, time(hour=WORKDAY_END_HOUR))
-    return datetime.utcfromtimestamp(local_cutoff.timestamp())
+    local_cutoff = datetime.combine(local_day, time(hour=WORKDAY_END_HOUR), tzinfo=ZAGREB_TZ)
+    return zagreb_datetime_to_utc_naive(local_cutoff)
 
 
 def auto_close_sessions(db: Session, now: datetime | None = None) -> int:
-    current_time = now or datetime.utcnow()
+    current_time = now or utc_now_naive()
     active_sessions = (
         db.query(TaskWorkSession)
         .filter(
@@ -1462,7 +1467,7 @@ def auto_close_sessions(db: Session, now: datetime | None = None) -> int:
 
     closed_sessions = 0
     for session in active_sessions:
-        session_local_started_at = _utc_naive_to_local(session.started_at)
+        session_local_started_at = utc_naive_to_zagreb(session.started_at)
         session_cutoff = _local_workday_end_to_utc_naive(session_local_started_at.date())
         if current_time < session_cutoff:
             continue
@@ -1475,7 +1480,7 @@ def auto_close_sessions(db: Session, now: datetime | None = None) -> int:
 
 
 def finish_work_session(session: TaskWorkSession, finished_at: datetime | None = None) -> TaskWorkSession:
-    finished_value = finished_at or datetime.utcnow()
+    finished_value = finished_at or utc_now_naive()
     session.finished_at = finished_value
     session.duration_minutes = _duration_minutes_between(session.started_at, finished_value)
     session.status = "done"
@@ -1501,7 +1506,7 @@ def get_active_task_work_session(
 
 
 def start_task_work_session(db: Session, task_id: int, user_id: int, started_at: datetime | None = None):
-    now = started_at or datetime.utcnow()
+    now = started_at or utc_now_naive()
 
     active_same_task = get_active_task_work_session(db, task_id, user_id)
     if active_same_task:
@@ -1524,7 +1529,7 @@ def finish_task_work_session(
     finished_at: datetime | None = None,
     create_fallback: bool = True,
 ):
-    now = finished_at or datetime.utcnow()
+    now = finished_at or utc_now_naive()
     active_session = get_active_task_work_session(db, task_id, user_id)
     if active_session:
         return finish_work_session(active_session, now), False
@@ -1550,7 +1555,7 @@ def get_worker_task_finish_validation_error(
     user_id: int,
     as_of: datetime | None = None,
 ) -> str | None:
-    now = as_of or datetime.utcnow()
+    now = as_of or utc_now_naive()
     task_status = (task.status or "open")
     if task_status == "blocked":
         return "Task needs to be restarted after being blocked."
@@ -1572,7 +1577,7 @@ def finish_active_sessions_for_tasks(db: Session, task_ids: list[int], finished_
     if not task_ids:
         return 0
 
-    now = finished_at or datetime.utcnow()
+    now = finished_at or utc_now_naive()
     active_sessions = (
         db.query(TaskWorkSession)
         .filter(
@@ -1787,8 +1792,8 @@ def manager_activity_display_name(activity: UserActivity) -> str:
 
 
 def build_manager_activity_rows(db: Session, today_value: date):
-    start_today = datetime.combine(today_value, datetime.min.time())
-    start_week = datetime.combine(start_of_current_week(today_value), datetime.min.time())
+    start_today = zagreb_day_start_utc_naive(today_value)
+    start_week = zagreb_day_start_utc_naive(start_of_current_week(today_value))
     rows_by_key: dict[str, dict] = {}
 
     activities = (
@@ -1856,7 +1861,7 @@ def render_manager_dashboard_page(user: User):
             body_class="manager",
             autorefresh=False,
             active_tab="manager",
-            last_updated_label=dashboard_data["generated_at"].strftime("%d %b %Y · %H:%M"),
+            last_updated_label=format_zagreb_datetime(dashboard_data["generated_at"], "%d %b %Y · %H:%M"),
             **dashboard_data,
         )
     finally:
@@ -1884,7 +1889,7 @@ def render_manager_reports_page(user: User):
             body_class="manager",
             autorefresh=False,
             active_tab="manager",
-            last_updated_label=reports_data["generated_at"].strftime("%d %b %Y · %H:%M"),
+            last_updated_label=format_zagreb_datetime(reports_data["generated_at"], "%d %b %Y · %H:%M"),
             **reports_data,
         )
     finally:
@@ -1912,7 +1917,7 @@ def render_manager_done_tasks_page(user: User):
             body_class="manager",
             autorefresh=False,
             active_tab="manager",
-            last_updated_label=done_tasks_data["generated_at"].strftime("%d %b %Y · %H:%M"),
+            last_updated_label=format_zagreb_datetime(done_tasks_data["generated_at"], "%d %b %Y · %H:%M"),
             **done_tasks_data,
         )
     finally:
@@ -1941,7 +1946,7 @@ def render_manager_tasks_page(user: User):
             body_class="manager",
             autorefresh=False,
             active_tab="manager",
-            last_updated_label=tasks_data["generated_at"].strftime("%d %b %Y Â· %H:%M"),
+            last_updated_label=format_zagreb_datetime(tasks_data["generated_at"], "%d %b %Y · %H:%M"),
             **tasks_data,
         )
     finally:
@@ -1961,7 +1966,7 @@ def render_manager_task_detail_page(user: User, task_id: int):
             return (row.display_name or row.username.split("@")[0]).strip()
 
         def format_datetime(value: datetime | None) -> str:
-            return value.strftime("%d %b %Y - %H:%M") if value else "-"
+            return format_zagreb_datetime(value, "%d %b %Y - %H:%M")
 
         location = db.get(Location, task.location_id) if task.location_id else None
         assigned_rows = (
@@ -2093,7 +2098,7 @@ def render_manager_task_detail_page(user: User, task_id: int):
             priority_key=priority_key,
             session_items=session_items,
             total_duration_label=f"{total_minutes // 60}h {total_minutes % 60}m" if total_minutes else None,
-            last_updated_label=datetime.utcnow().strftime("%d %b %Y - %H:%M"),
+            last_updated_label=format_zagreb_datetime(utc_now_naive(), "%d %b %Y - %H:%M"),
         )
     finally:
         db.close()
@@ -2120,7 +2125,7 @@ def render_manager_observations_page(user: User):
             body_class="manager",
             autorefresh=False,
             active_tab="manager",
-            last_updated_label=observations_data["generated_at"].strftime("%d %b %Y Â· %H:%M"),
+            last_updated_label=format_zagreb_datetime(observations_data["generated_at"], "%d %b %Y · %H:%M"),
             **observations_data,
         )
     finally:
@@ -2345,8 +2350,9 @@ def admin_locations_delete(loc_id):
 def admin_tasks():
     db = SessionLocal()
     try:
-        today = date.today().isoformat()
-        today_start = datetime.combine(date.today(), datetime.min.time())
+        today_value = zagreb_today()
+        today = today_value.isoformat()
+        today_start = zagreb_day_start_utc_naive(today_value)
         selected_module = (request.args.get("module") or "").strip().lower()
         selected_location_raw = (request.args.get("location_id") or "").strip()
         selected_assignee_raw = (request.args.get("assignee_id") or "").strip()
@@ -2477,7 +2483,7 @@ def admin_tasks():
         done_bucket = {}
 
         def done_group_date(task: Task):
-            return task.finished_at.date() if task.finished_at else task.task_date
+            return utc_naive_to_zagreb(task.finished_at).date() if task.finished_at else task.task_date
 
         def done_group_sort_key(task: Task):
             if task.finished_at:
@@ -2496,7 +2502,7 @@ def admin_tasks():
             items = sorted(done_bucket[group_date], key=done_group_sort_key, reverse=True)
             done_history_groups.append({
                 "key": group_date.isoformat(),
-                "label": group_date.strftime("%A, %Y-%m-%d"),
+                "label": format_zagreb_datetime(group_date, "%A, %Y-%m-%d"),
                 "count": len(items),
                 "items": items,
             })
@@ -2668,7 +2674,7 @@ def admin_activity():
             .all()
         )
 
-        today_value = date.today()
+        today_value = zagreb_today()
         stats_by_user_id = build_activity_stats(db, workers, today_value)
 
         return render_template(
@@ -2692,7 +2698,7 @@ def admin_activity_detail(user_id: int):
             flash("User not found.")
             return redirect(url_for("admin_activity"))
 
-        today_value = date.today()
+        today_value = zagreb_today()
         stats = build_activity_stats(db, [user], today_value).get(
             user.id,
             {"last_seen": None, "today_count": 0, "week_count": 0},
@@ -2729,7 +2735,7 @@ def admin_activity_detail(user_id: int):
 def admin_manager_activity():
     db = SessionLocal()
     try:
-        today_value = date.today()
+        today_value = zagreb_today()
         rows = build_manager_activity_rows(db, today_value)
 
         return render_template(
@@ -2772,9 +2778,9 @@ def admin_manager_activity_detail(user_key: str):
             flash("Manager activity user not found.")
             return redirect(url_for("admin_manager_activity"))
 
-        today_value = date.today()
-        start_today = datetime.combine(today_value, datetime.min.time())
-        start_week = datetime.combine(start_of_current_week(today_value), datetime.min.time())
+        today_value = zagreb_today()
+        start_today = zagreb_day_start_utc_naive(today_value)
+        start_week = zagreb_day_start_utc_naive(start_of_current_week(today_value))
         stats = {
             "last_seen": (
                 db.query(func.max(UserActivity.created_at))
@@ -2965,7 +2971,7 @@ def admin_task_new():
             elif is_todo:
                 task_date_val = None
             else:
-                task_date_val = date.today()
+                task_date_val = zagreb_today()
 
             if not title or not area_id_raw.isdigit():
                 flash("Title and location (phase/area) are required.")
@@ -3132,7 +3138,7 @@ def worker_home():
 def worker_dashboard():
     user = request.cf_user  # type: ignore[attr-defined]
 
-    today = date.today()
+    today = zagreb_today()
     until = today + timedelta(days=7)
     active_module, module_filter = parse_module_arg()
     view = request.args.get("view", "all")
@@ -3226,7 +3232,7 @@ def worker_dashboard():
         else:
             view = "all"
 
-        today_pretty = today.strftime("%A, %B %d, %Y")
+        today_pretty = format_zagreb_datetime(today, "%A, %B %d, %Y")
         unread_observation_count = get_worker_unread_observation_count(db, user.id)
 
         return render_template(
@@ -3340,7 +3346,7 @@ def worker_task_detail(task_id: int):
         else:
             created_by_name = "TaskManager"
 
-        created_at_label = task.created_at.strftime("%Y-%m-%d %H:%M") if task.created_at else "-"
+        created_at_label = format_zagreb_datetime(task.created_at, "%Y-%m-%d %H:%M")
 
         priority_label = None
         priority_tone = None
@@ -3359,7 +3365,7 @@ def worker_task_detail(task_id: int):
             attachment_items.append({
                 "path": path,
                 "label": "Task photo",
-                "created_at": photo.created_at.strftime("%Y-%m-%d %H:%M") if photo.created_at else "",
+                "created_at": format_zagreb_datetime(photo.created_at, "%Y-%m-%d %H:%M", ""),
             })
 
         for photo in issue_photos:
@@ -3370,7 +3376,7 @@ def worker_task_detail(task_id: int):
             attachment_items.append({
                 "path": path,
                 "label": f"Issue #{linked_issue.id} reference" if linked_issue else "Reference",
-                "created_at": photo.created_at.strftime("%Y-%m-%d %H:%M") if photo.created_at else "",
+                "created_at": format_zagreb_datetime(photo.created_at, "%Y-%m-%d %H:%M", ""),
             })
 
         primary_image = attachment_items[0] if attachment_items else None
@@ -3439,7 +3445,7 @@ def worker_task_detail(task_id: int):
 def worker_task_start(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
-    now = datetime.utcnow()
+    now = utc_now_naive()
 
     default_url = url_for("worker_dashboard", module=module)
     next_url = safe_next_url(default_url)
@@ -3483,8 +3489,8 @@ def worker_task_start(task_id: int):
 def worker_task_done(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
-    today = date.today()
-    now = datetime.utcnow()
+    today = zagreb_today()
+    now = utc_now_naive()
 
     default_url = url_for("worker_dashboard", module=module)
     next_url = safe_next_url(default_url)
@@ -3586,7 +3592,7 @@ def worker_task_done(task_id: int):
 def worker_task_blocked(task_id: int):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all").lower()
-    now = datetime.utcnow()
+    now = utc_now_naive()
 
     default_url = url_for("worker_dashboard", module=module)
     next_url = safe_next_url(default_url)
@@ -3909,8 +3915,8 @@ def admin_issue_convert_to_task(issue_id: int):
             title=issue.title.strip(),
             module=issue.module,
             status="open",
-            task_date=date.today(),
-            next_action_date=date.today(),
+            task_date=zagreb_today(),
+            next_action_date=zagreb_today(),
             location_id=issue.location_id,
             notes="\n".join(notes_parts).strip(),
         )
@@ -3973,8 +3979,8 @@ def admin_issue_set_location(issue_id: int):
 def worker_task_next_day(task_id):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all")
-    today = date.today()
-    now = datetime.utcnow()
+    today = zagreb_today()
+    now = utc_now_naive()
 
     db = SessionLocal()
     try:
@@ -4012,7 +4018,7 @@ def worker_task_next_day(task_id):
 def worker_task_back_today(task_id):
     user = request.cf_user  # type: ignore[attr-defined]
     module = (request.args.get("module") or "all")
-    today = date.today()
+    today = zagreb_today()
 
     db = SessionLocal()
     try:
@@ -4116,7 +4122,7 @@ def admin_tasks_batch_done():
         if not task_ids:
             return redirect_back()
 
-        now = datetime.utcnow()
+        now = utc_now_naive()
         rows = db.query(Task).filter(Task.id.in_(task_ids)).all()
         for task in rows:
             task.status = "done"
@@ -4214,7 +4220,7 @@ def admin_task_move_to_today(task_id: int):
             flash("Task not found.")
             return redirect_back()
 
-        today = date.today()
+        today = zagreb_today()
         task.is_todo = False
         task.task_date = today
         task.next_action_date = today
@@ -4266,7 +4272,7 @@ def admin_tasks_batch_block():
         if not task_ids:
             return redirect_back()
 
-        now = datetime.utcnow()
+        now = utc_now_naive()
         blocked_reason = (request.form.get("reason") or "").strip().lower() or None
         blocked_until = None
         until_raw = (request.form.get("blocked_until") or "").strip()

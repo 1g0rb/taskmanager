@@ -57,7 +57,7 @@
           {% if last_updated_label %}
             {{ last_updated_label }}
           {% elif generated_at %}
-            {{ generated_at.strftime('%d %b %Y · %H:%M') if generated_at.strftime else generated_at }}
+            {{ generated_at|zagreb_datetime('%d %b %Y · %H:%M') }}
           {% else %}
             Last updated just now
           {% endif %}
@@ -187,7 +187,7 @@
                 <span class="manager-badge status-done">Done</span>
                 <span class="manager-badge priority-{{ task.priority }}">{{ task.priority|title }}</span>
               </div>
-              <span class="manager-task-date">{{ task.completed_at.strftime('%d %b') if task.completed_at and task.completed_at.strftime else 'Recently' }}</span>
+              <span class="manager-task-date">{{ task.completed_at|zagreb_datetime('%d %b', 'Recently') }}</span>
             </div>
           </a>
           {% else %}

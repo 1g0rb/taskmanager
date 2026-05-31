@@ -39,7 +39,7 @@
             </div>
 
             <div class="issue-meta">
-              <div><strong>When:</strong> {{ i.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+              <div><strong>When:</strong> {{ i.created_at|zagreb_datetime("%Y-%m-%d %H:%M") }}</div>
               <div><strong>Module:</strong> {{ i.module }}</div>
 
               <div>

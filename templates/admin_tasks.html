@@ -129,8 +129,8 @@
             {% endif %}
           </td>
           <td>{{ task.title if task else ('Task #' ~ session.task_id) }}</td>
-          <td>{{ session.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
-          <td>{{ session.finished_at.strftime("%Y-%m-%d %H:%M") if session.finished_at else "In progress" }}</td>
+          <td>{{ session.started_at|zagreb_datetime("%Y-%m-%d %H:%M") }}</td>
+          <td>{{ session.finished_at|zagreb_datetime("%Y-%m-%d %H:%M", "In progress") }}</td>
           <td>{{ format_duration_minutes(session.duration_minutes) }}</td>
         </tr>
         {% else %}
