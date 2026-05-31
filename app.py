@@ -1505,6 +1505,65 @@ def get_active_task_work_session(
     )
 
 
+def get_completed_task_work_session(
+    db: Session,
+    task_id: int,
+    user_id: int,
+) -> TaskWorkSession | None:
+    return (
+        db.query(TaskWorkSession)
+        .filter(
+            TaskWorkSession.task_id == task_id,
+            TaskWorkSession.user_id == user_id,
+            TaskWorkSession.status == "done",
+            TaskWorkSession.finished_at.isnot(None),
+        )
+        .order_by(TaskWorkSession.finished_at.desc(), TaskWorkSession.id.desc())
+        .first()
+    )
+
+
+def task_has_active_work_sessions(db: Session, task_id: int) -> bool:
+    return (
+        db.query(TaskWorkSession.id)
+        .filter(
+            TaskWorkSession.task_id == task_id,
+            TaskWorkSession.status == "active",
+            TaskWorkSession.finished_at.is_(None),
+        )
+        .first()
+        is not None
+    )
+
+
+def task_all_assignees_completed(db: Session, task: Task) -> bool:
+    assigned_user_ids = [
+        row.user_id
+        for row in db.query(TaskAssignee.user_id).filter(TaskAssignee.task_id == task.id).all()
+        if row.user_id
+    ]
+    if not assigned_user_ids and task.assigned_to:
+        assigned_user_ids = [task.assigned_to]
+    if not assigned_user_ids:
+        return True
+
+    completed_user_ids = {
+        user_id
+        for (user_id,) in (
+            db.query(TaskWorkSession.user_id)
+            .filter(
+                TaskWorkSession.task_id == task.id,
+                TaskWorkSession.user_id.in_(assigned_user_ids),
+                TaskWorkSession.status == "done",
+                TaskWorkSession.finished_at.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+    }
+    return set(assigned_user_ids).issubset(completed_user_ids)
+
+
 def start_task_work_session(db: Session, task_id: int, user_id: int, started_at: datetime | None = None):
     now = started_at or utc_now_naive()
 
@@ -3149,11 +3208,6 @@ def worker_dashboard():
             db, user, module_filter, today, until
         )
 
-        # ORIGINALNI COUNTS - uvijek iz punih lista
-        overdue_count = len(overdue_tasks)
-        today_count = len(today_tasks)
-        upcoming_count = len(upcoming_tasks)
-
         locations = {l.id: l for l in db.query(Location).all()}
         users = {u.id: u for u in db.query(User).all()}
 
@@ -3214,11 +3268,36 @@ def worker_dashboard():
             for (task_id, session_user_id), session in active_work_session_by_task_user.items()
             if session_user_id == user.id
         }
+        worker_completed_session_by_task_id = {
+            session.task_id: session
+            for session in (
+                db.query(TaskWorkSession)
+                .filter(
+                    TaskWorkSession.task_id.in_(all_ids),
+                    TaskWorkSession.user_id == user.id,
+                    TaskWorkSession.status == "done",
+                    TaskWorkSession.finished_at.isnot(None),
+                )
+                .order_by(TaskWorkSession.finished_at.desc(), TaskWorkSession.id.desc())
+                .all()
+            )
+        } if all_ids else {}
+
+        def visible_for_worker(tasks: list[Task]) -> list[Task]:
+            return [
+                task for task in tasks
+                if task.id in worker_active_session_by_task_id
+                or task.id not in worker_completed_session_by_task_id
+            ]
 
         # DISPLAY liste - samo za ono što se vidi na ekranu
-        display_overdue_tasks = overdue_tasks
-        display_today_tasks = today_tasks
-        display_upcoming_tasks = upcoming_tasks
+        display_overdue_tasks = visible_for_worker(overdue_tasks)
+        display_today_tasks = visible_for_worker(today_tasks)
+        display_upcoming_tasks = visible_for_worker(upcoming_tasks)
+
+        overdue_count = len(display_overdue_tasks)
+        today_count = len(display_today_tasks)
+        upcoming_count = len(display_upcoming_tasks)
 
         if view == "today":
             display_overdue_tasks = []
@@ -3258,6 +3337,7 @@ def worker_dashboard():
             linked_issue_photo_by_task_id=linked_issue_photo_by_task_id,
             latest_task_photo_by_task_id=latest_task_photo_by_task_id,
             worker_active_session_by_task_id=worker_active_session_by_task_id,
+            worker_completed_session_by_task_id=worker_completed_session_by_task_id,
             view=view,
             unread_observation_count=unread_observation_count,
         )
@@ -3315,6 +3395,7 @@ def worker_task_detail(task_id: int):
             .all()
         )
         worker_active_session = get_active_task_work_session(db, task.id, user.id)
+        worker_completed_session = get_completed_task_work_session(db, task.id, user.id)
 
         issue_photos = []
         if linked_issue:
@@ -3428,6 +3509,7 @@ def worker_task_detail(task_id: int):
             current_view=view,
             linked_issue=linked_issue,
             worker_has_active_session=worker_active_session is not None,
+            worker_has_completed_session=worker_completed_session is not None,
             primary_image=primary_image,
             attachment_items=attachment_items,
             notes_items=notes_items,
@@ -3463,6 +3545,10 @@ def worker_task_start(task_id: int):
 
         if t.status == "done":
             flash("Task already done.")
+            return redirect(next_url)
+
+        if get_completed_task_work_session(db, t.id, user.id):
+            flash("You already completed your work on this task.")
             return redirect(next_url)
 
         if t.status == "blocked":
@@ -3513,19 +3599,14 @@ def worker_task_done(task_id: int):
 
         finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
 
-        has_active_sessions = (
-            db.query(TaskWorkSession.id)
-            .filter(
-                TaskWorkSession.task_id == t.id,
-                TaskWorkSession.status == "active",
-                TaskWorkSession.finished_at.is_(None),
-            )
-            .first()
-            is not None
-        )
-
-        if has_active_sessions:
+        if task_has_active_work_sessions(db, t.id):
             t.status = "in_progress"
+            db.commit()
+            return redirect(next_url)
+
+        if not task_all_assignees_completed(db, t):
+            t.status = "open"
+            t.finished_at = None
             db.commit()
             return redirect(next_url)
 

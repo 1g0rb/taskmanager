@@ -199,7 +199,7 @@
           <span>Block</span>
         </button>
       </form>
-      {% elif task.status in ["open", "in_progress"] %}
+      {% elif task.status in ["open", "in_progress"] and not worker_has_completed_session %}
       <button
         class="wbtn secondary worker-detail-dock-btn worker-detail-dock-btn-secondary"
         type="button"
@@ -231,7 +231,7 @@
           <span data-primary-label>Finish Task</span>
         </button>
       </form>
-      {% elif task.status in ["open", "in_progress"] %}
+      {% elif task.status in ["open", "in_progress"] and not worker_has_completed_session %}
       <form
         method="post"
         action="{{ url_for('worker_task_start', task_id=task.id) }}?module={{ active_module }}"
@@ -246,6 +246,11 @@
           <span data-primary-label>Start Task</span>
         </button>
       </form>
+      {% elif worker_has_completed_session %}
+      <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary is-complete" type="button" disabled data-primary-button>
+        <span class="worker-detail-dock-icon" aria-hidden="true">&#10003;</span>
+        <span data-primary-label>Completed</span>
+      </button>
       {% else %}
       <button class="wbtn done worker-detail-dock-btn worker-detail-dock-btn-primary" type="button" disabled data-primary-button>
         <span class="worker-detail-dock-icon" aria-hidden="true">&#9654;</span>
@@ -254,7 +259,7 @@
       {% endif %}
     </section>
 
-    {% if task.status in ["open", "in_progress"] %}
+    {% if task.status in ["open", "in_progress"] and not worker_has_completed_session %}
     <section id="worker-block-panel" class="worker-detail-block-panel" hidden>
       <form method="post" action="{{ url_for('worker_task_blocked', task_id=task.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">

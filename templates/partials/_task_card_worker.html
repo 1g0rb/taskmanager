@@ -2,13 +2,16 @@
 {% set s = (t.status or "open") %}
 {% set ids = task_to_user_ids.get(t.id, []) %}
 {% set worker_active_sessions = worker_active_session_by_task_id|default({}) %}
+{% set worker_completed_sessions = worker_completed_session_by_task_id|default({}) %}
 {% set worker_has_active_session = t.id in worker_active_sessions %}
+{% set worker_has_completed_session = t.id in worker_completed_sessions %}
 {% set loc_name = locations[t.location_id].name if t.location_id in locations else "?" %}
 {% set assignee_names = [] %}
 {% for uid in ids %}
   {% set _ = assignee_names.append((users[uid].display_name or users[uid].username.split('@')[0]) if uid in users else "?") %}
 {% endfor %}
 
+{% if not (worker_has_completed_session and not worker_has_active_session) %}
 <article class="task-card task-card-compact" data-group="{{ group }}" data-status="{{ s }}">
   <div class="accent
     {% if group == 'overdue' %}accent-overdue
@@ -71,7 +74,7 @@
           <span class="task-done-circle-icon" aria-hidden="true">&#10003;</span>
         </button>
       </form>
-      {% elif s in ["open", "in_progress"] %}
+      {% elif s in ["open", "in_progress"] and not worker_has_completed_session %}
       <form method="post" action="{{ url_for('worker_task_start', task_id=t.id) }}?module={{ active_module }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
         <button class="task-done-circle" type="submit" aria-label="Start {{ t.title }}">
@@ -86,3 +89,4 @@
     </div>
   </div>
 </article>
+{% endif %}
