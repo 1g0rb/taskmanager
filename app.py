@@ -228,6 +228,36 @@ class IssuePhoto(Base):
     created_at = Column(DateTime, default=utc_now_naive, nullable=False)
 
 
+class SupplyRequest(Base):
+    __tablename__ = "supply_requests"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    quantity = Column(String, nullable=True)
+    unit = Column(String, nullable=True)
+    module = Column(String, nullable=False)
+    location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
+    urgency = Column(String(20), nullable=False, default="normal")
+    needed_by = Column(Date, nullable=True)
+    status = Column(String(20), nullable=False, default="requested")
+    requested_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False, index=True)
+    notes = Column(Text, nullable=True)
+
+    photos = relationship("SupplyRequestPhoto", backref="supply_request", lazy="select")
+
+
+class SupplyRequestPhoto(Base):
+    __tablename__ = "supply_request_photos"
+
+    id = Column(Integer, primary_key=True)
+    supply_request_id = Column(Integer, ForeignKey("supply_requests.id"), nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=utc_now_naive, nullable=False)
+
+
 observation_workers = Table(
     "observation_workers",
     Base.metadata,
@@ -422,6 +452,35 @@ def save_observation_photo_upload(
         file_path=rel_path,
         uploaded_by=uploaded_by,
     )
+
+
+def save_supply_request_photo_upload(
+    supply_request_id: int,
+    upload,
+    uploaded_by: int | None = None,
+) -> SupplyRequestPhoto:
+    original_name = secure_filename(upload.filename or "")
+    if not original_name:
+        raise ValueError("Missing file name.")
+
+    if not allowed_image_file(original_name):
+        raise ValueError("Unsupported image format.")
+
+    unique_name = f"{uuid4().hex}.jpg"
+    upload_dir = os.path.join(app.static_folder, "uploads", "supply", str(supply_request_id))
+    os.makedirs(upload_dir, exist_ok=True)
+
+    abs_path = os.path.join(upload_dir, unique_name)
+    save_optimized_image(upload, abs_path, max_size=(1600, 1600), quality=82)
+
+    rel_path = normalize_static_file_path(f"uploads/supply/{supply_request_id}/{unique_name}")
+    return SupplyRequestPhoto(
+        supply_request_id=supply_request_id,
+        filename=original_name,
+        file_path=rel_path,
+        uploaded_by=uploaded_by,
+    )
+
 
 def send_telegram_message(text, chat_id=None):
     token = (TELEGRAM_BOT_TOKEN or "").strip()
@@ -3877,6 +3936,109 @@ def worker_issue_new():
     finally:
         db.close()
 
+
+@app.route("/worker/supply/new", methods=["GET", "POST"])
+@cf_required
+def worker_supply_new():
+    user = request.cf_user  # type: ignore[attr-defined]
+    db = SessionLocal()
+    try:
+        locations = (
+            db.query(Location)
+            .filter(Location.is_active == True)
+            .order_by(Location.module.asc(), Location.name.asc())
+            .all()
+        )
+
+        if request.method == "POST":
+            title = (request.form.get("title") or "").strip()
+            quantity = (request.form.get("quantity") or "").strip() or None
+            unit = (request.form.get("unit") or "").strip() or None
+            module = (request.form.get("module") or "horticulture").strip().lower()
+            urgency = (request.form.get("urgency") or "normal").strip().lower()
+            notes = (request.form.get("notes") or "").strip() or None
+            loc_raw = (request.form.get("location_id") or "").strip()
+            needed_by_raw = (request.form.get("needed_by") or "").strip()
+
+            if module not in {"horticulture", "garden"}:
+                module = "horticulture"
+            if urgency not in {"normal", "urgent"}:
+                urgency = "normal"
+
+            location_id = int(loc_raw) if loc_raw.isdigit() else None
+            needed_by = None
+            if needed_by_raw:
+                try:
+                    y, m, d = needed_by_raw.split("-")
+                    needed_by = date(int(y), int(m), int(d))
+                except ValueError:
+                    flash("Needed by date is invalid.")
+                    return render_template(
+                        "worker_supply_new.html",
+                        title="Request supply",
+                        locations=locations,
+                        active_tab="supply",
+                        active_module=module,
+                    )
+
+            if not title:
+                flash("Item name is required.")
+                return render_template(
+                    "worker_supply_new.html",
+                    title="Request supply",
+                    locations=locations,
+                    active_tab="supply",
+                    active_module=module,
+                )
+
+            supply_request = SupplyRequest(
+                title=title,
+                quantity=quantity,
+                unit=unit,
+                module=module,
+                location_id=location_id,
+                urgency=urgency,
+                needed_by=needed_by,
+                status="requested",
+                requested_by=user.id,
+                notes=notes,
+            )
+            db.add(supply_request)
+            db.commit()
+
+            photo = request.files.get("photo")
+            if photo and photo.filename:
+                if not allowed_image_file(photo.filename):
+                    flash("Unsupported image format.")
+                    return redirect(url_for("worker_supply_new", module=module))
+
+                db.add(save_supply_request_photo_upload(
+                    supply_request.id,
+                    photo,
+                    uploaded_by=getattr(user, "id", None),
+                ))
+                db.commit()
+
+            quantity_text = f"\nQuantity: {quantity} {unit or ''}".rstrip() if quantity else ""
+            send_telegram_message(
+                f"New supply request\n"
+                f"{title}{quantity_text}\n"
+                f"{TASKMANAGER_URL}admin/supply"
+            )
+            flash("Supply request sent.")
+            return redirect(url_for("worker_home", module=module))
+
+        return render_template(
+            "worker_supply_new.html",
+            title="Request supply",
+            locations=locations,
+            active_tab="supply",
+            active_module=(request.args.get("module") or "all").lower(),
+        )
+    finally:
+        db.close()
+
+
 @app.get("/worker/settings")
 @cf_required
 def worker_settings():
@@ -3887,6 +4049,69 @@ def worker_settings():
         active_tab="settings",
         active_module=(request.args.get("module") or "all").lower(),
     )
+
+# -------- Admin: Supply --------
+@app.get("/admin/supply")
+@admin_required
+def admin_supply():
+    db = SessionLocal()
+    try:
+        supply_requests = (
+            db.query(SupplyRequest)
+            .order_by(SupplyRequest.created_at.desc(), SupplyRequest.id.desc())
+            .limit(200)
+            .all()
+        )
+        locations = {location.id: location for location in db.query(Location).all()}
+        users = {user.id: user for user in db.query(User).all()}
+        request_ids = [row.id for row in supply_requests]
+        photo_rows = (
+            db.query(SupplyRequestPhoto)
+            .filter(SupplyRequestPhoto.supply_request_id.in_(request_ids))
+            .order_by(SupplyRequestPhoto.created_at.desc(), SupplyRequestPhoto.id.desc())
+            .all()
+        ) if request_ids else []
+        latest_photo_by_supply_request = {}
+        for photo in photo_rows:
+            if photo.supply_request_id not in latest_photo_by_supply_request:
+                latest_photo_by_supply_request[photo.supply_request_id] = photo.file_path
+
+        return render_template(
+            "admin_supply.html",
+            title="Supply",
+            supply_requests=supply_requests,
+            locations=locations,
+            users=users,
+            latest_photo_by_supply_request=latest_photo_by_supply_request,
+            statuses=["requested", "approved", "ordered", "received", "rejected"],
+        )
+    finally:
+        db.close()
+
+
+@app.post("/admin/supply/<int:supply_request_id>/status")
+@admin_required
+def admin_supply_set_status(supply_request_id: int):
+    new_status = (request.form.get("status") or "requested").strip().lower()
+    allowed = {"requested", "approved", "ordered", "received", "rejected"}
+    if new_status not in allowed:
+        flash("Invalid supply status.")
+        return redirect(url_for("admin_supply"))
+
+    db = SessionLocal()
+    try:
+        supply_request = db.get(SupplyRequest, supply_request_id)
+        if not supply_request:
+            flash("Supply request not found.")
+            return redirect(url_for("admin_supply"))
+
+        supply_request.status = new_status
+        db.commit()
+        flash(f"Supply request #{supply_request.id} status updated.")
+        return redirect(url_for("admin_supply"))
+    finally:
+        db.close()
+
 
 # -------- Admin: Issues --------
 @app.get("/admin/issues")

@@ -1,0 +1,101 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+  <div class="row between center">
+    <div>
+      <h1 style="margin:0;">Supply</h1>
+      <div class="small">Last 200 supply requests</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="overflow:auto;">
+    <table class="users-table activity-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Quantity</th>
+          <th>Location</th>
+          <th>Urgency</th>
+          <th>Status</th>
+          <th>Requested by</th>
+          <th>Created</th>
+          <th>Photo</th>
+          <th>Update</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for request_row in supply_requests %}
+        <tr>
+          <td>
+            <strong>{{ request_row.title }}</strong>
+            {% if request_row.notes %}
+              <div class="small">{{ request_row.notes }}</div>
+            {% endif %}
+            {% if request_row.needed_by %}
+              <div class="small">Needed by: {{ request_row.needed_by }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if request_row.quantity %}
+              {{ request_row.quantity }}{% if request_row.unit %} {{ request_row.unit }}{% endif %}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if request_row.location_id and locations.get(request_row.location_id) %}
+              {{ locations[request_row.location_id].name }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            <span class="issue-badge {% if request_row.urgency == 'urgent' %}issue-badge-sev-high{% else %}issue-badge-sev-low{% endif %}">
+              {{ request_row.urgency }}
+            </span>
+          </td>
+          <td>
+            <span class="issue-badge {% if request_row.status == 'received' %}issue-badge-status-done{% else %}issue-badge-status-open{% endif %}">
+              {{ request_row.status }}
+            </span>
+          </td>
+          <td>
+            {% if users.get(request_row.requested_by) %}
+              {{ users[request_row.requested_by].display_name or users[request_row.requested_by].username }}
+            {% else %}
+              User #{{ request_row.requested_by }}
+            {% endif %}
+          </td>
+          <td>{{ request_row.created_at|zagreb_datetime("%Y-%m-%d %H:%M") }}</td>
+          <td>
+            {% if latest_photo_by_supply_request.get(request_row.id) %}
+              <a href="{{ url_for('static', filename=latest_photo_by_supply_request[request_row.id]) }}" target="_blank">Open</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('admin_supply_set_status', supply_request_id=request_row.id) }}" class="issue-inline-form">
+              <select class="input" name="status">
+                {% for status in statuses %}
+                  <option value="{{ status }}" {{ 'selected' if request_row.status == status else '' }}>{{ status }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn" type="submit">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9"><span class="small">No supply requests yet.</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

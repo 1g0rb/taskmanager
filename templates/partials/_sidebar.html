@@ -22,6 +22,8 @@
       Manager Activity</a>
     <a class="{{ 'active' if request.endpoint=='admin_issues' else '' }}" href="{{ url_for('admin_issues') }}">🛠
       Issues</a>
+    <a class="{{ 'active' if request.endpoint in ['admin_supply', 'admin_supply_set_status'] else '' }}" href="{{ url_for('admin_supply') }}">
+      Supply</a>
     <a class="{{ 'active' if request.endpoint=='admin_observation_new' else '' }}"
       href="{{ url_for('admin_observation_new') }}">
       📝 Observations

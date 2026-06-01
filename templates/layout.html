@@ -117,15 +117,16 @@
       <span class="nav-label">Issues</span>
     </a>
 
-    <a class="worker-navitem {{ 'active' if active_tab=='settings' else '' }}"
-       href="{{ url_for('worker_settings', module=active_module|default('all')) }}">
+    <a class="worker-navitem {{ 'active' if active_tab=='supply' else '' }}"
+       href="{{ url_for('worker_supply_new', module=active_module|default('all')) }}">
       <span class="nav-ico" aria-hidden="true">
         <svg viewBox="0 0 24 24" class="worker-icon worker-icon-nav">
-          <path d="M12 12.25a3.25 3.25 0 1 0-3.25-3.25A3.25 3.25 0 0 0 12 12.25Z" />
-          <path d="M5.5 18.5a6.5 6.5 0 0 1 13 0" />
+          <path d="M5 8.5h14l-1.2 10H6.2L5 8.5Z" />
+          <path d="M8 8.5a4 4 0 0 1 8 0" />
+          <path d="M9 13h6" />
         </svg>
       </span>
-      <span class="nav-label">Settings</span>
+      <span class="nav-label">Supply</span>
     </a>
 
   </footer>
@@ -190,7 +191,7 @@
     })();
   </script>
   <script>
-    const photoInput = document.getElementById("issue-photo");
+    const photoInput = document.getElementById("issue-photo") || document.getElementById("supply-photo");
     const preview = document.getElementById("photo-preview");
 
     if (photoInput) {

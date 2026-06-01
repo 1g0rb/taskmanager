@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <h2 style="margin-top:0;">Request supply</h2>
+
+      <form method="post" enctype="multipart/form-data">
+        <label>Item name</label>
+        <input class="input" name="title" placeholder="e.g. Gloves, trimmer line, fertilizer" required>
+
+        <label>Quantity (optional)</label>
+        <input class="input" name="quantity" placeholder="e.g. 2, 10, 1 box">
+
+        <label>Unit (optional)</label>
+        <input class="input" name="unit" placeholder="e.g. pcs, kg, bags, rolls">
+
+        <label>Module</label>
+        <select class="input" name="module">
+          <option value="horticulture">horticulture</option>
+          <option value="garden">garden</option>
+        </select>
+
+        <label>Location (optional)</label>
+        <select class="input" name="location_id">
+          <option value="">-</option>
+          {% for l in locations %}
+          <option value="{{ l.id }}">{{ l.module }} - {{ l.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label>Urgency</label>
+        <select class="input" name="urgency">
+          <option value="normal">normal</option>
+          <option value="urgent">urgent</option>
+        </select>
+
+        <label>Needed by (optional)</label>
+        <input class="input" type="date" name="needed_by">
+
+        <label>Notes (optional)</label>
+        <textarea class="input" name="notes" rows="3" placeholder="extra details..."></textarea>
+
+        <label>Photo (optional)</label>
+        <div class="photo-center">
+          <input id="supply-photo" type="file" name="photo" accept="image/*" capture="environment" hidden>
+          <label for="supply-photo" class="btn photo-btn">Take photo</label>
+        </div>
+
+        <img id="photo-preview" class="photo-preview" style="display:none;">
+
+        <div class="form-actions">
+          <button class="btn warn" type="submit">Submit</button>
+          <a class="btn" href="{{ url_for('worker_home', module=active_module|default('all')) }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
