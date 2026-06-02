@@ -2506,12 +2506,30 @@ def admin_tasks():
         selected_module = (request.args.get("module") or "").strip().lower()
         selected_location_raw = (request.args.get("location_id") or "").strip()
         selected_assignee_raw = (request.args.get("assignee_id") or "").strip()
+        selected_from_date = (request.args.get("from_date") or "").strip()
+        selected_to_date = (request.args.get("to_date") or "").strip()
+        flt = request.args.get("filter", "all")
+        page_raw = (request.args.get("page") or "1").strip()
+        per_page_raw = (request.args.get("per_page") or "50").strip()
         selected_location_id = int(selected_location_raw) if selected_location_raw.isdigit() else None
         selected_assignee_id = int(selected_assignee_raw) if selected_assignee_raw.isdigit() else None
         selected_assignee_set = {selected_assignee_id} if selected_assignee_id is not None else set()
+        page = max(int(page_raw), 1) if page_raw.isdigit() else 1
+        per_page = max(min(int(per_page_raw), 200), 1) if per_page_raw.isdigit() else 50
 
-        # LOAD TASKS
-        all_tasks = db.query(Task).all()
+        def parse_filter_date(value: str) -> date | None:
+            if not value:
+                return None
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+
+        done_from_date = parse_filter_date(selected_from_date)
+        done_to_date = parse_filter_date(selected_to_date)
+
+        # LOAD ACTIVE DASHBOARD TASKS
+        all_tasks = db.query(Task).filter(Task.status != "done").all()
 
         # SMART SORT (command center order)
         def task_sort_key(t):
@@ -2574,9 +2592,6 @@ def admin_tasks():
         tasks = [t for t in all_tasks if matches_admin_filters(t)]
         tasks = sorted(tasks, key=task_sort_key)[:200]
 
-        # FILTER PARAM
-        flt = request.args.get("filter", "all")
-
         # URGENT STRIP
         urgent_tasks = [
             t for t in tasks
@@ -2592,6 +2607,84 @@ def admin_tasks():
             "done": sum(1 for t in tasks if not t.is_todo and t.status == "done"),
         }
 
+        done_count_query = db.query(Task).filter(
+            Task.status == "done",
+            Task.is_todo == False,
+        )
+        if selected_module:
+            done_count_query = done_count_query.filter(Task.module == selected_module)
+        if selected_location_id is not None:
+            done_count_query = done_count_query.filter(Task.location_id == selected_location_id)
+        if selected_assignee_id is not None:
+            done_count_query = (
+                done_count_query
+                .join(TaskAssignee, TaskAssignee.task_id == Task.id)
+                .filter(TaskAssignee.user_id == selected_assignee_id)
+                .distinct()
+            )
+        counts["done"] = done_count_query.count()
+
+        done_history_total_count = 0
+        done_history_page = page
+        done_history_per_page = per_page
+        done_history_has_prev = False
+        done_history_has_next = False
+        done_history_total_pages = 0
+        done_history_items = []
+
+        if flt == "done":
+            done_query = db.query(Task).filter(
+                Task.status == "done",
+                Task.is_todo == False,
+            )
+            if selected_module:
+                done_query = done_query.filter(Task.module == selected_module)
+            if selected_location_id is not None:
+                done_query = done_query.filter(Task.location_id == selected_location_id)
+            if selected_assignee_id is not None:
+                done_query = (
+                    done_query
+                    .join(TaskAssignee, TaskAssignee.task_id == Task.id)
+                    .filter(TaskAssignee.user_id == selected_assignee_id)
+                    .distinct()
+                )
+            if done_from_date:
+                from_start = zagreb_datetime_to_utc_naive(
+                    datetime.combine(done_from_date, time.min, tzinfo=ZAGREB_TZ)
+                )
+                done_query = done_query.filter(or_(
+                    Task.finished_at >= from_start,
+                    (Task.finished_at.is_(None)) & (Task.task_date >= done_from_date),
+                ))
+            if done_to_date:
+                to_end = zagreb_datetime_to_utc_naive(
+                    datetime.combine(done_to_date + timedelta(days=1), time.min, tzinfo=ZAGREB_TZ)
+                )
+                done_query = done_query.filter(or_(
+                    Task.finished_at < to_end,
+                    (Task.finished_at.is_(None)) & (Task.task_date <= done_to_date),
+                ))
+
+            done_history_total_count = done_query.count()
+            done_history_total_pages = max((done_history_total_count + per_page - 1) // per_page, 1)
+            done_history_page = min(page, done_history_total_pages)
+            done_history_has_prev = done_history_page > 1
+            done_history_has_next = done_history_page < done_history_total_pages
+            counts["done"] = done_history_total_count
+
+            done_history_items = (
+                done_query
+                .order_by(
+                    case((Task.finished_at.is_(None), 1), else_=0).asc(),
+                    Task.finished_at.desc(),
+                    Task.task_date.desc(),
+                    Task.id.desc(),
+                )
+                .offset((done_history_page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
+
         # FILTER LIST
         filtered_tasks = tasks
         if flt == "todo":
@@ -2603,7 +2696,7 @@ def admin_tasks():
         elif flt == "open":
             filtered_tasks = [t for t in tasks if t.status == "open" and not t.is_todo]
         elif flt == "done":
-            filtered_tasks = [t for t in tasks if t.status == "done" and not t.is_todo]
+            filtered_tasks = done_history_items
         elif flt == "upcoming":
             filtered_tasks = [t for t in tasks if (not t.is_todo and t.task_date and str(t.task_date) > today and t.status != "done")]
 
@@ -2660,7 +2753,7 @@ def admin_tasks():
         # -----------------------------
         # LINKED ISSUE + ISSUE PHOTO MAP
         # -----------------------------
-        task_ids = [t.id for t in tasks]
+        task_ids = list({t.id for t in tasks + groups["done"] if t.id})
 
         linked_issues = (
             db.query(Issue)
@@ -2741,6 +2834,14 @@ def admin_tasks():
             flt=flt,
             groups=groups,
             done_history_groups=done_history_groups,
+            done_history_total_count=done_history_total_count,
+            done_history_page=done_history_page,
+            done_history_per_page=done_history_per_page,
+            done_history_has_prev=done_history_has_prev,
+            done_history_has_next=done_history_has_next,
+            done_history_total_pages=done_history_total_pages,
+            selected_from_date=selected_from_date,
+            selected_to_date=selected_to_date,
             selected_module=selected_module,
             selected_location_id=selected_location_id,
             selected_assignee_id=selected_assignee_id,

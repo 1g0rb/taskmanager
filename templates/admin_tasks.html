@@ -29,7 +29,7 @@
       <div class="dash-stat-ico">🟣</div>
     </a>
 
-    <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id) }}">
+    <a class="dash-stat {{ 'active' if flt=='done' else '' }}" href="{{ url_for('admin_tasks', filter='done', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id, from_date=selected_from_date, to_date=selected_to_date, per_page=done_history_per_page) }}">
       <div class="dash-stat-label">Done</div>
       <div class="dash-stat-value">{{ counts['done'] }}</div>
       <div class="dash-stat-ico">✅</div>
@@ -65,9 +65,19 @@
             </option>
           {% endfor %}
         </select>
+
+        {% if flt == 'done' %}
+          <input class="select" type="date" name="from_date" value="{{ selected_from_date }}" onchange="this.form.submit()">
+          <input class="select" type="date" name="to_date" value="{{ selected_to_date }}" onchange="this.form.submit()">
+          <select class="select" name="per_page" onchange="this.form.submit()">
+            {% for size in [25, 50, 100, 200] %}
+              <option value="{{ size }}" {{ 'selected' if done_history_per_page == size else '' }}>{{ size }} per page</option>
+            {% endfor %}
+          </select>
+        {% endif %}
       </div>
 
-      {% if selected_module or selected_location_id or selected_assignee_id %}
+      {% if selected_module or selected_location_id or selected_assignee_id or selected_from_date or selected_to_date %}
         <div class="dash-filter-actions">
           <a class="btn btn-secondary" href="{{ url_for('admin_tasks', filter=flt) }}">Clear filters</a>
         </div>
@@ -169,14 +179,37 @@
 
 {% endfor %}
 
-{% if done_history_groups %}
+{% if flt == 'done' or done_history_groups %}
   <div class="group">
     <div class="group-header" id="group-head-done" onclick="toggleGroup('done')">
-      <span>✅ Done History ({{ counts['done'] }})</span>
+      <span>Done History ({{ done_history_total_count if flt == 'done' else counts['done'] }})</span>
       <span class="group-toggle">▾</span>
     </div>
 
     <div class="group-body" id="group-done">
+      {% if flt == 'done' %}
+        <div class="card" style="margin-bottom:12px;">
+          <div class="row between center">
+            <div class="small">
+              Showing page {{ done_history_page }} of {{ done_history_total_pages }} - {{ done_history_total_count }} completed task{{ "" if done_history_total_count == 1 else "s" }}
+            </div>
+            <div class="row center" style="gap:8px;">
+              {% if done_history_has_prev %}
+                <a class="btn btn-secondary" href="{{ url_for('admin_tasks', filter='done', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id, from_date=selected_from_date, to_date=selected_to_date, per_page=done_history_per_page, page=done_history_page - 1) }}">Previous</a>
+              {% else %}
+                <button class="btn btn-secondary" type="button" disabled>Previous</button>
+              {% endif %}
+
+              {% if done_history_has_next %}
+                <a class="btn btn-secondary" href="{{ url_for('admin_tasks', filter='done', module=selected_module, location_id=selected_location_id, assignee_id=selected_assignee_id, from_date=selected_from_date, to_date=selected_to_date, per_page=done_history_per_page, page=done_history_page + 1) }}">Next</a>
+              {% else %}
+                <button class="btn btn-secondary" type="button" disabled>Next</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
       <div class="done-history">
         {% for day in done_history_groups %}
           <div class="done-day-group">
@@ -197,13 +230,18 @@
               {% endfor %}
             </div>
           </div>
+        {% else %}
+          <div class="card admin-empty-state">
+            <div class="done-row-title" style="margin-bottom:6px;">No completed tasks in this range</div>
+            <div class="muted">Try widening the date range or clearing filters.</div>
+          </div>
         {% endfor %}
       </div>
     </div>
   </div>
 {% endif %}
 
-{% if not groups['todo'] and not groups['unfinished'] and not groups['today'] and not groups['upcoming'] and not done_history_groups %}
+{% if flt != 'done' and not groups['todo'] and not groups['unfinished'] and not groups['today'] and not groups['upcoming'] and not done_history_groups %}
   <div class="card admin-empty-state">
     <div class="done-row-title" style="margin-bottom:6px;">No tasks match these filters</div>
     <div class="muted">Try clearing one or more filters, or switch to another task view.</div>
