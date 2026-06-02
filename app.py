@@ -989,9 +989,13 @@ def track_user_activity():
         db = SessionLocal()
         try:
             closed_sessions = auto_close_sessions(db)
-            if closed_sessions:
+            reconciled_tasks = reconcile_stale_in_progress_tasks(db)
+            if closed_sessions or reconciled_tasks:
                 db.commit()
-                print(f"Auto-closed {closed_sessions} work session(s) at end of day.")
+                if closed_sessions:
+                    print(f"Auto-closed {closed_sessions} work session(s) at end of day.")
+                if reconciled_tasks:
+                    print(f"Reconciled {reconciled_tasks} stale in-progress task(s).")
             else:
                 db.rollback()
         except Exception:
@@ -1525,6 +1529,7 @@ def auto_close_sessions(db: Session, now: datetime | None = None) -> int:
     )
 
     closed_sessions = 0
+    affected_task_ids = set()
     for session in active_sessions:
         session_local_started_at = utc_naive_to_zagreb(session.started_at)
         session_cutoff = _local_workday_end_to_utc_naive(session_local_started_at.date())
@@ -1533,7 +1538,14 @@ def auto_close_sessions(db: Session, now: datetime | None = None) -> int:
 
         finished_at = max(session.started_at, session_cutoff)
         finish_work_session(session, finished_at)
+        affected_task_ids.add(session.task_id)
         closed_sessions += 1
+
+    if affected_task_ids:
+        db.flush()
+        tasks = db.query(Task).filter(Task.id.in_(affected_task_ids)).all()
+        for task in tasks:
+            reconcile_task_after_session_close(db, task)
 
     return closed_sessions
 
@@ -1595,32 +1607,52 @@ def task_has_active_work_sessions(db: Session, task_id: int) -> bool:
     )
 
 
-def task_all_assignees_completed(db: Session, task: Task) -> bool:
-    assigned_user_ids = [
-        row.user_id
-        for row in db.query(TaskAssignee.user_id).filter(TaskAssignee.task_id == task.id).all()
-        if row.user_id
-    ]
-    if not assigned_user_ids and task.assigned_to:
-        assigned_user_ids = [task.assigned_to]
-    if not assigned_user_ids:
-        return True
+def reconcile_task_after_session_close(
+    db: Session,
+    task: Task,
+    finished_at: datetime | None = None,
+) -> Task:
+    if (task.status or "open") == "blocked":
+        return task
 
-    completed_user_ids = {
-        user_id
-        for (user_id,) in (
-            db.query(TaskWorkSession.user_id)
-            .filter(
-                TaskWorkSession.task_id == task.id,
-                TaskWorkSession.user_id.in_(assigned_user_ids),
-                TaskWorkSession.status == "done",
-                TaskWorkSession.finished_at.isnot(None),
-            )
-            .distinct()
-            .all()
+    db.flush()
+
+    if task_has_active_work_sessions(db, task.id):
+        task.status = "in_progress"
+        return task
+
+    latest_finished_at, earliest_started_at = (
+        db.query(
+            func.max(TaskWorkSession.finished_at),
+            func.min(TaskWorkSession.started_at),
         )
-    }
-    return set(assigned_user_ids).issubset(completed_user_ids)
+        .filter(
+            TaskWorkSession.task_id == task.id,
+            TaskWorkSession.status == "done",
+            TaskWorkSession.finished_at.isnot(None),
+        )
+        .one()
+    )
+
+    if latest_finished_at:
+        task.status = "done"
+        task.finished_at = latest_finished_at
+        if not task.started_at:
+            task.started_at = earliest_started_at or finished_at or latest_finished_at
+
+    return task
+
+
+def reconcile_stale_in_progress_tasks(db: Session) -> int:
+    tasks = db.query(Task).filter(Task.status == "in_progress").all()
+    reconciled = 0
+    for task in tasks:
+        previous_status = task.status
+        previous_finished_at = task.finished_at
+        reconcile_task_after_session_close(db, task)
+        if task.status != previous_status or task.finished_at != previous_finished_at:
+            reconciled += 1
+    return reconciled
 
 
 def start_task_work_session(db: Session, task_id: int, user_id: int, started_at: datetime | None = None):
@@ -3657,15 +3689,9 @@ def worker_task_done(task_id: int):
             return redirect(next_url)
 
         finish_task_work_session(db, t.id, user.id, finished_at=now, create_fallback=False)
+        reconcile_task_after_session_close(db, t, finished_at=now)
 
-        if task_has_active_work_sessions(db, t.id):
-            t.status = "in_progress"
-            db.commit()
-            return redirect(next_url)
-
-        if not task_all_assignees_completed(db, t):
-            t.status = "open"
-            t.finished_at = None
+        if t.status == "in_progress":
             db.commit()
             return redirect(next_url)
 
