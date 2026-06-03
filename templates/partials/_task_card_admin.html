@@ -7,6 +7,7 @@
 {% set is_upcoming = (t.status != "done" and d and d > today) %}
 {% set work_summary = task_work_summary_by_task_id.get(t.id, {}) %}
 {% set task_photo_paths = task_photo_paths_by_task_id.get(t.id, []) %}
+{% set cover_photo = task_photo_paths[0] if task_photo_paths else None %}
 
 <div class="taskv2" id="task-{{ t.id }}">
 
@@ -99,18 +100,16 @@
         {% endif %}
 
       </div>
-      {% if task_photo_paths %}
+      {% if cover_photo %}
   <div class="task-photo-wrap" style="margin-top:12px;">
-    <div class="small" style="margin-bottom:6px;">Task photo{% if task_photo_paths|length > 1 %}s{% endif %}</div>
+    <div class="small" style="margin-bottom:6px;">Cover photo</div>
 
-    {% for task_photo in task_photo_paths %}
     <img
-      src="{{ url_for('static', filename=task_photo) }}"
-      alt="Task photo {{ loop.index }}"
+      src="{{ url_for('static', filename=cover_photo) }}"
+      alt="Cover photo"
       class="issue-thumb js-lightbox-image"
-      data-fullsrc="{{ url_for('static', filename=task_photo) }}"
-      style="width:100%; max-width:260px; height:160px; object-fit:cover; border-radius:12px; border:1px solid rgba(0,0,0,.08); display:block; margin-bottom:{{ '10px' if not loop.last else '0' }};">
-    {% endfor %}
+      data-fullsrc="{{ url_for('static', filename=cover_photo) }}"
+      style="width:100%; max-width:260px; height:160px; object-fit:cover; border-radius:12px; border:1px solid rgba(0,0,0,.08); display:block;">
   </div>
 {% endif %}
 {% if linked_issue_photo_by_task_id.get(t.id) %}

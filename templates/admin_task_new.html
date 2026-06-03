@@ -146,6 +146,7 @@
           📷 Reference photo
         </label>
         <div class="small" style="margin-top:6px;">Workers can attach more than one image and will see them on the task detail screen.</div>
+        <div id="task-photo-preview-list" class="task-photo-preview-list" aria-live="polite"></div>
 
         <div style="margin-top:14px; display:flex; gap:10px;">
           <button class="btn ok" type="submit">Create</button>
@@ -155,4 +156,79 @@
     </div>
   </div>
 </div>
+<style>
+  .task-photo-preview-list{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));
+    gap:10px;
+    margin-top:12px;
+  }
+  .task-photo-preview-item{
+    position:relative;
+    min-height:96px;
+    border:1px solid rgba(0,0,0,.1);
+    border-radius:10px;
+    overflow:hidden;
+    background:#f8fafc;
+  }
+  .task-photo-preview-item img{
+    display:block;
+    width:100%;
+    height:112px;
+    object-fit:cover;
+  }
+  .task-photo-preview-cover{
+    position:absolute;
+    top:6px;
+    left:6px;
+    padding:3px 7px;
+    border-radius:999px;
+    background:rgba(17,24,39,.88);
+    color:#fff;
+    font-size:12px;
+    font-weight:700;
+  }
+</style>
+<script>
+  (function () {
+    const input = document.getElementById("task-photo");
+    const list = document.getElementById("task-photo-preview-list");
+    if (!input || !list) return;
+
+    let previewUrls = [];
+    function clearPreviewUrls() {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls = [];
+    }
+
+    input.addEventListener("change", function () {
+      clearPreviewUrls();
+      list.innerHTML = "";
+
+      Array.from(input.files || []).forEach((file, index) => {
+        if (!file.type || !file.type.startsWith("image/")) return;
+
+        const url = URL.createObjectURL(file);
+        previewUrls.push(url);
+
+        const item = document.createElement("div");
+        item.className = "task-photo-preview-item";
+
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = file.name || `Reference photo ${index + 1}`;
+        item.appendChild(img);
+
+        if (index === 0) {
+          const badge = document.createElement("span");
+          badge.className = "task-photo-preview-cover";
+          badge.textContent = "Cover";
+          item.appendChild(badge);
+        }
+
+        list.appendChild(item);
+      });
+    });
+  })();
+</script>
 {% endblock %}

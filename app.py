@@ -2137,7 +2137,7 @@ def render_manager_task_detail_page(user: User, task_id: int):
         task_photos = (
             db.query(TaskPhoto)
             .filter(TaskPhoto.task_id == task.id)
-            .order_by(TaskPhoto.created_at.desc(), TaskPhoto.id.desc())
+            .order_by(TaskPhoto.created_at.asc(), TaskPhoto.id.asc())
             .all()
         )
         issue_photos = []
@@ -2174,9 +2174,21 @@ def render_manager_task_detail_page(user: User, task_id: int):
         else:
             created_by_name = "TaskManager"
 
-        attachment_items = []
+        task_cover_photo = task_photos[0] if task_photos else None
+        primary_image = None
         seen_paths = set()
-        for photo in task_photos:
+        if task_cover_photo:
+            cover_path = normalize_static_file_path(task_cover_photo.file_path)
+            if cover_path:
+                seen_paths.add(cover_path)
+                primary_image = {
+                    "path": cover_path,
+                    "label": "Cover photo",
+                    "created_at": format_datetime(task_cover_photo.created_at),
+                }
+
+        attachment_items = []
+        for photo in task_photos[1:]:
             path = normalize_static_file_path(photo.file_path)
             if not path or path in seen_paths:
                 continue
@@ -2241,7 +2253,7 @@ def render_manager_task_detail_page(user: User, task_id: int):
             scheduled_date=get_task_schedule_date(task),
             completed_at_label=format_datetime(task.finished_at) if task.finished_at else None,
             attachment_items=attachment_items,
-            primary_image=attachment_items[0] if attachment_items else None,
+            primary_image=primary_image,
             notes_items=notes_items,
             linked_issue=linked_issue,
             priority_label=priority_label,
@@ -2774,7 +2786,7 @@ def admin_tasks():
         photo_rows = (
             db.query(TaskPhoto)
             .filter(TaskPhoto.task_id.in_(task_ids))
-            .order_by(TaskPhoto.created_at.desc())
+            .order_by(TaskPhoto.created_at.asc(), TaskPhoto.id.asc())
             .all()
         ) if task_ids else []
 
@@ -3442,7 +3454,7 @@ def worker_dashboard():
         photo_rows = (
             db.query(TaskPhoto)
             .filter(TaskPhoto.task_id.in_(all_ids))
-            .order_by(TaskPhoto.created_at.desc())
+            .order_by(TaskPhoto.created_at.asc(), TaskPhoto.id.asc())
             .all()
         ) if all_ids else []
 
@@ -3583,7 +3595,7 @@ def worker_task_detail(task_id: int):
         task_photos = (
             db.query(TaskPhoto)
             .filter(TaskPhoto.task_id == task.id)
-            .order_by(TaskPhoto.created_at.desc(), TaskPhoto.id.desc())
+            .order_by(TaskPhoto.created_at.asc(), TaskPhoto.id.asc())
             .all()
         )
         worker_active_session = get_active_task_work_session(db, task.id, user.id)
@@ -3627,10 +3639,22 @@ def worker_task_detail(task_id: int):
             priority_label = f"{linked_issue.severity.title()} priority"
             priority_tone = linked_issue.severity
 
-        attachment_items = []
+        task_cover_photo = task_photos[0] if task_photos else None
+        primary_image = None
         seen_paths = set()
+        if task_cover_photo:
+            cover_path = normalize_static_file_path(task_cover_photo.file_path)
+            if cover_path:
+                seen_paths.add(cover_path)
+                primary_image = {
+                    "path": cover_path,
+                    "label": "Cover photo",
+                    "created_at": format_zagreb_datetime(task_cover_photo.created_at, "%Y-%m-%d %H:%M", ""),
+                }
 
-        for photo in task_photos:
+        attachment_items = []
+
+        for photo in task_photos[1:]:
             path = normalize_static_file_path(photo.file_path)
             if not path or path in seen_paths:
                 continue
@@ -3651,8 +3675,6 @@ def worker_task_detail(task_id: int):
                 "label": f"Issue #{linked_issue.id} reference" if linked_issue else "Reference",
                 "created_at": format_zagreb_datetime(photo.created_at, "%Y-%m-%d %H:%M", ""),
             })
-
-        primary_image = attachment_items[0] if attachment_items else None
 
         notes_items = []
         if linked_issue and linked_issue.notes:

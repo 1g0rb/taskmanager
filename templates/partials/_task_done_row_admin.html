@@ -2,6 +2,7 @@
 {% set location = locations[t.location_id] if t.location_id in locations else None %}
 {% set task_photos = task_photo_paths_by_task_id.get(t.id, []) %}
 {% set task_photo = task_photos[0] if task_photos else latest_task_photo_by_task_id.get(t.id) %}
+{% set task_attachment_photos = task_photos[1:] if task_photos else [] %}
 {% set issue_photo = linked_issue_photo_by_task_id.get(t.id) %}
 {% set linked_issue = issue_by_task_id.get(t.id) %}
 {% set work_summary = task_work_summary_by_task_id.get(t.id, {}) %}
@@ -90,30 +91,20 @@
 
     {% include "partials/_task_work_sessions_admin.html" %}
 
-    {% if task_photo or issue_photo %}
+    {% if task_attachment_photos or issue_photo %}
       <div class="done-photo-grid">
-        {% if task_photos %}
-          {% for task_photo_item in task_photos %}
+        {% if task_attachment_photos %}
+          {% for task_photo_item in task_attachment_photos %}
           <div class="done-photo-card">
-            <div class="done-detail-label">Task photo{% if task_photos|length > 1 %} {{ loop.index }}{% endif %}</div>
+            <div class="done-detail-label">Task attachment {{ loop.index }}</div>
             <img
               src="{{ url_for('static', filename=task_photo_item) }}"
-              alt="Task photo {{ loop.index }}"
+              alt="Task attachment {{ loop.index }}"
               class="done-photo js-lightbox-image"
               data-fullsrc="{{ url_for('static', filename=task_photo_item) }}"
             >
           </div>
           {% endfor %}
-        {% elif task_photo %}
-          <div class="done-photo-card">
-            <div class="done-detail-label">Task photo</div>
-            <img
-              src="{{ url_for('static', filename=task_photo) }}"
-              alt="Task photo"
-              class="done-photo js-lightbox-image"
-              data-fullsrc="{{ url_for('static', filename=task_photo) }}"
-            >
-          </div>
         {% endif %}
 
         {% if issue_photo %}
